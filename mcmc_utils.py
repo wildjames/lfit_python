@@ -3,7 +3,7 @@ import scipy.stats as stats
 import pandas as pd
 import emcee
 import dask.dataframe as dd
-
+import seaborn
 try:
     import triangle
     # This triangle should have a method corner
@@ -65,7 +65,7 @@ class Prior(object):
         if self.type == 'gauss':
             prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
             if prob > 0:
-                return np.log()
+                return np.log(prob)
             else:
                 return TINY
         elif self.type == 'gaussPos':
@@ -127,7 +127,10 @@ def fracWithin(pdf, val):
 
 
 def thumbPlot(chain, labels, **kwargs):
-    fig = triangle.corner(chain, labels=labels, **kwargs)
+    seaborn.set(style='ticks')
+    seaborn.set_style({"xtick.direction": "in","ytick.direction": "in"})
+    fig = triangle.corner(chain, labels=labels, bins=50,
+                          label_kwargs=dict(fontsize=18), **kwargs)
     return fig
 
 

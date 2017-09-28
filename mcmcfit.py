@@ -1,408 +1,866 @@
+from __future__ import absolute_import
+from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import matplotlib.gridspec as gridspec
+from matplotlib.ticker import MaxNLocator
 from trm import roche
 import sys
+import configobj
 import lfit
 import emcee
-import george
+import warnings
 import GaussianProcess as GP
-from george import kernels
 from mcmc_utils import *
+import seaborn
+from collections import MutableSequence
+from model import Model
+import time
 
+sys.settrace
 
-def model(pars,phi,width,cv):
-    '''
-    Model params:
-    fwd - white dwarf flux
-    fdisc - disc flux
-    fbs - bright spot flux
-    fd - donor flux
-    q - mass ratio
-    dphi - width of wd eclipse
-    rdisc - disc radius (rdisc/xl1)
-    ulimb - limb darkening of wd
-    rwd - primary radius (r1/xl1)
-    az,frac,scale - compulsory bright spot params
-    rexp - disc exponent
-    off - phase offset
-    [exp1,exp2,tilt,yaw] - [optional] bright spot params
-    '''
-    # CV takes a list of params which *must* include
-    # fwd,fdisc,fbs,fd,q,dphi,rdisc (xl1), ulimb, rwd (xl1), scale, az, frac, rexp and phi0
-    # if that's it. It makes a simple bright spot
+# parallellise with MPIPool
+from emcee.utils import MPIPool
+from six.moves import range
 
-    # if you provide a longer list which has at the end
-    # exp1,exp2,tilt,yaw
-    # it uses a complex bright spot
-
-    # once you've made a CV, you can update the params when you call calcFlux
-    # and the same is true
-    return cv.calcFlux(pars,phi,width)
-
-def ln_prior_gp(params):
-
-    lna, lntau = params[:2]
+class LCModel(Model):
+    """CV lightcurve model for multiple eclipses.
     
-    lnp = 0.0
-    
-    prior = Prior('uniform',-3.005,-2.995)
-    lnp += prior.ln_prob(lna)
-    
-    #flickering timescale 30s to 2 mins (for a typical orbital period of 100 mins)
-    #prior = Prior('uniform',-5.30,-3.91)
-    
-    prior = Prior('uniform',-5.565, -5.555) 
-    lnp += prior.ln_prob(lntau)
-    
-    return lnp + ln_prior_base(params[2:])
-
-def ln_prior_base(pars):
-
-    lnp = 0.0
-
-    #Wd flux
-    prior = Prior('uniform',0.001,2)
-    lnp += prior.ln_prob(pars[0])
-
-    #Disc flux
-    prior = Prior('uniform',0.001,2)
-    lnp += prior.ln_prob(pars[1])
-
-    #BS flux
-    prior = Prior('uniform',0.001,2)
-    lnp += prior.ln_prob(pars[2])
-
-    #Donor flux
-    prior = Prior('uniform',0.0,2)
-    lnp += prior.ln_prob(pars[3])
-
-    #Mass ratio
-    prior = Prior('uniform',0.001,3.5)
-    lnp += prior.ln_prob(pars[4])
-
-    #Wd eclipse width, dphi
-    tol = 1.0e-6
-    try:
-        maxphi = roche.findphi(pars[4],90.0) #dphi when i is slightly less than 90
-        prior = Prior('uniform',0.001,maxphi-tol)
-        lnp += prior.ln_prob(pars[5])
-    except:
-        # we get here when roche.findphi raises error - usually invalid q
-        lnp += -np.inf
-
-    #Disc radius (XL1) 
-    try:
-        xl1 = roche.xl1(pars[4]) # xl1/a
-        prior = Prior('uniform',0.25,0.46/xl1) # maximum size disc can be without precessing
-        lnp += prior.ln_prob(pars[6])
-    except:
-        # we get here when roche.findphi raises error - usually invalid q
-        lnp += -np.inf
-    
-    #Limb darkening
-    prior = Prior('gauss',0.39,0.005)
-    lnp += prior.ln_prob(pars[7])
-
-    #Wd radius (XL1)
-    prior = Prior('uniform',0.0001,0.1)
-    lnp += prior.ln_prob(pars[8])
-
-    #BS scale (XL1)
-    rwd = pars[8]
-    prior = Prior('log_uniform',rwd/3.,rwd*3.)
-    lnp += prior.ln_prob(pars[9])
-
-    #BS az
-    slop=40.0
-
-    try:
-        # find position of bright spot where it hits disc
-        # will fail if q invalid
-        xl1 = roche.xl1(pars[4]) # xl1/a
-        rd_a = pars[6]*xl1
-
-        # Does stream miss disc? (disc/a < 0.2 or > 0.65 )
-        # if so, Tom's code will fail
-        x,y,vx,vy = roche.bspot(pars[4],rd_a)
-            
-        # find tangent to disc at this point
-        alpha = np.degrees(np.arctan2(y,x))
-            
-        # alpha is between -90 and 90. if negative spot lags disc ie alpha > 90
-        if alpha < 0: alpha = 90-alpha
-        tangent = alpha + 90 # disc tangent
-    
-        prior = Prior('uniform',max(0,tangent-slop),min(178,tangent+slop))
-        lnp += prior.ln_prob(pars[10])
-    except:
-        lnp += -np.inf
+       Can be passed to routines for calculating model, chisq, prior, prob, etc.
+       Can add eclipses at will with addEcl function. All eclipses share q, dphi, rwd.
+       All other parameters vary. You cannot mix and match complex and simple bright 
+       spot models for eclipses; all must use the same type of bright spot."""
+       
+    def __init__(self,parList,complex,nel_disc=1000,nel_donor=400):
+        """Initialise model.
         
-    #BS isotropic fraction
-    prior = Prior('uniform',0.001,0.9)
-    lnp += prior.ln_prob(pars[11])
-    
-    #Disc exponent
-    prior = Prior('uniform',0.0001,2.5)
-    lnp += prior.ln_prob(pars[12])
-
-    #Phase offset
-    prior = Prior('uniform',-0.1,0.1)
-    lnp += prior.ln_prob(pars[13])
-
-    if len(pars) > 14:
-        #BS exp1
-        prior = Prior('uniform',0.01,4.0)
-        lnp += prior.ln_prob(pars[14])
-
-        #BS exp2
-        prior = Prior('uniform',0.9,3.0)
-        lnp += prior.ln_prob(pars[15])
-
-        #BS tilt angle
-        prior = Prior('uniform',0.0,165.0)
-        lnp += prior.ln_prob(pars[16])
-
-        #BS yaw angle
-        prior = Prior('uniform',-90,90.0)
-        lnp += prior.ln_prob(pars[17])
-    return lnp
-    
-def chisq(y,yfit,e):
-    resids = ( y - yfit ) / e
-    return np.sum(resids*resids)
-
-def reducedChisq(y,yfit,e,pars):
-    return chisq(y,yfit, e) / (len(y) - len(pars) - 1)
-
-def createGP(params,phi):
-    a, tau = np.exp(params[:2])
-    dphi, phiOff = params[7],params[15]
-    
-    k_out = a*GP.Matern32Kernel(tau)
-    k_in  = 0.01*a*GP.Matern32Kernel(tau)
-    
-    # Find location of all changepoints
-    changepoints = []
-    for n in range (int(phi[1]),int(phi[-1])+1,1):
-        changepoints.append(n-dphi/2.)
-        changepoints.append(n+dphi/2.)  
-
-    # Depending on number of changepoints, create kernel structure
-    kernel_struc = [k_out]    
-    for k in range (int(phi[1]),int(phi[-1])+1,1):
-        kernel_struc.append(k_in)
-        kernel_struc.append(k_out)
-    
-    # create kernel with changepoints 
-    # obviously need one more kernel than changepoints!
-    kernel = GP.DrasticChangepointKernel(kernel_struc,changepoints)
-    
-    # create GPs using this kernel
-    gp = GP.GaussianProcess(kernel)
-    return gp
+        Parameter list should be a 14 element (non-complex BS) or 18 element (complex BS)
+        dictionary of Param objects. These are:
+        wdFlux, dFlux, sFlux, rsFlux, q, dphi, rdisc, ulimb, rwd, scale, az, fis, dexp, phi0
+        And additional params: exp1, exp2, tilt, yaw"""
         
-def lnlike_gp(params, phi, width, y, e, cv): 
-    gp = createGP(params,phi)
-    gp.compute(phi,e)
+        # Use of the super function allows abstract class in model.py to be referenced
+        # Here the initialise function is referenced
+        super(LCModel,self).__init__(parList)
+        self.complex = complex
+        
+        # Need a way of checking number of parameters is correct
+        if complex:
+            assert len(parList)==18, "Wrong number of parameters"
+        else:
+            assert len(parList)==14, "Wrong number of parameters"
+        
+        # We need an LFIT CV object to do the calculations
+        # First we create list of parameter names (first eclipse = 0)
+        # Then we get values for each parameter through using getValue function from model.py
+        # Finally, CV object calculated from these values
+        parNames = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
+            'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
+        if complex:
+            parNames.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
+        parVals = [self.getValue(name) for name in parNames]
+        self.cv = lfit.CV(parVals)
+        
+        # How many eclipses?
+        self.necl = 1
+
+    def addEclipse(self,parList):
+        """Allows additional eclipses to be added.
+        
+        Parameter list should include 11 or 15 Param objects (all params individual
+        to each eclipse), depending on complexity of the bright spot model. These should be:
+        wdFlux, dFlux, sFlux, rsFlux, rdisc, ulimb, scale, az, fis, dexp, phi0
+        and additional params: exp1, exp2, tilt, yaw""" 
+        
+        # Need a way of checking number of parameters is correct  
+        if self.complex:
+            assert len(parList) == 15, "Wrong number of parameters"
+        else:
+            assert len(parList) == 11, "Wrong number of parameters"
+        
+        # How many eclipses?
+        self.necl += 1
+        # Add params from additional eclipses to existing parameter list
+        self.plist.extend(parList)
+        
+    def calc(self,ecl,phi,width=None):
+        """Extracts current parameter values for each eclipse and calculates CV flux."""
+
+        # Template required for parameter names
+        parNameTemplate = ['wdFlux_{0}', 'dFlux_{0}', 'sFlux_{0}', 'rsFlux_{0}', 'q', 'dphi',\
+            'rdisc_{0}', 'ulimb_{0}', 'rwd', 'scale_{0}', 'az_{0}', 'fis_{0}', 'dexp_{0}', 'phi0_{0}']
+        if complex:
+            parNameTemplate.extend(['exp1_{0}', 'exp2_{0}', 'tilt_{0}', 'yaw_{0}'])
+        # Template needs updating depending on eclipse number
+        parNames = [template.format(ecl) for template in parNameTemplate]
+        # List filled in with current parameter values 
+        parVals = [self.getValue(name) for name in parNames]
+        # CV Flux calculated from list of current parameter values
+        try:
+            return self.cv.calcFlux(parVals,phi,width)
+        except:
+            return -np.inf
+        
+    def chisq(self,phi,y,e,width=None):
+        """Calculates chisq, which is required in ln_like"""
+        retVal = 0.0
+        for iecl in range(self.necl):
+            if width:
+                thisWidth=width[iecl]
+            else:
+                thisWidth=None
+            # chisq calculation
+            resids = (y[iecl] - self.calc(iecl,phi[iecl],thisWidth)) / e[iecl]
+            # Check for bugs in model
+            if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
+                warnings.warn('model gave nan or inf answers')
+                return -np.inf
+            retVal += np.sum(resids**2)
+        return retVal
+        
+    def ln_prior(self,verbose=False):
+        """Returns the natural log of the prior probability of this model.
+        
+        Certain parameters (dphi, rdisc, scale, az) need to be treated as special cases,
+        as the model contains more prior information than included in the parameter priors"""
+        
+        # Use of the super function allows abstract class in model.py to be referenced
+        # Here the ln_prior function is referenced
+        retVal = super(LCModel,self).ln_prior()
+        
+        # Remaining part of this function deals with special cases
+        # dphi
+        tol = 1.0e-6
+        try:
+            # Uses getParam function from model.py to get the objects of variable parameters
+            q = self.getParam('q')
+            dphi = self.getParam('dphi')
+            # maxphi is dphi when i = 90
+            maxphi = roche.findphi(q.currVal,90.0)
+            # dphi cannot be greater than (or within a certain tolerance of) maxphi
+            if dphi.currVal > maxphi-tol:
+                if verbose:
+                    print('Combination of q and dphi is invalid')
+                retVal += -np.inf
+            
+        except:
+            # We get here when roche.findphi raises error - usually invalid q
+            retVal += -np.inf
+            if verbose:
+                print('Combination of q and dphi is invalid')
+        
+        # rdisc 
+        try:
+            maxrdisc_a = 0.46 # Maximum size disc can reach before precessing
+            xl1 = roche.xl1(q.currVal) # xl1/a
+            # rdisc is unique to each eclipse, so have to use slightly different method to 
+            # obtain its object, compared to q and dphi which are shared parameters
+            rdiscTemplate = 'rdisc_{0}'
+            for iecl in range(self.necl):
+                rdisc = self.getParam(rdiscTemplate.format(iecl))
+                rdisc_a = rdisc.currVal*xl1 # rdisc/a
+                # rdisc cannot be greater than maxrdisc
+                if rdisc_a > maxrdisc_a:
+                    retVal += -np.inf
+                
+        except:
+            # We get here when roche.findphi raises error - usually invalid q
+            if verbose:
+                print('Rdisc and q imply disc does not hit stream')
+            retVal += -np.inf
+        
+        #BS scale
+        rwd = self.getParam('rwd')
+        minscale = rwd.currVal/3 # Minimum BS scale equal to 1/3 of rwd
+        maxscale = rwd.currVal*3 # Maximum BS scale equal to 3x rwd
+        scaleTemplate = 'scale_{0}'
+        for iecl in range(self.necl):
+            scale = self.getParam(scaleTemplate.format(iecl))
+            # BS scale must be within allowed range 
+            if scale.currVal < minscale or scale.currVal > maxscale:
+                retVal += -np.inf
+                if verbose:
+                    print('BS Scale is not between 1/3 and 3 times WD size')
+            
+        #BS az
+        slope = 80.0
+        try:
+            # Find position of bright spot where it hits disc
+            azTemplate = 'az_{0}'
+            for iecl in range(self.necl):
+                rdisc = self.getParam(rdiscTemplate.format(iecl))
+                rd_a = rdisc.currVal*xl1 # rdisc/a
+                az = self.getParam(azTemplate.format(iecl))
+                # Does stream miss disc? (rdisc/a < 0.2 or rdisc/a > 0.65 )
+                # If yes, Tom's code will fail
+                # Calculate position of BS
+                x,y,vx,vy = roche.bspot(q.currVal,rd_a)
+                # Find tangent to disc at this point
+                alpha = np.degrees(np.arctan2(y,x))
+                # Alpha is between -90 and 90. If negative, spot lags disc (i.e. alpha > 90)
+                if alpha < 0: alpha = 90 - alpha
+                tangent = alpha + 90 # Disc tangent
+                # Calculate minimum and maximum az values using tangent and slope
+                minaz = max(0,tangent-slope)
+                maxaz = min(178,tangent+slope)
+                # BS az must be within allowed range
+                if az.currVal < minaz or az.currVal > maxaz:
+                    retVal += -np.inf
+
+        except:
+            if verbose:
+                print('Stream does not hit disc, or az is outside 80 degree tolerance')
+            # We get here when roche.findphi raises error - usually invalid q
+            retVal += -np.inf
+           
+        if complex:
+            # BS exponential parameters
+            # Total extent of bright spot is scale*(e1/e2)**(1/e2)
+            # Limit this to half an inner lagrangian distance
+            scaleTemplate = 'scale_{0}'
+            exp1Template = 'exp1_{0}'
+            exp2Template = 'exp2_{0}'
+            for iecl in range(self.necl):
+                sc = self.getParam(scaleTemplate.format(iecl))
+                e1 = self.getParam(exp1Template.format(iecl))
+                e2 = self.getParam(exp2Template.format(iecl))
+                if sc.currVal*(e1.currVal/e2.currVal)**(1.0/e2.currVal) > 0.5:
+                    retVal += -np.inf
     
-    resids = y - model(params[2:],phi,width,cv)
+        return retVal
+         
+    def ln_like(self,phi,y,e,width=None):
+        """Calculates the natural log of the likelihood"""
+        return -0.5*self.chisq(phi,y,e,width)
+        
+    def ln_prob(self,phi,y,e,width=None):
+        """Calculates the natural log of the posterior probability (ln_prior + ln_like)"""
+        # First calculate ln_prior
+        lnp = self.ln_prior()
+        # Then add ln_prior to ln_like
+        if np.isfinite(lnp):
+            try:
+                return lnp + self.ln_like(phi,y,e,width)
+            except:
+                return -np.inf
+        else:
+            return lnp
+            
+class GPLCModel(LCModel):
+    """CV lightcurve model for multiple eclipses, with added Gaussian process fitting"""
     
-    # check for bugs in model
-    if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
-        print params
-        print 'Warning: model gave nan or inf answers'
-        #raise Exception('model gave nan or inf answers')
-        return -np.inf
- 
-    # now calculate ln_likelihood
-    return gp.lnlikelihood(resids) 
-
-def lnprob_gp(params, phi, width, y, e, cv):
-    lp = ln_prior_gp(params)
-    if not np.isfinite(lp):
-        return -np.inf
-    return lp + lnlike_gp(params, phi, width, y, e, cv)
-
-def fit_gp(initialGuess, phi, width, y, e, cv, mcmcPars=(80,5000,5000,500,6)):
-    nwalkers, nBurn1, nBurn2, nProd, nThreads = mcmcPars
-    ndim_gp = len(initialGuess)
-    pos = emcee.utils.sample_ball(initialGuess,0.05*initialGuess,size=nwalkers)
-    sampler_gp = emcee.EnsembleSampler(nwalkers, ndim_gp, lnprob_gp, args=(phi,width,y,e,cv), threads=nThreads)
-
-    print("Running burn-in")
-    pos, prob, state = run_burnin(sampler_gp,pos,nBurn1)
-    sampler_gp.reset()
-
-    print("Running second burn-in")
-    # choose the highest probability point in first Burn-In as starting point
-    pos = pos[np.argmax(prob)]
-    pos = emcee.utils.sample_ball(pos,0.05*pos,size=nwalkers)
-    pos, prob, state = run_burnin(sampler_gp,pos,nBurn2)
-    sampler_gp.reset()
-
-    print("Running production")
-    sampler_gp = run_mcmc_save(sampler_gp,pos,nProd,state,"chain.txt")
-
-    return sampler_gp
-
-def plot_result(bestFit, x, width, y, e, cv):
-
-    #calc residuals
-    fit = model(bestFit[2:],x,width,cv)
-    res = y-fit
-
-    #fine scale fit for plotting
-    xf = np.linspace(x.min(),x.max(),1000)
-    wf = 0.5*np.mean(np.diff(xf))*np.ones_like(xf)
-    yf = model(bestFit[2:],xf,wf,cv)
+    def __init__(self,parList,complex,ampin_gp,ampout_gp,tau_gp,nel_disc=1000,nel_donor=400):
+        """Initialise model.
+        
+        Parameter list should be a 17 element (non-complex BS) or 21 element (complex BS)
+        dictionary of Param objects. These are:
+        ampin_gp, ampout_gp, tau_gp, wdFlux, dFlux, sFlux, rsFlux, q, dphi, rdisc, ulimb, rwd, scale, az, fis, dexp, phi0
+        And additional params: exp1, exp2, tilt, yaw"""
+        
+        super(GPLCModel,self).__init__(parList,complex,nel_disc,nel_donor)
+        # Make sure GP parameters are variable when using this model
+        self.plist.append(ampin_gp)
+        self.plist.append(ampout_gp)
+        self.plist.append(tau_gp)
+        self._dist_cp = 10.0
+        self._oldq = 10.0
+        self._olddphi = 10.0
+        self._oldrwd = 10.0
+        
+    def calcChangepoints(self,phi):
+            
+        # Also get object for dphi, q and rwd as this is required to determine changepoints
+        dphi = self.getParam('dphi')
+        q = self.getParam('q')
+        rwd = self.getParam('rwd')
+        phi0Template = 'phi0_{0}'
     
-    # create GP with changepoints at WD eclipse
-    gp = createGP(bestFit,x)
-    gp.compute(x,e)
+        dphi_change = np.fabs(self._olddphi - dphi.currVal)/dphi.currVal
+        q_change    = np.fabs(self._oldq - q.currVal)/q.currVal
+        rwd_change  = np.fabs(self._oldrwd - rwd.currVal)/rwd.currVal
     
-    #condition GP on residuals, and draw conditional samples
-    samples = gp.sample_conditional(res, x, size=300)
-    # compute mean and standard deviation of samples from GPs
-    mu      = np.mean(samples,axis=0)
-    std     = np.std(samples,axis=0)
-
-    # don't forget to predict at fine samples
-    fmu, _ = gp.predict(res, xf)
-
-    #set up plot subplots
-    gs = gridspec.GridSpec(3,1,height_ratios=[2,1,1])
-    gs.update(hspace=0.0)
-    ax_dat = plt.subplot(gs[0,0])
-    ax_dat_mod = plt.subplot(gs[1,0],sharex=ax_dat)
-    ax_res = plt.subplot(gs[2,0],sharex=ax_dat) 
+        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
+            # Calculate inclination
+            inc = roche.findi(q.currVal,dphi.currVal)
+            # Calculate wd contact phases 3 and 4
+            phi3, phi4 = roche.wdphases(q.currVal, inc, rwd.currVal, ntheta=10)
+            # Calculate length of wd egress
+            dpwd = phi4 - phi3
+            # Distance from changepoints to mideclipse
+            dist_cp = (dphi.currVal+dpwd)/2.
+        else:
+            dist_cp = self._dist_cp
+                        
+        '''# Find location of all changepoints
+        for iecl in range(self.necl):
+            changepoints = []
+            phi0 = self.getParam(phi0Template.format(iecl))
+            # the following range construction gives a list
+            # of all mid-eclipse phases within phi array
+            for n in range (int( phi.min() ), int( phi.max() )+1, 1):
+                changepoints.append(n+phi0.currVal-dist_cp)
+                changepoints.append(n+phi0.currVal+dist_cp) '''
     
-    #data plot
-    ax_dat.plot(xf,yf+fmu,'r-')
-    ax_dat.errorbar(x,y,yerr=e,fmt='.',color='k',capsize=0)
-
-   
-    #data - model plot
-    ax_dat_mod.plot(xf,yf,'r-')
-    ax_dat_mod.errorbar(x,y-mu,yerr=e,fmt='.',color='k',capsize=0)
+        # Find location of all changepoints
+       
+        changepoints = []
+        # the following range construction gives a list
+        # of all mid-eclipse phases within phi array
+        for n in range (int( phi.min() ), int( phi.max() )+1, 1):
+            changepoints.append(n-dist_cp)
+            changepoints.append(n+dist_cp)       
+        
+        # save these values for speed
+        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
+            self._dist_cp = dist_cp
+            self._oldq = q.currVal
+            self._olddphi = dphi.currVal
+            self._oldrwd = rwd.currVal
+        
+        return changepoints
+     
+    def createGP(self,phi):
+        """Constructs a kernel, which is used to create Gaussian processes.
+        
+        Using values for the two hyperparameters (amp,tau), amp_ratio and dphi, this function:
+        creates kernels for both inside and out of eclipse, works out the location of any 
+        changepoints present, constructs a single (mixed) kernel and uses this kernel to create GPs"""
     
-    #residual plot
-    ax_res.errorbar(x,res,yerr=e,fmt='.',color='k',capsize=0)
-    ax_res.fill_between(x,mu+2.0*std,mu-2.0*std,color='r',alpha=0.4)
-
-    #fix the x-axes
-    plt.setp(ax_dat.get_xticklabels(),visible=False)
-    ax_res.yaxis.set_major_locator(mpl.ticker.MaxNLocator(4,prune='both'))
-    ax_dat.set_ylabel('Flux (mJy)')
-    ax_dat_mod.set_ylabel('Flux (mJy)')
-    ax_res.set_xlabel('Orbital Period')
-    ax_res.set_ylabel('Residuals')
-    #plt.xlim(-0.1,0.15)
-    plt.savefig('bestFit.pdf')
-    plt.show()
-    
-def parseStartPars(file):
-    f = open(file)
-    newDict = {}
-    for line in f:
-        k,v = line.strip().split('=')
-        newDict[k.strip()] = float(v.strip())
-    return newDict
-    
+        # Get objects for ampin_gp, ampout_gp, tau_gp and find the exponential of their current values
+        ln_ampin = self.getParam('ampin_gp')
+        ln_ampout = self.getParam('ampout_gp')
+        ln_tau = self.getParam('tau_gp')
+        
+        ampin = np.exp(ln_ampin.currVal)
+        ampout = np.exp(ln_ampout.currVal)
+        tau = np.exp(ln_tau.currVal)
+       
+        # Calculate kernels for both out of and in eclipse WD eclipse
+        # Kernel inside of WD has smaller amplitude than that of outside eclipse,
+        #k_in  = ampin*GP.ExpSquaredKernel(tau)
+        #k_out  = ampout*GP.ExpSquaredKernel(tau)
+        k_in  = ampin*GP.Matern32Kernel(tau)
+        k_out = ampout*GP.Matern32Kernel(tau)
+        #k_in  = ampin*GP.ExpKernel(tau)
+        #k_out = ampout*GP.ExpKernel(tau)
+        
+        changepoints = self.calcChangepoints(phi)
+        
+        # Depending on number of changepoints, create kernel structure
+        kernel_struc = [k_out]      
+        for k in range (int( phi.min() ), int( phi.max() )+1, 1):
+            kernel_struc.append(k_in)
+            kernel_struc.append(k_out)
+        
+        # Create kernel with changepoints 
+        kernel = GP.DrasticChangepointKernel(kernel_struc,changepoints)
+        
+        '''k1 = GP.Matern32Kernel(tau)
+        
+        gp_pars = np.array([ampout,ampin,ampout])
+        changepoints = self.calcChangepoints(phi)
+        
+        k2 = GP.OutputScaleChangePointKernel(gp_pars,changepoints)
+        
+        kernel = k1*k2'''
+        
+        # Create GPs using this kernel
+        gp = GP.GaussianProcess(kernel)
+        return gp
+            
+    def ln_like(self,phi,y,e,width=None):
+        """Calculates the natural log of the likelihood.
+        
+        This alternative ln_like function uses the createGP function to create Gaussian
+        processes"""
+        lnlike = 0.0
+        # For each eclipse, create (and compute) Gaussian process and calculate the model
+        for iecl in range(self.necl):
+            gp = self.createGP(phi[iecl])
+            gp.compute(phi[iecl],e[iecl])
+            if width:
+                thisWidth=width[iecl]
+            else:
+                thisWidth=None
+            resids = y[iecl] - self.calc(iecl,phi[iecl],thisWidth)
+                                
+            # Check for bugs in model
+            if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
+                warnings.warn('model gave nan or inf answers')
+                return -np.inf
+                                
+            # Calculate ln_like using lnlikelihood function from GaussianProcess.py             
+            lnlike += gp.lnlikelihood(resids)         
+        return lnlike
+                
+def parseInput(file):
+    """Splits input file up making it easier to read"""
+    input_dict = configobj.ConfigObj(file)
+    return input_dict
+            
 if __name__ == "__main__":
 
-    # Command line arguments 
+    # Allows input file to be passed to code from argument line
     import argparse
     parser = argparse.ArgumentParser(description='Fit CV lightcurves with lfit')
-    parser.add_argument('file',action='store',help='input file (x,y,e)')
-    parser.add_argument('parfile',action='store',help='starting parameters')
-    parser.add_argument('-f','--fit',action='store_true',help='actually fit, otherwise just plot')
-    parser.add_argument('-nw','--nwalkers',action='store',help='number of walkers', type=int, default=80)
-    parser.add_argument('-nt','--nthreads',action='store',help='number of threads', type=int, default=6)
-    parser.add_argument('-nb','--nburn',action='store',help='number of burn steps', type=int, default=5000)
-    parser.add_argument('-np','--nprod',action='store',help='number of prod steps', type=int, default=1000)
+    parser.add_argument('file',action='store',help='input file')
     args = parser.parse_args()
-    file = args.file
-    toFit = args.fit
-
-    # Input lightcurve data from txt file
-    x,y,e = np.loadtxt(file,skiprows=16).T
-    width = np.mean(np.diff(x))*np.ones_like(x)/2.
     
-    parDict = parseStartPars(args.parfile)
-    q = parDict['q']
-    dphi = parDict['dphi']
-    rwd = parDict['rwd']
-    ulimb = parDict['ulimb']
-    rdisc = parDict['rdisc']
-    rexp = parDict['rexp']
-    az = parDict['az']
-    frac = parDict['frac']
-    scale = parDict['scale']
-    fwd = parDict['fwd']
-    fdisc = parDict['fdisc']
-    fbs = parDict['fbs']
-    fd = parDict['fd']
-    off = parDict['off']
-    amp_gp = parDict['amp_gp']
-    tau_gp = parDict['tau_gp']
-    try:
-        exp1 = parDict['exp1']
-        exp2 = parDict['exp2']
-        tilt = parDict['tilt']
-        yaw = parDict['yaw']    
-        guessP = np.array([amp_gp,tau_gp,fwd,fdisc,fbs,fd,q,dphi,rdisc,ulimb,rwd,scale,az,frac,rexp,off, \
-                          exp1,exp2,tilt,yaw])
-    except:
-        guessP = np.array([amp_gp,tau_gp,fwd,fdisc,fbs,fd,q,dphi,rdisc,ulimb,rwd,scale,az,frac,rexp,off])
+    # Use parseInput function to read data from input file
+    input_dict = parseInput(args.file)  
+
+    # Read in information about mcmc, neclipses, use of complex/GP etc.
+    nburn     = int(input_dict['nburn'])
+    nprod     = int(input_dict['nprod'])
+    nthreads  = int(input_dict['nthread'])
+    nwalkers  = int(input_dict['nwalkers'])
+    ntemps    = int(input_dict['ntemps'])
+    scatter_1   = float(input_dict['first_scatter'])
+    scatter_2   = float(input_dict['second_scatter'])
+    toFit     = int(input_dict['fit'])
+    neclipses = int(input_dict['neclipses'])
+    complex   = bool(int(input_dict['complex']))
+    useGP     = bool(int(input_dict['useGP']))
+    usePT     = bool(int(input_dict['usePT']))
+    corner    = bool(int(input_dict['corner']))
+    double_burnin = bool(int(input_dict['double_burnin']))
+    comp_scat   = bool(int(input_dict['comp_scat']))
+    
+    # Read in GP params using fromString function from mcmc_utils.py
+    ampin_gp = Param.fromString('ampin_gp', input_dict['ampin_gp'])
+    ampout_gp = Param.fromString('ampout_gp', input_dict['ampout_gp'])
+    tau_gp = Param.fromString('tau_gp', input_dict['tau_gp'])
+    
+    # Read in file names containing eclipse data, as well as output plot names
+    files = []
+    output_plots = []
+    for ecl in range(0,neclipses):
+        files.append(input_dict['file_{0}'.format(ecl)])
+        output_plots.append(input_dict['plot_{0}'.format(ecl)])
+
+
+    # Output file code - needs completing
+    # This file contains the data and best fit. 
+    # The first three columns are the data (x, y and y error)
+    # The next column is the CV flux
+    # The next columns are the flux from wd, bright spot, disc and donor
+    # Setup header for output file format
+    # outfile_header = 
+
+    # Create a model from the first eclipses (eclipse 0) parameters
+    parNames = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
+        'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
+    if complex:
+        parNames.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
+    # List of values obtained from input file using fromString function from mcmc_utils.py
+    parList = [Param.fromString(name, input_dict[name]) for name in parNames]
+    #parList = [Param.fromString(name, input_dict[name]) for name in parNames if Param.isValid]
+    # If fitting using GPs use GPLCModel, else use LCModel
+    if useGP:
+        model = GPLCModel(parList,complex,ampin_gp,ampout_gp,tau_gp)
+    else:
+        model = LCModel(parList,complex)
         
-    # is our starting position legal
-    if np.isinf( ln_prior_gp(guessP) ):
-        print parDict
-        print 'Error: starting position violates priors'
+    # pickle is used for parallelisation
+    # pickle cannot pickle methods of classes, so we wrap
+    # the ln_prior, ln_like and ln_prob functions here to 
+    # make something that can be pickled
+    def ln_prior(parList):
+        model.pars = parList
+        return model.ln_prior()
+    def ln_like(parList,phi,y,e,width=None):
+        model.pars = parList
+        #return model.ln_like(phi,y,e,width)
+        lnlike = model.ln_like(phi,y,e,width)
+        if np.isfinite(lnlike):
+        	return lnlike
+        else:
+        	print(parList)
+        	print(lnlike)
+        	return lnlike
+    def ln_prob(parList,phi,y,e,width=None):
+        model.pars = parList
+        return model.ln_prob(phi,y,e,width) 
+            
+    # Add in additional eclipses as necessary
+    parNameTemplate = ['wdFlux_{0}', 'dFlux_{0}', 'sFlux_{0}', 'rsFlux_{0}',\
+        'rdisc_{0}', 'ulimb_{0}', 'scale_{0}', 'az_{0}', 'fis_{0}', 'dexp_{0}', 'phi0_{0}']
+    if complex:
+        parNameTemplate.extend(['exp1_{0}', 'exp2_{0}', 'tilt_{0}', 'yaw_{0}']) 
+    for ecl in range(1,neclipses):
+        # This line changes the eclipse number for each parameter name
+        parNames = [template.format(ecl) for template in parNameTemplate]
+        # List of values obtained from input file using fromString function from mcmc_utils.py
+        parList = [Param.fromString(name, input_dict[name]) for name in parNames]
+        # Use addEclipse function defined above to add eclipse parameters to parameter list
+        model.addEclipse(parList)
+        
+    # Store your data in python lists, so that x[0] are the times for eclipse 0, etc.
+    x = []
+    y = []
+    e = []
+    w = []
+    
+    # Crop to range given in input file
+    start = float(input_dict['phi_start'])
+    end = float(input_dict['phi_end'])
+    # Read in eclipse data
+    for file in files:
+        xt,yt,et = np.loadtxt(file,skiprows=16).T
+        wt = np.mean(np.diff(xt))*np.ones_like(xt)/2.
+        # Create mask
+        mask = (xt > start) & (xt < end)
+        x.append(xt[mask])
+        y.append(yt[mask])
+        e.append(et[mask])
+        w.append(wt[mask])
+        
+    
+    # Is starting position legal?
+    if np.isinf(model.ln_prior()):
+        print ('Error: starting position violates priors')
+        print ('Offending parameters are:')
+        for par in model.pars:
+            if not par.isValid:
+                print (par.name)
+        # running a verbose ln_prior checks invalid param combinations
+        model.ln_prior(verbose=True)
         sys.exit(-1)
-        
-    # initialize a cv with these params
-    myCV = lfit.CV(guessP[2:])
-    
-    '''
-    BIZARRO WORLD!
-    Calling the lnprior,lnlikelihood andlnprob functions once outside of multiprocessing
-    causes multiprocessing calls to the same function to hang or segfault
-    when using numpy/scipy on OS X. This is a known bug when using mp
-    in combination with the BLAS library (cho_factor uses this).
-        
-    http://stackoverflow.com/questions/19705200/multiprocessing-with-numpy-makes-python-quit-unexpectedly-on-osx
-    '''
-    #lnprior = ln_prior_gp(guessP)
-    #lnlikelihood = lnlike_gp(guessP, x, width, y, e, myCV)
-    #lnprob = lnprob_gp(guessP, x, width, y, e, myCV)
-    
-    #print "lnprior =      " ,lnprior
-    #print "lnlikelihood = " ,lnlikelihood
-    #print "lnprob =       " ,lnprob
-
-    if toFit:
-        npars = len(guessP)
        
-        mcmcPars = (args.nwalkers,args.nburn,args.nburn,args.nprod,args.nthreads)
-        sampler = fit_gp(guessP, x, width, y, e, myCV, mcmcPars)
+    # How many parameters?  
+    npars = model.npars
+    # Current values of all parameters
+    params = [par.currVal for par in model.pars]
+    
+    # The following code will only run if option to fit has been selected in input file
+    if toFit:
+        # Initialize the MPI-based pool used for parallelization.
+        # Need to look into this
+        '''
+        pool = MPIPool()
 
-        chain = flatchain(sampler.chain,npars,thin=5)
-        nameList = ['lna','lntau','fwd','fdisc','fbs','fd','q','dphi','rdisc','ulimb','rwd','scale', \
-                    'az','frac','rexp','off','exp1','exp2','tilt','yaw']
-        bestPars = []
+        if not pool.is_master():
+            # Wait for instructions from the master process.
+            pool.wait()
+            sys.exit(0)
+        '''   
+        
+        # Starting parameters   
+        p0 = np.array(params)
+
+        # Create array of scatter values from input file    
+        p0_scatter_1 = np.array([scatter_1 for i in model.lookuptable])
+        # In certain cases, scatter needs to vary between parameters
+        if comp_scat:
+            # Scatter values need altering for certain parameters
+            for i in range(0,len(p0_scatter_1)):
+            	
+            	# Increase q scatter by a factor of 2 
+                if i == model.getIndex('q'):
+                    p0_scatter_1[i] *= 2
+                # Decrease dphi scatter by a factor of 5      
+                if i == model.getIndex('dphi'):
+                    p0_scatter_1[i] *= 2e-1 
+                
+                for ecl in range(0,neclipses):
+                
+                    # Increase disc flux by a factor of 2
+                    if i == model.getIndex('dFlux_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2
+                    # Increase bs flux by a factor of 2
+                    if i == model.getIndex('sFlux_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2
+                    # Increase donor flux by a factor of 2
+                    if i == model.getIndex('rsFlux_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2
+                        
+                    # Increase disc rad by a factor of 2
+                    if i == model.getIndex('rdisc_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2 
+                        
+                    # Decrease limb darkening scatter by a factor of 1000000
+                    if i == model.getIndex('ulimb_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 1e-6
+                    # Increase bs scale by a factor of 3
+                    if i == model.getIndex('scale_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 3
+                    # Increase iso frac by a factor of 3
+                    if i == model.getIndex('fis_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 3
+                    # Increase disc exp by a factor of 3
+                    if i == model.getIndex('dexp_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 3
+                    # Increase phase offset by a factor of 20
+                    if i == model.getIndex('phi0_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2e1
+                        
+                    # Increase az by a factor of 2
+                    if i == model.getIndex('az_{0}'.format(ecl)):
+                        p0_scatter_1[i] *= 2
+                        
+                    if complex:
+                        # Increase bs exponential params by a factor of 5
+                        if i == model.getIndex('exp1_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 5
+                        if i == model.getIndex('exp2_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 5
+                        # Increase bs yaw by a factor of 10
+                        if i == model.getIndex('yaw_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 1e1
+                            
+                    	# Increase bs tilt by a factor of 2
+                    	if i == model.getIndex('tilt_{0}'.format(ecl)):
+                        	p0_scatter_1[i] *= 2
+        
+        # Create second scatter array for second burnin
+        p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
+        
+        '''
+        BIZARRO WORLD!
+        Calling the ln_prob function once outside of multiprocessing
+        causes multiprocessing calls to the same function to hang or segfault
+        when using numpy/scipy on OS X. This is a known bug when using mp
+        in combination with the BLAS library (cho_factor uses this).
+        
+        http://stackoverflow.com/questions/19705200/multiprocessing-with-numpy-makes-python-quit-unexpectedly-on-osx
+        
+        print "initial ln probability = %.2f" % model.ln_prob(x,y,e,w)
+        
+        print 'probabilities of walker positions: '
+        for i, par in enumerate(p0):
+            print '%d = %.2f' % (i,model.ln_prob(x,y,e,w))
+        '''
+        
+        if usePT:
+            # Produce a ball of walkers around p0, ensuring all walker positions
+            # are valid
+            p0 = initialise_walkers_pt(p0,p0_scatter_1,nwalkers,ntemps,ln_prior)
+            # Instantiate Parallel-Tempering Ensemble sampler
+            sampler = emcee.PTSampler(ntemps,nwalkers,npars,ln_like,ln_prior,\
+                loglargs=[x,y,e],threads=nthreads)
+        else:
+            # Produce a ball of walkers around p0, ensuring all walker positions
+            # are valid
+            p0 = initialise_walkers(p0,p0_scatter_1,nwalkers,ln_prior)
+            # Instantiate Ensemble sampler
+            sampler = emcee.EnsembleSampler(nwalkers,npars,ln_prob,args=[x,y,e],threads=nthreads)
+        
+        # Burn-in
+        print('starting burn-in')
+        # Run burn-in stage of mcmc using run_burnin function from mcmc_utils.py
+        pos, prob, state = run_burnin(sampler,p0,nburn)
+        
+        if double_burnin:
+            # Run second burn-in stage (if requested), scattered around best fit of previous burn-in
+            # DFM (emcee creator) reports this can help convergence in difficult cases
+            print('starting second burn-in')
+            p0 = pos[np.argmax(prob)]
+            p0 = initialise_walkers(p0,p0_scatter_2,nwalkers,ln_prior)
+            pos, prob, state = run_burnin(sampler,p0,nburn)
+
+        #Production
+        sampler.reset()
+        print('starting main mcmc chain')
+        if usePT:
+            # Run production stage of pt mcmc using run_ptmcmc_save function from mcmc_utils.py
+            sampler = run_ptmcmc_save(sampler,pos,nprod,"chain_prod.txt")
+            # get chain for zero temp, chain shape = (ntemps,nwalkers*nsteps,ndim)
+            chain = sampler.flatchain[0,...] 
+        else:
+            # Run production stage of mcmc using run_mcmc_save function from mcmc_utils.py
+            sampler = run_mcmc_save(sampler,pos,nprod,state,"chain_prod.txt")
+            # lnprob is in sampler.lnprobability and is shape (nwalkers, nsteps)
+            # sampler.chain has shape (nwalkers, nsteps, npars)
+            # Create a chain (i.e. collect results from all walkers) using flatchain function
+            # from mcmc_utils.py
+            chain = flatchain(sampler.chain,npars,thin=10)
+            # Save flattened chain
+            np.savetxt('chain_flat.txt',chain,delimiter=' ')
+            
+        '''
+        stop parallelism
+        pool.close()
+        '''
+
+        # Print out and save individual parameters to file
+        f = open("modparams.txt","w")
+        f.close()
+        params = []
         for i in range(npars):
             par = chain[:,i]
             lolim,best,uplim = np.percentile(par,[16,50,84])
-            print "%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim)
-            bestPars.append(best)
-        fig = thumbPlot(chain,nameList,truths=guessP)
-        fig.savefig('cornerPlot.pdf')
-        plt.close()
-    else:
-        bestPars = guessP
-
-    plot_result(bestPars, x, width, y, e, myCV)
+            print("%s = %f +%f -%f" % (model.lookuptable[i],best,uplim-best,best-lolim))
+            f = open("modparams.txt","a")
+            f.write("%s = %f +%f -%f\n" % (model.lookuptable[i],best,uplim-best,best-lolim))
+            f.close()
+            params.append(best)
+        # Plot cornerplot (include only shared and 1st eclipse parameters)
+        if corner:
+            # First extract shared and 1st eclipse parameters from chain
+            if complex:
+                pars_cp = 18
+            else:
+                pars_cp = 14
+            if useGP:
+                pars_cp += 3
+            chain_cp = chain[:,0:pars_cp] 
+            # Create corner plot
+            fig = thumbPlot(chain_cp,model.lookuptable[0:pars_cp])
+            fig.savefig('cornerPlot.pdf')
+            plt.close()
+        # Update model with best parameters
+        model.pars = params
     
+    # Print out chisq, ln prior, ln likelihood and ln probability for the model                
+    print('\nFor this model:\n')
+    # Size of data required in order to calculate degrees of freedom (D.O.F)
+    dataSize = np.sum((xa.size for xa in x))
+    print("Chisq          = %.2f (%d D.O.F)" % (model.chisq(x,y,e,w),dataSize - model.npars - 1))
+    print("ln prior       = %.2f" % model.ln_prior())
+    print("ln likelihood = %.2f" % model.ln_like(x,y,e,w))
+    print("ln probability = %.2f" % model.ln_prob(x,y,e,w))
+    print('\nFrom wrapper functions:\n')
+    print("ln prior       = %.2f" % ln_prior(params))
+    print("ln likelihood = %.2f" % ln_like(params,x,y,e,w))
+    print("ln probability = %.2f" % ln_prob(params,x,y,e,w))
+    
+    # Save these to file
+    if toFit:
+        f = open("modparams.txt","a")
+    else:
+        f = open("modparams.txt","w")
+    f.write("\nFor this model:\n\n")
+    f.write("Chisq          = %.2f (%d D.O.F)\n" % (model.chisq(x,y,e,w),dataSize - model.npars - 1))
+    f.write("ln prior       = %.2f\n" % model.ln_prior())
+    f.write("ln likelihood = %.2f\n" % model.ln_like(x,y,e,w))
+    f.write("ln probability = %.2f\n" % model.ln_prob(x,y,e,w))
+    f.close()
+    
+    # Plot model & data
+    # Use of gridspec to help with plotting
+    gs = gridspec.GridSpec(2,1,height_ratios=[2,1])
+    gs.update(hspace=0.0)
+    seaborn.set(style='ticks')
+    seaborn.set_style({"xtick.direction": "in","ytick.direction": "in"})
+
+    for iecl in range(neclipses):
+        xp = x[iecl]
+        yp = y[iecl]
+        ep = e[iecl]
+        wp = w[iecl]
+           
+        xf = np.linspace(xp.min(),xp.max(),1000)
+        #xf = np.linspace(-0.9,0.9,1000)
+        wf = 0.5*np.mean(np.diff(xf))*np.ones_like(xf)
+        yp_fit = model.calc(iecl,xp,wp)
+        yf = model.calc(iecl,xf,wf)
+        res = yp - yp_fit
+        
+        # Needed for plotting GP 
+        if useGP:
+            gp = model.createGP(xp)
+            gp.compute(xp,ep)
+            samples = gp.sample_conditional(res, xp, size = 300)
+            mu = np.mean(samples,axis=0)
+            std = np.std(samples,axis=0)
+            fmu, _ = gp.predict(res, xf)
+        
+        ax1 = plt.subplot(gs[0,0])
+        
+        # CV model
+        ax1.plot(xf,yf)
+        ax1.plot(xf,model.cv.yrs)
+        ax1.plot(xf,model.cv.ys)
+        ax1.plot(xf,model.cv.ywd)
+        ax1.plot(xf,model.cv.yd)
+        if useGP:
+                 
+            # Plot fill-between region
+            if toFit:
+                # Read chain
+                # First few lines used to determine number of parameters
+                if complex:
+                    pars_fill = 15
+                else:
+                    pars_fill = 11
+                pars_fill_e1 = pars_fill + 3
+                if useGP:
+                    pars_fill_e1 += 3
+                if iecl == 0:
+                    # Read parameters of first eclipse from chain
+                    pars = chain[:,0:pars_fill_e1-3]
+                else:
+                    # Parameters from additional eclipses are a little trickier
+                    # to read from chain
+                    pars_1 = chain[:,pars_fill_e1+pars_fill*(iecl-1):pars_fill_e1+pars_fill*(iecl-1)+4]
+                    pars_2 = chain[:,4:6]
+                    pars_3 = chain[:,pars_fill_e1+pars_fill*(iecl-1)+4:pars_fill_e1+pars_fill*(iecl-1)+6]
+                    pars_4 = chain[:,8]
+                    pars_5 = chain[:,pars_fill_e1+pars_fill*(iecl-1)+6:pars_fill_e1+pars_fill*iecl]
+                    pars = []
+                    for i in range(0,len(pars_1)):
+                        new_pars = np.append(pars_1[i],pars_2[i])
+                        new_pars = np.append(new_pars,pars_3[i])
+                        new_pars = np.append(new_pars,pars_4[i])
+                        new_pars = np.append(new_pars,pars_5[i])
+                        pars.append(new_pars)
+                    pars = np.array(pars)
+                    
+                # Create array of 1000 random numbers
+                random_sample = np.random.randint(0,len(pars[0:]),1000)
+                
+                lcs = []
+                for i in random_sample:
+                    CV = lfit.CV(pars[i])
+                
+                    xf_2 = np.linspace(xp.min(),xp.max(),1000)
+                    wf_2 = 0.5*np.mean(np.diff(xf_2))*np.ones_like(xf_2)
+                    yf_2 = CV.calcFlux(pars[i],xf_2,wf_2)
+                    lcs.append(yf_2)
+                
+                # Plot filled area    
+                lcs = np.array(lcs)
+                mu_2 = lcs.mean(axis=0)
+                std_2 = lcs.std(axis=0)
+                plt.fill_between(xf_2,mu_2+std_2,mu_2-std_2,color='b',alpha=0.2)
+            
+        # Data
+        if useGP:
+        	ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.2,markersize=5,linewidth=1)
+        	fmu, _ = gp.predict(res, xp)
+        	ax1.errorbar(xp,yp-fmu,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
+        else:
+        	ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
+        ax2 = plt.subplot(gs[1,0],sharex=ax1)
+        ax2.errorbar(xp,yp-yp_fit,yerr=ep,color='k',fmt='.',capsize=0,alpha=0.6,markersize=5,linewidth=1)
+        ax1.set_ylim(ymin=0)
+        #ax1.set_ylim(ymin=-0.0001)
+        ax1.set_xlim(xmin=start,xmax=end)
+        ax1.tick_params(top='on',right='on')
+        ax2.tick_params(top='on',right='on')
+        #ax2.set_xlim(ax1.get_xlim())
+        #ax2.set_xlim(-0.1,0.12)
+        if useGP:
+            ax2.fill_between(xp,mu+1.0*std,mu-1.0*std,color='r',alpha=0.4)
+
+        # Labels
+        ax1.set_ylabel('Flux (mJy)', fontsize=15)
+        ax2.set_ylabel('Residuals (mJy)', fontsize=15)
+        ax1.set_xlabel('Orbital Phase', fontsize=15)
+        ax2.set_xlabel('Orbital Phase', fontsize=15)
+        ax2.yaxis.set_major_locator(MaxNLocator(4,prune='both'))
+        ax1.tick_params(axis='both',labelbottom='off',labelsize=14)
+        ax2.tick_params(axis='both',labelsize=14)
+        
+        for ax in plt.gcf().get_axes()[::2]:
+            ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
+            
+        plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        
+        # Save plot images
+        plt.savefig(output_plots[iecl])
+        if toFit and useGP:
+            plt.close()
+        else:
+            plt.show()
+     
