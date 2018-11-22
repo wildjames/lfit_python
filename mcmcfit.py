@@ -473,11 +473,11 @@ if __name__ == "__main__":
         #return model.ln_like(phi,y,e,width)
         lnlike = model.ln_like(phi,y,e,width)
         if np.isfinite(lnlike):
-        	return lnlike
+            return lnlike
         else:
-        	print(parList)
-        	print(lnlike)
-        	return lnlike
+            print(parList)
+            print(lnlike)
+            return lnlike
     def ln_prob(parList,phi,y,e,width=None):
         model.pars = parList
         return model.ln_prob(phi,y,e,width) 
@@ -554,8 +554,8 @@ if __name__ == "__main__":
         if comp_scat:
             # Scatter values need altering for certain parameters
             for i in range(0,len(p0_scatter_1)):
-            	
-            	# Increase q scatter by a factor of 2 
+                
+                # Increase q scatter by a factor of 2 
                 if i == model.getIndex('q'):
                     p0_scatter_1[i] *= 2
                 # Decrease dphi scatter by a factor of 5      
@@ -608,9 +608,9 @@ if __name__ == "__main__":
                         if i == model.getIndex('yaw_{0}'.format(ecl)):
                             p0_scatter_1[i] *= 1e1
                             
-                    	# Increase bs tilt by a factor of 2
-                    	if i == model.getIndex('tilt_{0}'.format(ecl)):
-                        	p0_scatter_1[i] *= 2
+                        # Increase bs tilt by a factor of 2
+                        if i == model.getIndex('tilt_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2
         
         # Create second scatter array for second burnin
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
@@ -826,11 +826,11 @@ if __name__ == "__main__":
             
         # Data
         if useGP:
-        	ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.2,markersize=5,linewidth=1)
-        	fmu, _ = gp.predict(res, xp)
-        	ax1.errorbar(xp,yp-fmu,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
+            ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.2,markersize=5,linewidth=1)
+            fmu, _ = gp.predict(res, xp)
+            ax1.errorbar(xp,yp-fmu,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
         else:
-        	ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
+            ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
         ax2 = plt.subplot(gs[1,0],sharex=ax1)
         ax2.errorbar(xp,yp-yp_fit,yerr=ep,color='k',fmt='.',capsize=0,alpha=0.6,markersize=5,linewidth=1)
         ax1.set_ylim(ymin=0)
