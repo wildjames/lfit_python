@@ -9,7 +9,7 @@ try:
     # This triangle should have a method corner
     # There are two python packages with conflicting names
     getattr(triangle, "corner")
-except (AttributeError, ModuleNotFoundError):
+except (AttributeError, ImportError):
     # We want the other package
     import corner as triangle
 

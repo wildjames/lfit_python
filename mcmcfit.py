@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from __future__ import absolute_import
 from __future__ import print_function
 import numpy as np
@@ -506,6 +508,7 @@ if __name__ == "__main__":
     end = float(input_dict['phi_end'])
     # Read in eclipse data
     for file in files:
+        print("File: {}".format(file))
         xt,yt,et = np.loadtxt(file,skiprows=16).T
         wt = np.mean(np.diff(xt))*np.ones_like(xt)/2.
         # Create mask
@@ -833,11 +836,11 @@ if __name__ == "__main__":
             ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
         ax2 = plt.subplot(gs[1,0],sharex=ax1)
         ax2.errorbar(xp,yp-yp_fit,yerr=ep,color='k',fmt='.',capsize=0,alpha=0.6,markersize=5,linewidth=1)
-        ax1.set_ylim(ymin=0)
+        ax1.set_ylim(bottom=0)
         #ax1.set_ylim(ymin=-0.0001)
-        ax1.set_xlim(xmin=start,xmax=end)
-        ax1.tick_params(top='on',right='on')
-        ax2.tick_params(top='on',right='on')
+        ax1.set_xlim(start,end)
+        ax1.tick_params(top=True,right=True)
+        ax2.tick_params(top=True,right=True)
         #ax2.set_xlim(ax1.get_xlim())
         #ax2.set_xlim(-0.1,0.12)
         if useGP:
@@ -849,7 +852,7 @@ if __name__ == "__main__":
         ax1.set_xlabel('Orbital Phase', fontsize=15)
         ax2.set_xlabel('Orbital Phase', fontsize=15)
         ax2.yaxis.set_major_locator(MaxNLocator(4,prune='both'))
-        ax1.tick_params(axis='both',labelbottom='off',labelsize=14)
+        ax1.tick_params(axis='both',labelbottom=False,labelsize=14)
         ax2.tick_params(axis='both',labelsize=14)
         
         for ax in plt.gcf().get_axes()[::2]:
