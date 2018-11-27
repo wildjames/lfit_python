@@ -226,9 +226,13 @@ class LCModel(Model):
                 sc = self.getParam(scaleTemplate.format(iecl))
                 e1 = self.getParam(exp1Template.format(iecl))
                 e2 = self.getParam(exp2Template.format(iecl))
-                if sc.currVal*(e1.currVal/e2.currVal)**(1.0/e2.currVal) > 0.5:
+            
+                if sc.currVal*(e1.currVal/e2.currVal) < 0. and e2.currVal < 0:
                     retVal += -np.inf
-    
+                else:
+                    if sc.currVal*(e1.currVal/e2.currVal)**(1.0/e2.currVal) > 0.5:
+                        retVal += -np.inf
+
         return retVal
          
     def ln_like(self,phi,y,e,width=None):
