@@ -772,10 +772,10 @@ if __name__ == "__main__":
         
         # CV model
         ax1.plot(xf,yf)
-        ax1.plot(xf,model.cv.yrs)
-        ax1.plot(xf,model.cv.ys)
-        ax1.plot(xf,model.cv.ywd)
-        ax1.plot(xf,model.cv.yd)
+        ax1.plot(xf,model.cv.yrs, label='Sec')
+        ax1.plot(xf,model.cv.ys, label='Spt')
+        ax1.plot(xf,model.cv.ywd, label='WD')
+        ax1.plot(xf,model.cv.yd, label='Disc')
         if useGP:
                  
             # Plot fill-between region
@@ -854,6 +854,7 @@ if __name__ == "__main__":
         ax2.yaxis.set_major_locator(MaxNLocator(4,prune='both'))
         ax1.tick_params(axis='both',labelbottom=False,labelsize=14)
         ax2.tick_params(axis='both',labelsize=14)
+        ax1.legend()
         
         for ax in plt.gcf().get_axes()[::2]:
             ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
