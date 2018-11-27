@@ -211,6 +211,7 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=False):
         iStep += 1
         if progress:
             bar.update()
+    bar.close()
     return pos, prob, state
 
 
@@ -238,6 +239,7 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=False, **kwa
                 f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
         if file:
             f.close()
+    bar.close()
     return sampler
 
 
@@ -264,6 +266,7 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=False, **kwargs):
             thisProb = zprob[k]
             f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
         f.close()
+    bar.close()
     return sampler
 
 
