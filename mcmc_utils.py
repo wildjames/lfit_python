@@ -203,7 +203,7 @@ def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
     return p0
 
 
-def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
+def run_burnin(sampler, startPos, nSteps, storechain=False, progress=False):
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
@@ -214,7 +214,7 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     return pos, prob, state
 
 
-def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwargs):
+def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=False, **kwargs):
     '''runs an MCMC chain with emcee, and saves steps to a file'''
     # open chain save file
     if file:
@@ -241,7 +241,7 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwar
     return sampler
 
 
-def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
+def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=False, **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
     if file:
         f = open(file, "w")
