@@ -9,7 +9,7 @@ try:
     # This triangle should have a method corner
     # There are two python packages with conflicting names
     getattr(triangle, "corner")
-except (AttributeError, ModuleNotFoundError):
+except (AttributeError, ImportError):
     # We want the other package
     import corner as triangle
 
@@ -211,6 +211,8 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
         iStep += 1
         if progress:
             bar.update()
+    if progress:
+        bar.close()
     return pos, prob, state
 
 
@@ -238,6 +240,8 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwar
                 f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
         if file:
             f.close()
+    if progress:
+        bar.close()
     return sampler
 
 
@@ -264,6 +268,8 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
             thisProb = zprob[k]
             f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
         f.close()
+    if progress:
+        bar.close()
     return sampler
 
 

@@ -506,6 +506,7 @@ if __name__ == "__main__":
     end = float(input_dict['phi_end'])
     # Read in eclipse data
     for file in files:
+        print("File: {}".format(file))
         xt,yt,et = np.loadtxt(file,skiprows=16).T
         wt = np.mean(np.diff(xt))*np.ones_like(xt)/2.
         # Create mask
@@ -554,7 +555,6 @@ if __name__ == "__main__":
         if comp_scat:
             # Scatter values need altering for certain parameters
             for i in range(0,len(p0_scatter_1)):
-
                 # Increase q scatter by a factor of 2
                 if i == model.getIndex('q'):
                     p0_scatter_1[i] *= 2
@@ -607,10 +607,10 @@ if __name__ == "__main__":
                         # Increase bs yaw by a factor of 10
                         if i == model.getIndex('yaw_{0}'.format(ecl)):
                             p0_scatter_1[i] *= 1e1
-
                         # Increase bs tilt by a factor of 2
                         if i == model.getIndex('tilt_{0}'.format(ecl)):
                             p0_scatter_1[i] *= 2
+
 
         # Create second scatter array for second burnin
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
@@ -769,10 +769,10 @@ if __name__ == "__main__":
 
         # CV model
         ax1.plot(xf,yf)
-        ax1.plot(xf,model.cv.yrs)
-        ax1.plot(xf,model.cv.ys)
-        ax1.plot(xf,model.cv.ywd)
-        ax1.plot(xf,model.cv.yd)
+        ax1.plot(xf,model.cv.yrs, label='Sec')
+        ax1.plot(xf,model.cv.ys, label='Spt')
+        ax1.plot(xf,model.cv.ywd, label='WD')
+        ax1.plot(xf,model.cv.yd, label='Disc')
         if useGP:
 
             # Plot fill-between region
@@ -833,11 +833,11 @@ if __name__ == "__main__":
             ax1.errorbar(xp,yp,yerr=ep,fmt='.',color='k',capsize=0,alpha=0.6,markersize=5,linewidth=1)
         ax2 = plt.subplot(gs[1,0],sharex=ax1)
         ax2.errorbar(xp,yp-yp_fit,yerr=ep,color='k',fmt='.',capsize=0,alpha=0.6,markersize=5,linewidth=1)
-        ax1.set_ylim(ymin=0)
+        ax1.set_ylim(bottom=0)
         #ax1.set_ylim(ymin=-0.0001)
-        ax1.set_xlim(xmin=start,xmax=end)
-        ax1.tick_params(top='on',right='on')
-        ax2.tick_params(top='on',right='on')
+        ax1.set_xlim(start,end)
+        ax1.tick_params(top=True,right=True)
+        ax2.tick_params(top=True,right=True)
         #ax2.set_xlim(ax1.get_xlim())
         #ax2.set_xlim(-0.1,0.12)
         if useGP:
@@ -849,8 +849,9 @@ if __name__ == "__main__":
         ax1.set_xlabel('Orbital Phase', fontsize=15)
         ax2.set_xlabel('Orbital Phase', fontsize=15)
         ax2.yaxis.set_major_locator(MaxNLocator(4,prune='both'))
-        ax1.tick_params(axis='both',labelbottom='off',labelsize=14)
+        ax1.tick_params(axis='both',labelbottom=False,labelsize=14)
         ax2.tick_params(axis='both',labelsize=14)
+        ax1.legend()
 
         for ax in plt.gcf().get_axes()[::2]:
             ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
