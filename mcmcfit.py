@@ -127,6 +127,8 @@ class LCModel(Model):
         # Use of the super function allows abstract class in model.py to be referenced
         # Here the ln_prior function is referenced
         retVal = super(LCModel,self).ln_prior()
+        if not np.isfinite(retVal):
+            return retVal
 
         # Remaining part of this function deals with special cases
         # dphi
@@ -404,7 +406,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Fit CV lightcurves with lfit')
     parser.add_argument('file',action='store',help='input file')
+    parser.add_argument('--resume', '-r', help='resume from previous chain, chain file name is required')
     args = parser.parse_args()
+
+    if args.resume is not None and args.resume == 'chain_prod.txt':
+        raise ValueError('name of resume chain and output chain are the same. rename resume chain first')
 
     # Use parseInput function to read data from input file
     input_dict = parseInput(args.file)
@@ -545,118 +551,137 @@ if __name__ == "__main__":
             pool.wait()
             sys.exit(0)
         '''
+        if args.resume is not None:
+            # make sample ball from initial chainfile
+            print('reading original chain file')
+            chainfile = args.resume
+            chain = readchain(chainfile)
+            # shape of chain (walkers, steps, pars)
+            nw, ns, npa = chain.shape
+            if npa != len(params) + 1:
+                raise ValueError('conflict between number of params in chain and model')
+            walker_idx = np.random.randint(0, nw, nw)
+            step_idx = np.random.randint(0, ns, nw)
+            p0 = chain[walker_idx, step_idx, :-1]
+            print('done')
+        else:
+            # Starting parameters
+            p0 = np.array(params)
 
-        # Starting parameters
-        p0 = np.array(params)
-
-        # Create array of scatter values from input file
-        p0_scatter_1 = np.array([scatter_1 for i in model.lookuptable])
-        # In certain cases, scatter needs to vary between parameters
-        if comp_scat:
-            # Scatter values need altering for certain parameters
-            for i in range(0,len(p0_scatter_1)):
-                # Increase q scatter by a factor of 2
-                if i == model.getIndex('q'):
-                    p0_scatter_1[i] *= 2
-                # Decrease dphi scatter by a factor of 5
-                if i == model.getIndex('dphi'):
-                    p0_scatter_1[i] *= 2e-1
-
-                for ecl in range(0,neclipses):
-
-                    # Increase disc flux by a factor of 2
-                    if i == model.getIndex('dFlux_{0}'.format(ecl)):
+            # Create array of scatter values from input file
+            p0_scatter_1 = np.array([scatter_1 for i in model.lookuptable])
+            # In certain cases, scatter needs to vary between parameters
+            if comp_scat:
+                # Scatter values need altering for certain parameters
+                for i in range(0,len(p0_scatter_1)):
+                    # Increase q scatter by a factor of 2
+                    if i == model.getIndex('q'):
                         p0_scatter_1[i] *= 2
-                    # Increase bs flux by a factor of 2
-                    if i == model.getIndex('sFlux_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 2
-                    # Increase donor flux by a factor of 2
-                    if i == model.getIndex('rsFlux_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 2
+                    # Decrease dphi scatter by a factor of 5
+                    if i == model.getIndex('dphi'):
+                        p0_scatter_1[i] *= 2e-1
 
-                    # Increase disc rad by a factor of 2
-                    if i == model.getIndex('rdisc_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 2
+                    for ecl in range(0,neclipses):
 
-                    # Decrease limb darkening scatter by a factor of 1000000
-                    if i == model.getIndex('ulimb_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 1e-6
-                    # Increase bs scale by a factor of 3
-                    if i == model.getIndex('scale_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 3
-                    # Increase iso frac by a factor of 3
-                    if i == model.getIndex('fis_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 3
-                    # Increase disc exp by a factor of 3
-                    if i == model.getIndex('dexp_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 3
-                    # Increase phase offset by a factor of 20
-                    if i == model.getIndex('phi0_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 2e1
-
-                    # Increase az by a factor of 2
-                    if i == model.getIndex('az_{0}'.format(ecl)):
-                        p0_scatter_1[i] *= 2
-
-                    if complex:
-                        # Increase bs exponential params by a factor of 5
-                        if i == model.getIndex('exp1_{0}'.format(ecl)):
-                            p0_scatter_1[i] *= 5
-                        if i == model.getIndex('exp2_{0}'.format(ecl)):
-                            p0_scatter_1[i] *= 5
-                        # Increase bs yaw by a factor of 10
-                        if i == model.getIndex('yaw_{0}'.format(ecl)):
-                            p0_scatter_1[i] *= 1e1
-                        # Increase bs tilt by a factor of 2
-                        if i == model.getIndex('tilt_{0}'.format(ecl)):
+                        # Increase disc flux by a factor of 2
+                        if i == model.getIndex('dFlux_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2
+                        # Increase bs flux by a factor of 2
+                        if i == model.getIndex('sFlux_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2
+                        # Increase donor flux by a factor of 2
+                        if i == model.getIndex('rsFlux_{0}'.format(ecl)):
                             p0_scatter_1[i] *= 2
 
+                        # Increase disc rad by a factor of 2
+                        if i == model.getIndex('rdisc_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2
 
-        # Create second scatter array for second burnin
-        p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
+                        # Decrease limb darkening scatter by a factor of 1000000
+                        if i == model.getIndex('ulimb_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 1e-6
+                        # Increase bs scale by a factor of 3
+                        if i == model.getIndex('scale_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 3
+                        # Increase iso frac by a factor of 3
+                        if i == model.getIndex('fis_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 3
+                        # Increase disc exp by a factor of 3
+                        if i == model.getIndex('dexp_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 3
+                        # Increase phase offset by a factor of 20
+                        if i == model.getIndex('phi0_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2e1
 
-        '''
-        BIZARRO WORLD!
-        Calling the ln_prob function once outside of multiprocessing
-        causes multiprocessing calls to the same function to hang or segfault
-        when using numpy/scipy on OS X. This is a known bug when using mp
-        in combination with the BLAS library (cho_factor uses this).
+                        # Increase az by a factor of 2
+                        if i == model.getIndex('az_{0}'.format(ecl)):
+                            p0_scatter_1[i] *= 2
 
-        http://stackoverflow.com/questions/19705200/multiprocessing-with-numpy-makes-python-quit-unexpectedly-on-osx
+                        if complex:
+                            # Increase bs exponential params by a factor of 5
+                            if i == model.getIndex('exp1_{0}'.format(ecl)):
+                                p0_scatter_1[i] *= 5
+                            if i == model.getIndex('exp2_{0}'.format(ecl)):
+                                p0_scatter_1[i] *= 5
+                            # Increase bs yaw by a factor of 10
+                            if i == model.getIndex('yaw_{0}'.format(ecl)):
+                                p0_scatter_1[i] *= 1e1
+                            # Increase bs tilt by a factor of 2
+                            if i == model.getIndex('tilt_{0}'.format(ecl)):
+                                p0_scatter_1[i] *= 2
 
-        print "initial ln probability = %.2f" % model.ln_prob(x,y,e,w)
 
-        print 'probabilities of walker positions: '
-        for i, par in enumerate(p0):
-            print '%d = %.2f' % (i,model.ln_prob(x,y,e,w))
-        '''
+            # Create second scatter array for second burnin
+            p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
 
+            '''
+            BIZARRO WORLD!
+            Calling the ln_prob function once outside of multiprocessing
+            causes multiprocessing calls to the same function to hang or segfault
+            when using numpy/scipy on OS X. This is a known bug when using mp
+            in combination with the BLAS library (cho_factor uses this).
+
+            http://stackoverflow.com/questions/19705200/multiprocessing-with-numpy-makes-python-quit-unexpectedly-on-osx
+
+            print "initial ln probability = %.2f" % model.ln_prob(x,y,e,w)
+
+            print 'probabilities of walker positions: '
+            for i, par in enumerate(p0):
+                print '%d = %.2f' % (i,model.ln_prob(x,y,e,w))
+            '''
+
+            if usePT:
+                # Produce a ball of walkers around p0, ensuring all walker positions
+                # are valid
+                p0 = initialise_walkers_pt(p0,p0_scatter_1,nwalkers,ntemps,ln_prior)
+            else:
+                # Produce a ball of walkers around p0, ensuring all walker positions
+                # are valid
+                p0 = initialise_walkers(p0,p0_scatter_1,nwalkers,ln_prior)
+
+        # create Sampler
         if usePT:
-            # Produce a ball of walkers around p0, ensuring all walker positions
-            # are valid
-            p0 = initialise_walkers_pt(p0,p0_scatter_1,nwalkers,ntemps,ln_prior)
-            # Instantiate Parallel-Tempering Ensemble sampler
-            sampler = emcee.PTSampler(ntemps,nwalkers,npars,ln_like,ln_prior,\
-                loglargs=[x,y,e],threads=nthreads)
+            sampler = emcee.PTSampler(ntemps,nwalkers,npars,ln_like,ln_prior,
+                                      loglargs=[x,y,e],threads=nthreads)
         else:
-            # Produce a ball of walkers around p0, ensuring all walker positions
-            # are valid
-            p0 = initialise_walkers(p0,p0_scatter_1,nwalkers,ln_prior)
-            # Instantiate Ensemble sampler
             sampler = emcee.EnsembleSampler(nwalkers,npars,ln_prob,args=[x,y,e],threads=nthreads)
 
         # Burn-in
-        print('starting burn-in')
-        # Run burn-in stage of mcmc using run_burnin function from mcmc_utils.py
-        pos, prob, state = run_burnin(sampler,p0,nburn)
-
-        if double_burnin:
-            # Run second burn-in stage (if requested), scattered around best fit of previous burn-in
-            # DFM (emcee creator) reports this can help convergence in difficult cases
-            print('starting second burn-in')
-            p0 = pos[np.argmax(prob)]
-            p0 = initialise_walkers(p0,p0_scatter_2,nwalkers,ln_prior)
+        if args.resume is None:
+            print('starting burn-in')
+            # Run burn-in stage of mcmc using run_burnin function from mcmc_utils.py
             pos, prob, state = run_burnin(sampler,p0,nburn)
+
+            if double_burnin:
+                # Run second burn-in stage (if requested), scattered around best fit of previous burn-in
+                # DFM (emcee creator) reports this can help convergence in difficult cases
+                print('starting second burn-in')
+                p0 = pos[np.argmax(prob)]
+                p0 = initialise_walkers(p0,p0_scatter_2,nwalkers,ln_prior)
+                pos, prob, state = run_burnin(sampler,p0,nburn)
+        else:
+            pos = p0
+            state = None
 
         #Production
         sampler.reset()
