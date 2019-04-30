@@ -290,8 +290,8 @@ class Watcher():
 
         # Arrange the tab layout
         self.tab2_layout = column([
-            row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
             self.lc_plot,
+            row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
             row([gridplot(self.par_sliders, ncols=4),
                  gridplot(self.par_sliders_complex, ncols=1)]),
         ])
