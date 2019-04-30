@@ -172,9 +172,10 @@ class LCModel(Model):
             retVal += -np.inf
 
         #BS scale
+        ratioLim = 3
         rwd = self.getParam('rwd')
-        minscale = rwd.currVal/3 # Minimum BS scale equal to 1/3 of rwd
-        maxscale = rwd.currVal*3 # Maximum BS scale equal to 3x rwd
+        minscale = rwd.currVal/ratioLim # Minimum BS scale equal to 1/3 of rwd
+        maxscale = rwd.currVal*ratioLim # Maximum BS scale equal to 3x rwd
         scaleTemplate = 'scale_{0}'
         for iecl in range(self.necl):
             scale = self.getParam(scaleTemplate.format(iecl))
@@ -182,7 +183,7 @@ class LCModel(Model):
             if scale.currVal < minscale or scale.currVal > maxscale:
                 retVal += -np.inf
                 if verbose:
-                    print('BS Scale is not between 1/3 and 3 times WD size')
+                    print('BS Scale is not between 1/{0} and {0} times WD size'.format(ratioLim))
 
         #BS az
         slope = 80.0
@@ -353,7 +354,7 @@ class GPLCModel(LCModel):
                 # If we're inside an eclipse, use ampout
                 egress = changepoints[i]
                 try:
-                    # If we fail, then we've reached the end. Set the upper limit to inf. 
+                    # If we fail, then we've reached the end. Set the upper limit to inf.
                     ingress = changepoints[i+1]
                 except:
                     ingress = np.inf
