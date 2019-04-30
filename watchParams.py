@@ -17,6 +17,8 @@ from pandas import read_csv, DataFrame
 import configobj
 import time
 from os import path
+from os import getcwd
+import sys
 
 from pprint import pprint
 
@@ -72,6 +74,7 @@ class Watcher():
         # Save the tail and thin optional parameters to the self object
         self.tail = tail
         self.thin = thin
+        self.lastStep = None
         print("I'll follow {:,d} data points, and thin the chain file by {:,d}".format(self.tail, self.thin))
 
         # Save these, just in case I need to use them again later.
@@ -114,7 +117,7 @@ class Watcher():
         # Extend the parameter names for each eclipse
         for i in range(1, self.necl):
             parNames.extend([template.format(i) for template in parNameTemplate])
-        
+
         # Copy the above onto self
         self.parNames = list(parNames)
         # Human-readable names
@@ -138,7 +141,7 @@ class Watcher():
         print("Made the parameter picker...")
 
         # Lets report some characteristics of the chain
-        self.reportChain_label = markups.Div(width=500)
+        self.reportChain_label = markups.Div(width=1000)
         self.make_header()
         print("Made the little header")
 
@@ -149,7 +152,7 @@ class Watcher():
         # # Tail length - no way to update existing plot tail lengths...
         # self.tail_input = TextInput(placeholder='Number of steps to plot', width=200)
         # self.tail_input.on_change('value', self.update_tail)
-        
+
         # Add stuff to a layout for the area
         self.tab1_layout = column([self.reportChain_label, self.thin_input, self.plotPars])
 
@@ -237,7 +240,7 @@ class Watcher():
         # Total model lightcurve
         # TODO: This is slow, make the page with this empty at first, then populate the data in a callback afterwards
         self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
-        # Components 
+        # Components
         self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
         self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
         self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
@@ -267,13 +270,13 @@ class Watcher():
 
         # Plot the model
         self.lc_plot.line(x='phase', y='calc',  source=self.lc_obs,            line_color='red')
-        self.lc_plot.line(x='phase', y='sec',   source=self.lc_obs, alpha=0.6, line_color='brown')
-        self.lc_plot.line(x='phase', y='wd',    source=self.lc_obs, alpha=0.6, line_color='blue')
-        self.lc_plot.line(x='phase', y='bspot', source=self.lc_obs, alpha=0.6, line_color='green')
-        self.lc_plot.line(x='phase', y='disc',  source=self.lc_obs, alpha=0.6, line_color='magenta')
+        self.lc_plot.line(x='phase', y='sec',   source=self.lc_obs, alpha=0.5, line_color='brown')
+        self.lc_plot.line(x='phase', y='wd',    source=self.lc_obs, alpha=0.5, line_color='blue')
+        self.lc_plot.line(x='phase', y='bspot', source=self.lc_obs, alpha=0.5, line_color='green')
+        self.lc_plot.line(x='phase', y='disc',  source=self.lc_obs, alpha=0.5, line_color='magenta')
         print(" Done")
 
-        # I want a button that'll turn red when the parameters are invalid. When clicked, it will either return the 
+        # I want a button that'll turn red when the parameters are invalid. When clicked, it will either return the
         # model back to the initial values, or, if a chain has been read in, set the model to the last step read by the
         # watcher.
         self.lc_isvalid = Button(label='Initial Parameters', width=200)
@@ -283,12 +286,12 @@ class Watcher():
         # Write the current slider values to mcmc_input.dat
         self.write2input_button = Button(label='Write current values', width=200)
         self.write2input_button.on_click(self.write2input)
-        print("Made the write2input button") 
+        print("Made the write2input button")
 
         # Arrange the tab layout
         self.tab2_layout = column([
-            self.lc_plot,
             row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
+            self.lc_plot,
             row([gridplot(self.par_sliders, ncols=4),
                  gridplot(self.par_sliders_complex, ncols=1)]),
         ])
@@ -300,9 +303,9 @@ class Watcher():
         ################# Tab 3: Param Table #################
         ######################################################
 
-        self.tableColumns = ['wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'rdisc', 
+        self.tableColumns = ['wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'rdisc',
             'ulimb', 'scale', 'az', 'fis', 'dexp', 'phi0']
-        
+
         # Extra parameters for the complex model
         if self.complex:
             self.tableColumns.extend(['exp1', 'exp2', 'tilt', 'yaw'])
@@ -318,12 +321,10 @@ class Watcher():
         columns = [
             TableColumn(field=par, title=par, formatter=tables.NumberFormatter(format='0.0000')) for par in self.tableColumns
         ]
-        columns.insert(0, 
+        columns.insert(0,
             TableColumn(field='file', title='File', width=800)
             )
         self.parameter_table = DataTable(source=self.lastStep_CDS, columns=columns, width=1200)
-
-        ###TODO: Add a way to plot parameter over time based on observation dates
 
         self.tab3_layout = column([self.parameter_table])
         self.tab3 = Panel(child=self.tab3_layout, title="Parameter table")
@@ -333,21 +334,21 @@ class Watcher():
         ################# Tab 4: Corner plot #################
         ######################################################
 
-        # # Make corner plots. I need to know how long the burn in is though!
-        # self.burn_input = TextInput(placeholder='No. steps to discard', )
-        # self.corner_plot_button = Button(label='Make corner plots')
-        # self.corner_plot_button.on_click(self.make_corner_plots)
-        # print("Defualt button type is {}".format(self.corner_plot_button.button_type))
+        # Make corner plots. I need to know how long the burn in is though!
+        self.burn_input = TextInput(placeholder='No. steps to discard', )
+        self.corner_plot_button = Button(label='Make corner plots')
+        self.corner_plot_button.on_click(self.make_corner_plots)
+        print("Defualt button type is {}".format(self.corner_plot_button.button_type))
 
-        # self.cornerReporter = markups.Div(width=700)
-        # self.cornerReporter.text = "The chain file will have <b>{:,d}</b> steps when completed</br>".format(self.nProd)
-        # self.cornerReporter.text += "We're using <b>{:,d}</b> walkers, making for <b>{:,d}</b> total lines to read in.</br>".format(
-        #     self.nWalkers, self.nProd*self.nWalkers)
-        # self.cornerReporter.text += "I've not yet added support for embedded images here, and bokeh isn't a great tool for corner plots this big. You'll probably have to scp the files manually."
-        # curdir = path.dirname(path.realpath(__file__))
-        # self.cornerReporter.text += "This one-liner should do it:</br><b>scp callisto:{}/eclipse*.png .</b>".format(curdir)
+        self.cornerReporter = markups.Div(width=700)
+        self.cornerReporter.text = "The chain file will have <b>{:,d}</b> steps when completed</br>".format(self.nProd)
+        self.cornerReporter.text += "We're using <b>{:,d}</b> walkers, making for <b>{:,d}</b> total lines to read in.</br>".format(
+            self.nWalkers, self.nProd*self.nWalkers)
+        self.cornerReporter.text += "I've not yet added support for embedded images here, and bokeh isn't a great tool for corner plots this big. You'll probably have to scp the files manually."
+        curdir = getcwd()
+        self.cornerReporter.text += "This one-liner should do it:</br><b>scp callisto:{}/eclipse*.png .</b>".format(curdir)
 
-        # #TODO: 
+        # #TODO:
         # # - Show the corner plots in the page? Or, add a link to download them?
         # # - Corner plots can make the server run out of memory for large files! can we fix this?
 
@@ -576,22 +577,23 @@ class Watcher():
             print('  End of file! waiting for new step to be written...', end='\r')
             self.next_read = self.doc.add_timeout_callback(self.update_chain, 10000)
 
-            # print("\nUpdating the table with lastStep...")
-            for p in self.tableColumns:
-                get = p + "_{}"
-                
-                l = []
-                for i in range(self.necl):
-                    # work out the name of the parameter
-                    g = get.format(i)
-                    # get the index of that parameter in parNames
-                    index = self.parNames.index(g)
-                    # grab the value from lastStep
-                    val = self.lastStep[index]
-                    # store
-                    l.append(val)
-                
-                self.lastStep_CDS.data[p] = np.array(l)
+            if not self.lastStep is None:
+                # print("\nUpdating the table with lastStep...")
+                for p in self.tableColumns:
+                    get = p + "_{}"
+
+                    l = []
+                    for i in range(self.necl):
+                        # work out the name of the parameter
+                        g = get.format(i)
+                        # get the index of that parameter in parNames
+                        index = self.parNames.index(g)
+                        # grab the value from lastStep
+                        val = self.lastStep[index]
+                        # store
+                        l.append(val)
+
+                    self.lastStep_CDS.data[p] = np.array(l)
 
 
             return None
@@ -618,17 +620,22 @@ class Watcher():
                 means = np.nanmean(step, axis=0)
                 stds  = np.nanstd(step,  axis=0)
 
+                stds[np.isnan(means)]  = 0.0
+                means[np.isnan(means)] = 0.0
+
+
                 # Stream accepts a dict of lists
                 newdata = dict()
-                newdata['step'] = [self.s]
+                newdata['step'] = np.array([self.s])
 
                 for i, label in enumerate(self.labels):
-                    newdata[label+'Mean'] = [means[i]]
-                    newdata[label+'StdUpper']  = [means[i]+stds[i]]
-                    newdata[label+'StdLower']  = [means[i]-stds[i]]
+                    newdata[label+'Mean'] = np.array([means[i]])
+                    newdata[label+'StdUpper']  = np.array([means[i]+stds[i]])
+                    newdata[label+'StdLower']  = np.array([means[i]-stds[i]])
 
                 # Add to the plot.
                 self.paramFollowSource.stream(newdata, self.tail)
+
 
     def add_tracking_plot(self, attr, old, new):
         '''Add a plot to the page'''
@@ -718,7 +725,7 @@ class Watcher():
             get = par.replace('_0', '_{}'.format(fileNumber))
             index = parNames.index(get)
             param = stepData[index]
-            
+
             print("Setting the slider for {} to {}".format(get, param))
             slider.on_change('value', self.junk)
             slider.value = param
@@ -737,7 +744,7 @@ class Watcher():
                 slider.on_change('value', self.junk)
                 slider.value = param
                 slider.on_change('value', self.update_lc_model)
-        
+
         self.lc_isvalid.button_type = 'default'
 
     def recalc_lc_model(self):
@@ -749,12 +756,24 @@ class Watcher():
 
             self.cv = CV(pars)
 
+            rwd = pars[8]
+            scale = pars[9]
+
+
             self.lc_obs.data['calc']  = self.cv.calcFlux(pars, np.array(self.lc_obs.data['phase']))
-            # Components 
+            # Components
             self.lc_obs.data['sec']   = self.cv.yrs
             self.lc_obs.data['bspot'] = self.cv.ys
             self.lc_obs.data['wd']    = self.cv.ywd
             self.lc_obs.data['disc']  = self.cv.yd
+            self.lc_isvalid.button_type = 'default'
+            self.lc_isvalid.label = 'Get current step'
+
+            if rwd < (1./3.)*scale or scale > 3.*rwd:
+                print("BS Scale must be between 1/3 and 3 time WD size!")
+                self.lc_isvalid.button_type = 'danger'
+                self.lc_isvalid.label = 'BAD BS/RWD RATIO!'
+
         except Exception:
             print("Invalid parameters!")
             self.lc_isvalid.button_type = 'danger'
@@ -786,7 +805,7 @@ class Watcher():
                 parNames.append(name.format(i+1))
 
         self.parNames = list(parNames)
-        
+
         parNames.append('Likelihood')
 
         self.selectList = [(par, par) for par in parNames]
@@ -836,7 +855,7 @@ class Watcher():
             thin = int(thin)
         except:
             self.thin_input.value = ''
-        
+
         self.thin = thin
         self.make_header()
 
@@ -888,6 +907,7 @@ class Watcher():
             slider.on_change('value', self.junk)
             slider.value = value
             slider.on_change('value', self.update_lc_model)
+
         # Are we complex? If yes, set those too
         if self.complex:
             parNamesComplex = ['exp1_{}', 'exp2_{}', 'tilt_{}', 'yaw_{}']
@@ -905,7 +925,7 @@ class Watcher():
 
         # Total mode lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
-        # Components 
+        # Components
         new_obs['sec']   = self.cv.yrs
         new_obs['bspot'] = self.cv.ys
         new_obs['wd']    = self.cv.ywd
@@ -929,7 +949,8 @@ class Watcher():
     def make_header(self):
         '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
 
-        header =  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
+        header  = "I'm working from the directory: <b>{}</b></br>".format(getcwd())
+        header +=  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
             self.nBurn, self.nProd)
         header += " We're using <b>{:,d}</b> walkers,".format(self.nWalkers)
 
@@ -951,16 +972,16 @@ class Watcher():
             else:
                 write = p+'th'
 
-            header += " When plotting parameter evolutions, I'm skipping every "
-            header += "<b>{}</b> step and only keeping the last <b>{:,d}</b> data".format(write, self.tail)
+            header += " When plotting parameter evolutions, I'm plotting every "
+            header += "<b>{}</b> step and only keeping the last <b>{:,d}</b> steps".format(write, self.tail)
         else:
-            header += " When plotting parameter evolutions, I'll plot every step."
-        
+            header += " When plotting parameter evolutions, I'll plot every step, and keep the last <b>{:,d}</b> steps.".format(self.tail)
+
         self.reportChain_label.text = header
 
     def write2input(self):
         '''Get the slider values, and modify mcmc_input.dat to match them.'''
-        
+
         # Figure out which eclipse we're looking at
         fname = self.lc_obs_fname
         template = 'file_{}'
@@ -999,18 +1020,18 @@ class Watcher():
                     par = line_components[0]
                     if par in labels:
                         value = newvalues[par]
-                        
+
                         newline = line_components.copy()
                         newline[2] = value
                         newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
                             str(newline[0]),
-                            float(newline[2]), 
+                            float(newline[2]),
                             str(newline[3]),
-                            float(newline[4]), 
-                            float(newline[5]), 
+                            float(newline[4]),
+                            float(newline[5]),
                             int(newline[6])
                             )
-                        
+
                         line = newline
                 mcmc_file.append(line)
 
@@ -1036,7 +1057,7 @@ class Watcher():
             self.cornerReporter.text += "</br>Throwing away the first {:,d} steps of the product phase...".format(N)
         except:
             N = 0
-        
+
         chain = chain[:, N:, :]
         self.cornerReporter.text += "</br>Using {:,d} steps".format(chain.shape[1])
         flat = u.flatchain(chain, chain.shape[2])
@@ -1078,7 +1099,7 @@ class Watcher():
             if a:
                 for i in perm:
                     labels.append(parNames[i])
-                
+
                 night = np.concatenate((night, flat[:, perm]), axis=1)
 
             self.cornerReporter.text += "</br>Making the figure for eclipse {}...".format(j)
