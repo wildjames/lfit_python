@@ -222,7 +222,7 @@ class Watcher():
         print("Made the sliders...")
 
         # Data file picker
-        self.lc_change_fname_button = Dropdown(label="Choose Data", button_type="success", menu=menu, width=250)
+        self.lc_change_fname_button = Dropdown(label="Choose Data", button_type="success", menu=menu, width=500)
         self.lc_obs_fname = menu[0][0]
         self.lc_change_fname_button.on_change('value', self.update_lc_obs)
         print("Made the data picker...")
