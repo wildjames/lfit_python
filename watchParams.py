@@ -153,8 +153,15 @@ class Watcher():
         # self.tail_input = TextInput(placeholder='Number of steps to plot', width=200)
         # self.tail_input.on_change('value', self.update_tail)
 
+        # Shortcut to the Likelihood plot
+        self.likelihood_shortcut = Button(label='Quick Pars', width=200)
+        self.likelihood_shortcut.on_click(self.add_likelihood_plot)
+
         # Add stuff to a layout for the area
-        self.tab1_layout = column([self.reportChain_label, self.thin_input, self.plotPars])
+        self.tab1_layout = column([
+            self.reportChain_label,
+            self.thin_input,
+            row([self.plotPars, self.likelihood_shortcut])])
 
         # Add that layout to a tab
         self.tab1 = Panel(child=self.tab1_layout, title="Parameter History")
@@ -638,13 +645,29 @@ class Watcher():
 
 
     def add_tracking_plot(self, attr, old, new):
-        '''Add a plot to the page'''
+        '''Add a user-defined to the page'''
 
         print("Attempting to add a plot to the page")
 
         label = str(self.plotPars.value)
         params = [par[0] for par in self.selectList]
         par = params.index(label)
+        self.add_par_plot(label, par)
+
+    def add_likelihood_plot(self):
+        '''Add the global parameters to the page'''
+
+        labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
+        pars = [-1, 4, 5, 8]
+
+        for label, par in zip(labels, pars):
+            self.add_par_plot(label, par)
+
+    def add_par_plot(self, label, par):
+        '''Add a plot to the page'''
+
+        print("Adding a plot to the page: Label, Par: {}, {}".format(label, par))
+
         self.labels.append(label)
         self.pars.append(par)
 
@@ -689,7 +712,8 @@ class Watcher():
 
         print("Added a new plot!")
 
-        self.doc.add_next_tick_callback(self.update_chain)
+        if not self.f is False:
+            self.doc.add_next_tick_callback(self.update_chain)
 
     def reset_sliders(self):
         '''Set the parameters to the initial guesses.'''
