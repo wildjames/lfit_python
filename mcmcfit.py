@@ -114,7 +114,7 @@ class LCModel(Model):
             # Check for bugs in model
             if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
                 warnings.warn('model gave nan or inf answers')
-                return -np.inf
+                return np.inf
             retVal += np.sum(resids**2)
         return retVal
 
@@ -358,11 +358,11 @@ class GPLCModel(LCModel):
                     ingress = changepoints[i+1]
                 except:
                     ingress = np.inf
-                kernel += ampout * g.kernels.Matern32Kernel(tau, block=(egress, ingress))
+                kernel += ampout * g.kernels.Matern32Kernel(tau, block=[egress, ingress])
             else:
                 ingress = changepoints[i]
                 egress  = changepoints[i+1]
-                kernel += ampin * g.kernels.Matern32Kernel(tau, block=(ingress, egress))
+                kernel += ampin * g.kernels.Matern32Kernel(tau, block=[ingress, egress])
 
         # Use that kernel to make a GP object
         georgeGP = g.GP(kernel)
@@ -481,9 +481,7 @@ if __name__ == "__main__":
         if np.isfinite(lnlike):
             return lnlike
         else:
-            print(parList)
-            print(lnlike)
-            return lnlike
+            return -np.inf
     def ln_prob(parList,phi,y,e,width=None):
         model.pars = parList
         return model.ln_prob(phi,y,e,width)
