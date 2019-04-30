@@ -793,6 +793,7 @@ if __name__ == "__main__":
 
         # CV model
         ax1.plot(xf,yf)
+        ax1.set_title(output_plots[iecl])
         ax1.plot(xf,model.cv.yrs, label='Sec')
         ax1.plot(xf,model.cv.ys, label='Spt')
         ax1.plot(xf,model.cv.ywd, label='WD')
@@ -862,6 +863,7 @@ if __name__ == "__main__":
         ax1.set_xlim(start,end)
         ax1.tick_params(top=True,right=True)
         ax2.tick_params(top=True,right=True)
+        ax2.axhline(0.0, color='black', linestyle='--')
         #ax2.set_xlim(ax1.get_xlim())
         #ax2.set_xlim(-0.1,0.12)
         if useGP:
@@ -880,10 +882,12 @@ if __name__ == "__main__":
         for ax in plt.gcf().get_axes()[::2]:
             ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
 
-        plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.gcf().set_size_inches(18.5, 10.5)
+        # plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.tight_layout()
 
         # Save plot images
-        plt.savefig(output_plots[iecl])
+        plt.savefig(output_plots[iecl]+".png")
         if toFit and useGP:
             plt.close()
         else:
