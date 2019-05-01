@@ -149,12 +149,15 @@ class Watcher():
         self.thin_input = TextInput(placeholder='Number of steps to skip over', width=200)
         self.thin_input.on_change('value', self.update_thinning)
 
-        # # Tail length - no way to update existing plot tail lengths...
-        # self.tail_input = TextInput(placeholder='Number of steps to plot', width=200)
-        # self.tail_input.on_change('value', self.update_tail)
+        # Shortcut to the Likelihood plot
+        self.likelihood_shortcut = Button(label='Quick Pars', width=200)
+        self.likelihood_shortcut.on_click(self.add_likelihood_plot)
 
         # Add stuff to a layout for the area
-        self.tab1_layout = column([self.reportChain_label, self.thin_input, self.plotPars])
+        self.tab1_layout = column([
+            self.reportChain_label,
+            self.thin_input,
+            row([self.plotPars, self.likelihood_shortcut])])
 
         # Add that layout to a tab
         self.tab1 = Panel(child=self.tab1_layout, title="Parameter History")
