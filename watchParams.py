@@ -684,7 +684,7 @@ class Watcher():
 
         print("Closed and re-opened the file!")
 
-        new_plot = bk.plotting.figure(title=label, plot_height=300,
+        new_plot = bk.plotting.figure(title=label, plot_height=300, plot_width=1200,
             toolbar_location='above', y_axis_location="right",
             tools="ypan,ywheel_zoom,ybox_zoom,reset")
             # tools=[])
@@ -698,8 +698,6 @@ class Watcher():
         new_plot.x_range.range_padding = 0
         new_plot.y_range.range_padding_units = 'percent'
         new_plot.y_range.range_padding = 1
-
-        new_plot.sizing_mode = 'scale_width'
 
         # Make this add to the right tab
         self.tab1_layout.children.append(row(new_plot))
