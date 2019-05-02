@@ -114,7 +114,7 @@ class LCModel(Model):
             # Check for bugs in model
             if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
                 warnings.warn('model gave nan or inf answers')
-                return -np.inf
+                return np.inf
             retVal += np.sum(resids**2)
         return retVal
 
@@ -172,9 +172,10 @@ class LCModel(Model):
             retVal += -np.inf
 
         #BS scale
+        ratioLim = 3
         rwd = self.getParam('rwd')
-        minscale = rwd.currVal/3 # Minimum BS scale equal to 1/3 of rwd
-        maxscale = rwd.currVal*3 # Maximum BS scale equal to 3x rwd
+        minscale = rwd.currVal/ratioLim # Minimum BS scale equal to 1/3 of rwd
+        maxscale = rwd.currVal*ratioLim # Maximum BS scale equal to 3x rwd
         scaleTemplate = 'scale_{0}'
         for iecl in range(self.necl):
             scale = self.getParam(scaleTemplate.format(iecl))
@@ -182,7 +183,7 @@ class LCModel(Model):
             if scale.currVal < minscale or scale.currVal > maxscale:
                 retVal += -np.inf
                 if verbose:
-                    print('BS Scale is not between 1/3 and 3 times WD size')
+                    print('BS Scale is not between 1/{0} and {0} times WD size'.format(ratioLim))
 
         #BS az
         slope = 80.0
@@ -460,9 +461,7 @@ if __name__ == "__main__":
         if np.isfinite(lnlike):
             return lnlike
         else:
-            print(parList)
-            print(lnlike)
-            return lnlike
+            return -np.inf
     def ln_prob(parList,phi,y,e,width=None):
         model.pars = parList
         return model.ln_prob(phi,y,e,width)
@@ -773,6 +772,7 @@ if __name__ == "__main__":
 
         # CV model
         ax1.plot(xf,yf)
+        ax1.set_title(output_plots[iecl])
         ax1.plot(xf,model.cv.yrs, label='Sec')
         ax1.plot(xf,model.cv.ys, label='Spt')
         ax1.plot(xf,model.cv.ywd, label='WD')
@@ -842,6 +842,7 @@ if __name__ == "__main__":
         ax1.set_xlim(start,end)
         ax1.tick_params(top=True,right=True)
         ax2.tick_params(top=True,right=True)
+        ax2.axhline(0.0, color='black', linestyle='--')
         #ax2.set_xlim(ax1.get_xlim())
         #ax2.set_xlim(-0.1,0.12)
         if useGP:
@@ -860,10 +861,12 @@ if __name__ == "__main__":
         for ax in plt.gcf().get_axes()[::2]:
             ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
 
-        plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.gcf().set_size_inches(18.5, 10.5)
+        # plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.tight_layout()
 
         # Save plot images
-        plt.savefig(output_plots[iecl])
+        plt.savefig(output_plots[iecl]+".png")
         if toFit and useGP:
             plt.close()
         else:
