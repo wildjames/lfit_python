@@ -10,7 +10,7 @@ import configobj
 import lfit
 import emcee
 import warnings
-import GaussianProcess as GP
+import george as g
 from mcmc_utils import *
 import seaborn
 from collections import MutableSequence
@@ -293,24 +293,18 @@ class GPLCModel(LCModel):
         else:
             dist_cp = self._dist_cp
 
-        '''# Find location of all changepoints
-        for iecl in range(self.necl):
-            changepoints = []
-            phi0 = self.getParam(phi0Template.format(iecl))
-            # the following range construction gives a list
-            # of all mid-eclipse phases within phi array
-            for n in range (int( phi.min() ), int( phi.max() )+1, 1):
-                changepoints.append(n+phi0.currVal-dist_cp)
-                changepoints.append(n+phi0.currVal+dist_cp) '''
 
         # Find location of all changepoints
-
+        min_ecl = int(np.floor(phi.min()))
+        max_ecl = int(np.ceil(phi.max()))
+        eclipses = [e for e in range(min_ecl, max_ecl+1) if np.logical_and(e>phi.min(), e<1 + phi.max())]
         changepoints = []
-        # the following range construction gives a list
-        # of all mid-eclipse phases within phi array
-        for n in range (int( phi.min() ), int( phi.max() )+1, 1):
-            changepoints.append(n-dist_cp)
-            changepoints.append(n+dist_cp)
+        for e in eclipses:
+            # When did the last eclipse end?
+            egress = (e-1) + dist_cp
+            # When does this eclipse start?
+            ingress = e - dist_cp
+            changepoints.append([egress, ingress])
 
         # save these values for speed
         if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
@@ -338,37 +332,22 @@ class GPLCModel(LCModel):
         tau = np.exp(ln_tau.currVal)
 
         # Calculate kernels for both out of and in eclipse WD eclipse
-        # Kernel inside of WD has smaller amplitude than that of outside eclipse,
-        #k_in  = ampin*GP.ExpSquaredKernel(tau)
-        #k_out  = ampout*GP.ExpSquaredKernel(tau)
-        k_in  = ampin*GP.Matern32Kernel(tau)
-        k_out = ampout*GP.Matern32Kernel(tau)
-        #k_in  = ampin*GP.ExpKernel(tau)
-        #k_out = ampout*GP.ExpKernel(tau)
-
+        # Kernel inside of WD has smaller amplitude than that of outside eclipse
+        # First, get the changepoints
         changepoints = self.calcChangepoints(phi)
 
-        # Depending on number of changepoints, create kernel structure
-        kernel_struc = [k_out]
-        for k in range (int( phi.min() ), int( phi.max() )+1, 1):
-            kernel_struc.append(k_in)
-            kernel_struc.append(k_out)
+        # We need to make a fairly complex kernel.
+        # Global flicker
+        kernel = ampin * g.kernels.Matern32Kernel(tau)
+        # inter-eclipse flicker
+        for gap in changepoints:
+            kernel += ampout * g.kernels.Matern32Kernel(tau, block=gap)
 
-        # Create kernel with changepoints
-        kernel = GP.DrasticChangepointKernel(kernel_struc,changepoints)
+        # Use that kernel to make a GP object
+        georgeGP = g.GP(kernel)
 
-        '''k1 = GP.Matern32Kernel(tau)
+        return georgeGP
 
-        gp_pars = np.array([ampout,ampin,ampout])
-        changepoints = self.calcChangepoints(phi)
-
-        k2 = GP.OutputScaleChangePointKernel(gp_pars,changepoints)
-
-        kernel = k1*k2'''
-
-        # Create GPs using this kernel
-        gp = GP.GaussianProcess(kernel)
-        return gp
 
     def ln_like(self,phi,y,e,width=None):
         """Calculates the natural log of the likelihood.
