@@ -297,13 +297,13 @@ class GPLCModel(LCModel):
         # Find location of all changepoints
         min_ecl = int(np.floor(phi.min()))
         max_ecl = int(np.ceil(phi.max()))
-        eclipses = [e for e in range(min_ecl, max_ecl) if np.logical_and(e>phi.min(), e<phi.max())]
+        eclipses = [e for e in range(min_ecl, max_ecl+1) if np.logical_and(e>phi.min(), e<1 + phi.max())]
         changepoints = []
         for e in eclipses:
             # When did the last eclipse end?
-            egress = (e-1) - dist_cp
+            egress = (e-1) + dist_cp
             # When does this eclipse start?
-            ingress = e + dist_cp
+            ingress = e - dist_cp
             changepoints.append([egress, ingress])
 
         # save these values for speed
