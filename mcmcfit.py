@@ -10,7 +10,7 @@ import configobj
 import lfit
 import emcee
 import warnings
-import GaussianProcess as GP
+import george as g
 from mcmc_utils import *
 import seaborn
 from collections import MutableSequence
@@ -114,7 +114,7 @@ class LCModel(Model):
             # Check for bugs in model
             if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
                 warnings.warn('model gave nan or inf answers')
-                return -np.inf
+                return np.inf
             retVal += np.sum(resids**2)
         return retVal
 
@@ -172,9 +172,10 @@ class LCModel(Model):
             retVal += -np.inf
 
         #BS scale
+        ratioLim = 3
         rwd = self.getParam('rwd')
-        minscale = rwd.currVal/3 # Minimum BS scale equal to 1/3 of rwd
-        maxscale = rwd.currVal*3 # Maximum BS scale equal to 3x rwd
+        minscale = rwd.currVal/ratioLim # Minimum BS scale equal to 1/3 of rwd
+        maxscale = rwd.currVal*ratioLim # Maximum BS scale equal to 3x rwd
         scaleTemplate = 'scale_{0}'
         for iecl in range(self.necl):
             scale = self.getParam(scaleTemplate.format(iecl))
@@ -182,7 +183,7 @@ class LCModel(Model):
             if scale.currVal < minscale or scale.currVal > maxscale:
                 retVal += -np.inf
                 if verbose:
-                    print('BS Scale is not between 1/3 and 3 times WD size')
+                    print('BS Scale is not between 1/{0} and {0} times WD size'.format(ratioLim))
 
         #BS az
         slope = 80.0
@@ -338,37 +339,36 @@ class GPLCModel(LCModel):
         tau = np.exp(ln_tau.currVal)
 
         # Calculate kernels for both out of and in eclipse WD eclipse
-        # Kernel inside of WD has smaller amplitude than that of outside eclipse,
-        #k_in  = ampin*GP.ExpSquaredKernel(tau)
-        #k_out  = ampout*GP.ExpSquaredKernel(tau)
-        k_in  = ampin*GP.Matern32Kernel(tau)
-        k_out = ampout*GP.Matern32Kernel(tau)
-        #k_in  = ampin*GP.ExpKernel(tau)
-        #k_out = ampout*GP.ExpKernel(tau)
-
+        # Kernel inside of WD has smaller amplitude than that of outside eclipse
+        # First, get the changepoints
         changepoints = self.calcChangepoints(phi)
 
-        # Depending on number of changepoints, create kernel structure
-        kernel_struc = [k_out]
-        for k in range (int( phi.min() ), int( phi.max() )+1, 1):
-            kernel_struc.append(k_in)
-            kernel_struc.append(k_out)
+        # We need to make a fairly complex kernel.
+        # Initialise with an 'out of eclipse' kernel, that runs from negative infinity to the first changepoint.
+        kernel = ampout * g.kernels.Matern32Kernel(tau, block=(-np.inf, changepoints[0]) )
+        for i, _ in enumerate(changepoints):
+            # For each changepoint, and it's neighbour, check if we're:
+            # - inside an eclipse (odd i)
+            # - outside an eclipse (even i)
+            if i%2:
+                # If we're inside an eclipse, use ampout
+                egress = changepoints[i]
+                try:
+                    # If we fail, then we've reached the end. Set the upper limit to inf.
+                    ingress = changepoints[i+1]
+                except:
+                    ingress = np.inf
+                kernel += ampout * g.kernels.Matern32Kernel(tau, block=[egress, ingress])
+            else:
+                ingress = changepoints[i]
+                egress  = changepoints[i+1]
+                kernel += ampin * g.kernels.Matern32Kernel(tau, block=[ingress, egress])
 
-        # Create kernel with changepoints
-        kernel = GP.DrasticChangepointKernel(kernel_struc,changepoints)
+        # Use that kernel to make a GP object
+        georgeGP = g.GP(kernel)
 
-        '''k1 = GP.Matern32Kernel(tau)
+        return georgeGP
 
-        gp_pars = np.array([ampout,ampin,ampout])
-        changepoints = self.calcChangepoints(phi)
-
-        k2 = GP.OutputScaleChangePointKernel(gp_pars,changepoints)
-
-        kernel = k1*k2'''
-
-        # Create GPs using this kernel
-        gp = GP.GaussianProcess(kernel)
-        return gp
 
     def ln_like(self,phi,y,e,width=None):
         """Calculates the natural log of the likelihood.
@@ -481,9 +481,7 @@ if __name__ == "__main__":
         if np.isfinite(lnlike):
             return lnlike
         else:
-            print(parList)
-            print(lnlike)
-            return lnlike
+            return -np.inf
     def ln_prob(parList,phi,y,e,width=None):
         model.pars = parList
         return model.ln_prob(phi,y,e,width)
@@ -794,6 +792,7 @@ if __name__ == "__main__":
 
         # CV model
         ax1.plot(xf,yf)
+        ax1.set_title(output_plots[iecl])
         ax1.plot(xf,model.cv.yrs, label='Sec')
         ax1.plot(xf,model.cv.ys, label='Spt')
         ax1.plot(xf,model.cv.ywd, label='WD')
@@ -863,6 +862,7 @@ if __name__ == "__main__":
         ax1.set_xlim(start,end)
         ax1.tick_params(top=True,right=True)
         ax2.tick_params(top=True,right=True)
+        ax2.axhline(0.0, color='black', linestyle='--')
         #ax2.set_xlim(ax1.get_xlim())
         #ax2.set_xlim(-0.1,0.12)
         if useGP:
@@ -881,10 +881,12 @@ if __name__ == "__main__":
         for ax in plt.gcf().get_axes()[::2]:
             ax.yaxis.set_major_locator(MaxNLocator(prune='both'))
 
-        plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.gcf().set_size_inches(18.5, 10.5)
+        # plt.subplots_adjust(bottom=0.095, top=0.965, left=0.12, right=0.975)
+        plt.tight_layout()
 
         # Save plot images
-        plt.savefig(output_plots[iecl])
+        plt.savefig(output_plots[iecl]+".png")
         if toFit and useGP:
             plt.close()
         else:
