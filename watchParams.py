@@ -149,10 +149,6 @@ class Watcher():
         self.thin_input = TextInput(placeholder='Number of steps to skip over', width=200)
         self.thin_input.on_change('value', self.update_thinning)
 
-        # # Tail length - no way to update existing plot tail lengths...
-        # self.tail_input = TextInput(placeholder='Number of steps to plot', width=200)
-        # self.tail_input.on_change('value', self.update_tail)
-
         # Shortcut to the Likelihood plot
         self.likelihood_shortcut = Button(label='Quick Pars', width=200)
         self.likelihood_shortcut.on_click(self.add_likelihood_plot)
@@ -658,7 +654,7 @@ class Watcher():
         '''Add the global parameters to the page'''
 
         labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
-        pars = [-1, 4, 5, 8]
+        pars = [-1, 5, 6, 9]
 
         for label, par in zip(labels, pars):
             self.add_par_plot(label, par)
