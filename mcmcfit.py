@@ -345,7 +345,7 @@ class GPLCModel(LCModel):
             kernel += ampout * g.kernels.Matern32Kernel(tau, block=gap)
 
         # Use that kernel to make a GP object
-        georgeGP = g.GP(kernel)
+        georgeGP = g.GP(kernel, solver=g.HODLRSolver)
 
         return georgeGP
 
