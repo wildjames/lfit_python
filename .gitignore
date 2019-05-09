@@ -8,6 +8,7 @@ Results/**
 Chains/**
 *.dat
 !input.dat
+!Hamada/mr_hamada.dat
 Benchmarking.py
 chain_wd.txt
 fudgeChains.py
