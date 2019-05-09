@@ -6,7 +6,6 @@ import os, sys
 from astropy import constants as const, units
 from astropy.table import Table, Column
 from astropy.utils.console import ProgressBar as PB
-from progress import ProgressBar
 # see if our astropy version supports quantities or not
 quantitySupport = True
 try:
@@ -220,6 +219,7 @@ if __name__ == "__main__":
     flat = args.flat
     baseDir = args.dir
 
+    print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
         fchain = readflatchain(file)
@@ -230,6 +230,7 @@ if __name__ == "__main__":
         chain = readchain_dask(file)
         nwalkers, nsteps, npars = chain.shape
         fchain = flatchain(chain,npars,thin=thin)
+    print("Done!")
 
     # this is the order of the params in the chain
     nameList = ['fwd','fdisc','fbs','fd','q','dphi','rdisc','ulimb','rwd','scale', \
@@ -260,11 +261,8 @@ if __name__ == "__main__":
 
     print('Writing out results...')
     # loop over these results and put all the solutions in our results table
-    iStep = 0
-    bar = ProgressBar()
-    for thisResult in solvedParams:
-        bar.render(int(100*iStep/(len(solvedParams))),'Combining data')
-        iStep += 1
+    bar = PB(solvedParams)
+    for thisResult in bar:
         if thisResult is not None:
             results.add_row(thisResult)
 
