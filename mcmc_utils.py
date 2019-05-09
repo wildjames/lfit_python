@@ -26,22 +26,26 @@ class Prior(object):
     '''a class to represent a prior on a parameter, which makes calculating
     prior log-probability easier.
 
-    Priors can be of five types: gauss, gaussPos, uniform, log_uniform and mod_jeff
+    Priors can be of five types:
+        gauss, gaussPos, uniform, log_uniform and mod_jeff
 
     gauss is a Gaussian distribution, and is useful for parameters with
     existing constraints in the literature
     gaussPos is like gauss but enforces positivity
     Gaussian priors are initialised as Prior('gauss',mean,stdDev)
 
-    uniform is a uniform prior, initialised like Prior('uniform',low_limit,high_limit)
+    uniform is a uniform prior, initialised like:
+        Prior('uniform',low_limit,high_limit)
     uniform priors are useful because they are 'uninformative'
 
-    log_uniform priors have constant probability in log-space. They are the uninformative prior
-    for 'scale-factors', such as error bars (look up Jeffreys prior for more info)
+    log_uniform priors have constant probability in log-space. They are the
+    uninformative prior for 'scale-factors', such as error bars (look up
+    Jeffreys prior for more info)
 
     mod_jeff is a modified jeffries prior - see Gregory et al 2007
-    they are useful when you have a large uncertainty in the parameter value, so
-    a jeffreys prior is appropriate, but the range of allowed values starts at 0
+    they are useful when you have a large uncertainty in the parameter value,
+    so a jeffreys prior is appropriate, but the range of allowed values
+    starts at 0
 
     they have two parameters, p0 and pmax.
     they act as a jeffrey's prior about p0, and uniform below p0. typically
@@ -163,7 +167,8 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior):
         # Create replacement values from valid walkers
         replacements = p0[isValid][replacement_rows]
         # Add scatter to replacement values
-        replacements += 0.5*replacements*scatter*np.random.normal(size=replacements.shape)
+        replacements += 0.5*replacements*scatter*np.random.normal(
+            size=replacements.shape)
         # Replace invalid walkers with new values
         p0[~isValid] = replacements
         numInvalid = len(p0[~isValid])
@@ -195,7 +200,8 @@ def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
         # Create replacement values from valid walkers
         replacements = p0[isValid][replacement_rows]
         # Add scatter to replacement values
-        replacements += 0.5*replacements*scatter*np.random.normal(size=replacements.shape)
+        replacements += 0.5*replacements*scatter*np.random.normal(
+            size=replacements.shape)
         # Replace invalid walkers with new values
         p0[~isValid] = replacements
         numInvalid = len(p0[~isValid])
@@ -207,7 +213,9 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, state in sampler.sample(startPos, iterations=nSteps, storechain=storechain):
+    for pos, prob, state in sampler.sample(startPos,
+                                           iterations=nSteps,
+                                           storechain=storechain):
         iStep += 1
         if progress:
             bar.update()
@@ -216,7 +224,8 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     return pos, prob, state
 
 
-def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwargs):
+def run_mcmc_save(sampler, startPos, nSteps, rState, file,
+                  progress=True, **kwargs):
     '''runs an MCMC chain with emcee, and saves steps to a file'''
     # open chain save file
     if file:
@@ -225,7 +234,8 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwar
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, state in sampler.sample(startPos, iterations=nSteps, rstate0=rState,
+    for pos, prob, state in sampler.sample(startPos,
+                                           iterations=nSteps, rstate0=rState,
                                            storechain=True, **kwargs):
         if file:
             f = open(file, "a")
@@ -237,7 +247,8 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwar
             thisPos = pos[k]
             thisProb = prob[k]
             if file:
-                f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
+                f.write("{0:4d} {1:s} {2:f}\n".format(
+                    k, " ".join(map(str, thisPos)), thisProb))
         if file:
             f.close()
     if progress:
@@ -245,15 +256,21 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwar
     return sampler
 
 
-def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
+def run_ptmcmc_save(sampler, startPos, nSteps, file,
+                    progress=True, col_names='', **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
     if file:
         f = open(file, "w")
+        f.write(col_names)
+        if col_names:
+            f.write("\n")
         f.close()
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, like in sampler.sample(startPos, iterations=nSteps, storechain=True, **kwargs):
+    for pos, prob, like in sampler.sample(startPos,
+                                          iterations=nSteps,
+                                          storechain=True, **kwargs):
         f = open(file, "a")
         iStep += 1
         if progress:
@@ -266,23 +283,27 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
         for k in range(zpos.shape[0]):
             thisPos = zpos[k]
             thisProb = zprob[k]
-            f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
+            f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
+                map(str, thisPos)), thisProb))
         f.close()
     if progress:
         bar.close()
     return sampler
 
 
-def flatchain(chain, npars, nskip=0, thin=1):
+def flatchain(chain, npars=None, nskip=0, thin=1):
     '''flattens a chain (i.e collects results from all walkers),
     with options to skip the first nskip parameters, and thin the chain
     by only retrieving a point every thin steps - thinning can be useful when
     the steps of the chain are highly correlated'''
+    if npars is None:
+        npars = chain.shape[2]
     return chain[:, nskip::thin, :].reshape((-1, npars))
 
 
 def readchain(file, nskip=0, thin=1):
-    data = pd.read_csv(file, header=None, compression=None, delim_whitespace=True)
+    data = pd.read_csv(file, header=None, compression=None,
+                       delim_whitespace=True)
     data = np.array(data)
     nwalkers = int(data[:, 0].max()+1)
     nprod = int(data.shape[0]/nwalkers)
@@ -304,7 +325,8 @@ def readchain_dask(file, nskip=0, thin=1):
 
 
 def readflatchain(file):
-    data = pd.read_csv(file, header=None, compression=None, delim_whitespace=True)
+    data = pd.read_csv(file, header=None, compression=None,
+                       delim_whitespace=True)
     data = np.array(data)
     return data
 
@@ -336,7 +358,8 @@ def GR_diagnostic(sampler_chain):
         between = sum((psi_j_dot - psi_dot_dot)**2) / (m - 1)
 
         # Calculate within-chain variance
-        inner_sum = np.sum(np.array([(psi_j_t[j, :] - psi_j_dot[j])**2 for j in range(m)]), axis=1)
+        inner_sum = np.sum(np.array([(psi_j_t[j, :] - psi_j_dot[j])**2
+                                     for j in range(m)]), axis=1)
         outer_sum = np.sum(inner_sum)
         W = outer_sum / (m*(n-1))
 
@@ -372,7 +395,7 @@ def ln_marginal_likelihood(params, lnp):
     sigmas = params.std(axis=0)
 
     # now for the magic
-    # at each step in the chain, add up 0.5*((val-best)/sigma)**2 for all params
+    # at each step, add up 0.5*((val-best)/sigma)**2 for all params
     term = 0.5*((params-best)/sigmas)**2
     term = term.sum(axis=1)
 

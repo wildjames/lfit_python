@@ -1,21 +1,83 @@
-import GaussianProcess as GP
+import lfit
+# from celerite.modeling import Model  # don't actually use, this but be inspired by it
+import numpy as np
 
-amp, tau = 2.0, 0.01
-k_out = amp*GP.ExpSquaredKernel(tau)
-k_in  = 0.01*amp*GP.ExpSquaredKernel(tau)
+"""
+Kind of like celerites model class (though dont get too bogged down)
 
-# find times of WD eclipse present in data. 
-# need to be careful that this works when data
-# crosses phi = 0 and also when there is more
-# than one eclipse in the date
-# this version is NOT careful
-dphi = 0.05
-changepoints = [-dphi/2., dphi/2.]
+But we expand it to encompass the idea of a model optionally having
+parents and children. Set parameters from top down, get from bottom up
+"""
 
-# create kernel with changepoints 
-# obviously need one more kernel than changepoints!
-kernel = GP.DrasticChangepointKernel([k_out,k_in,k_out],changepoints)
 
-gp = GP.GaussianProcess(kernel)
-gp.compute(phi,errs)
-return gp.lnlikelihood(residuals)
+class Model:
+    def __init__(self, parameter_names, parent=None):
+        self.parameter_names = parameter_names
+        self.parent = parent
+
+    def get_parameter_names(self):
+        root = [] if self.parent is None else self.parent.get_parameter_names()
+        return root + self.parameter_names
+
+    def get_parameter(self, name):
+        if hasattr(self, name):
+            return getattr(self, name)
+        else:
+            return getattr(self.parent, name)
+
+    def set_parameter(self, name, val):
+        if hasattr(self, name):
+            self.name = val
+        else:
+            self.parent.name = val
+
+    def set_parameter_vector(self, vec):
+        for name, val in zip(self.parameter_names, vec):
+            self.set_parameter(name, val)
+
+
+class LightCurve:
+    def __init__(self, x, dx, y, e):
+        self.x = x
+        self.dx = dx
+        self.y = y
+        self.e = e
+
+
+class Eclipse(Model):
+
+    def __init__(self, lightcurve, band):
+        super().__init__(['rdisc', 'bstilt'], band)
+        self.lc = lightcurve
+
+
+class Band(Model):
+    def __init__(self, band_name):
+        super().__init__(['wdflux_{}'.format(band_name)])
+
+
+class LCModel(Model):
+    def __init__(self, bands):
+        assert all(isinstance(b, Band) for b in bands)
+        self.bands = list(bands)
+
+    def chisq(self, params):
+        self.set_parameter_list(params)
+        chisq = 0.0
+        for band in self.bands:
+            for eclipse in band.eclipses:
+                chisq += eclipse.chisq()
+        return chisq
+
+    def get_parameter_vector(self):
+        """
+        Should return list of parameter values like this
+
+        The for loop is needed because get_parameter_vector *should* be on
+        abstract class and automatically goes through children
+        """
+        pars = self.parameters()
+        for band in self.bands:
+            pars.extend(band.get_parameter_vector())
+            for eclipse in band.eclipses:
+                pars.extend(eclipse.get_parameter_vector())
