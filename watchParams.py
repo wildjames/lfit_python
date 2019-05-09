@@ -747,7 +747,7 @@ class Watcher():
             param = stepData[index]
 
             print("Setting the slider for {} to {}".format(get, param))
-            slider.on_change('value', self.junk)
+            slider.remove_on_change('value', self.update_lc_model)
             slider.value = param
             slider.on_change('value', self.update_lc_model)
 
@@ -761,10 +761,11 @@ class Watcher():
                 param = stepData[index]
 
                 print("Setting the slider for {} to {}".format(get, param))
-                slider.on_change('value', self.junk)
+                slider.remove_on_change('value', self.update_lc_model)
                 slider.value = param
                 slider.on_change('value', self.update_lc_model)
 
+        self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
 
     def recalc_lc_model(self):
@@ -858,7 +859,7 @@ class Watcher():
             print("Changing to the simple BS model")
             # Change the complex sliders to do nothing
             for slider in self.par_sliders_complex:
-                slider.on_change('value', self.junk)
+                slider.remove_on_change('value', self.update_lc_model)
             print("Disabled the comlpex sliders")
 
             # Initialise a new CV object with the new BS model
@@ -923,8 +924,8 @@ class Watcher():
             'rwd', 'scale_{}', 'az_{}', 'fis_{}', 'dexp_{}', 'phi0_{}']
         parNames = [x.format(i) for x in parNames]
         for par, slider in zip(parNames, self.par_sliders):
+            slider.remove_on_change('value', self.update_lc_model)
             value = self.parDict[par][0]
-            slider.on_change('value', self.junk)
             slider.value = value
             slider.on_change('value', self.update_lc_model)
 
@@ -933,8 +934,8 @@ class Watcher():
             parNamesComplex = ['exp1_{}', 'exp2_{}', 'tilt_{}', 'yaw_{}']
             parNamesComplex = [x.format(i) for x in parNamesComplex]
             for par, slider in zip(parNamesComplex, self.par_sliders_complex):
+                slider.remove_on_change('value', self.update_lc_model)
                 value = self.parDict[par][0]
-                slider.on_change('value', self.junk)
                 slider.value = value
                 slider.on_change('value', self.update_lc_model)
 
