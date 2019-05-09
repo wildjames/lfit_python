@@ -655,6 +655,13 @@ class Watcher():
 
         labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
         pars = [-1, 5, 6, 9]
+        if self.GP:
+            labels.extend(['ampin', 'ampout', 'tau'])
+            if self.complex:
+                pars.extend([19, 20, 21])
+            else:
+                pars.extend([16, 17, 18])
+
 
         for label, par in zip(labels, pars):
             self.add_par_plot(label, par)
