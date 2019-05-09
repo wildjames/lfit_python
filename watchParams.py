@@ -953,8 +953,7 @@ class Watcher():
         new_obs['disc']  = self.cv.yd
 
         # Push that into the data frame
-        rollover = len(new_obs['phase'])
-        self.lc_obs.stream(new_obs, rollover)
+        self.lc_obs.data = dict(new_obs)
 
         # Set the plotting area title
         fname = fname.split('/')[-1]
