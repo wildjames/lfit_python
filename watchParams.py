@@ -698,7 +698,7 @@ class Watcher():
 
         pars = [like_index, 5, 6, 9]
         if self.GP:
-            labels.extend(['ampin', 'ampout', 'tau'])
+            labels.extend(['ampin_gp', 'ampout_gp', 'tau'])
             if self.complex:
                 pars.extend([19, 20, 21])
             else:
