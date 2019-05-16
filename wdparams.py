@@ -13,6 +13,7 @@ from collections import MutableSequence
 import warnings
 import sys
 import seaborn
+from os.path import realpath
 
 class wdModel(MutableSequence):
     '''wd model
@@ -22,6 +23,7 @@ class wdModel(MutableSequence):
     this enables it to be seamlessly used with emcee
 
     Note that parallax should be provided in MILLIarcseconds.'''
+
 
     # arguments are Param objects (see mcmc_utils)
     def __init__(self,teff,logg,plax,ebv):
@@ -66,9 +68,12 @@ def parseInput(file):
 def model(thisModel,mask):
     t, g, p, ebv = thisModel
     d = thisModel.dist
-
+    
     # load bergeron models
-    data = np.loadtxt('Bergeron/da_ugrizkg5.txt')
+    myLoc = realpath(__file__)
+    myLoc = myLoc.split('/')[:-1]
+    myLoc = '/'.join(myLoc)
+    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -215,7 +220,10 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
 def plotColors(mags):
 
     # load bergeron models
-    data = numpy.loadtxt('Bergeron/da_ugrizkg5.txt')
+    myLoc = realpath(__file__)
+    myLoc = myLoc.split('/')[:-1]
+    myLoc = '/'.join(myLoc)
+    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
 
     # bergeron model magnitudes
     umags = data[:,4]
@@ -345,11 +353,12 @@ if __name__ == "__main__":
     for ecl in range(0,neclipses):
         filters.append(input_dict['fil_{0}'.format(ecl)])
     filters = np.array(filters)
-    print(filters)
+    print("I have the following filters:\n", filters)
 
     # Load in chain file
     file = input_dict['chain']
 
+    print("Reading in the chain file,", file)
     if flat:
         fchain = readflatchain(file)
     else:
@@ -357,6 +366,7 @@ if __name__ == "__main__":
         chain = readchain_dask(file)
         nwalkers, nsteps, npars = chain.shape
         fchain = flatchain(chain,npars,thin=thin)
+    print("Done!")
 
     # Create array of indexes of same filter type
     uband_filters = np.where(filters == 'u')
@@ -555,8 +565,11 @@ if __name__ == "__main__":
     if 'uflux' in locals(): uband_used = True
     mask = np.array([uband_used,gband_used,rband_used,iband_used,zband_used,kg5band_used])
 
-    print(mask)
-    myModel = wdModel(teff,logg,plax,ebv)
+    print("I'm using the filters:")
+    temp = ['u', 'g', 'r','i' , 'z', 'kg5']
+    for t, m in zip(temp, mask):
+        print("{}: {}".format(t, m))
+    myModel = wdModel(teff,logg,dist,ebv)
 
     npars = myModel.npars
 
