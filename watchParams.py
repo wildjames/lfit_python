@@ -1,6 +1,6 @@
 import bokeh as bk
 from bokeh.layouts import row, column, gridplot, layout
-from bokeh.models import ColumnDataSource, Band, Whisker
+from bokeh.models import ColumnDataSource, Band, Whisker, Span
 from bokeh.models.annotations import Title
 from bokeh.plotting import curdoc, figure
 from bokeh.server.callbacks import NextTickCallback
@@ -243,6 +243,7 @@ class Watcher():
         # Total model lightcurve
         # TODO: This is slow, make the page with this empty at first, then populate the data in a callback afterwards
         self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['res']   = np.zeros_like(self.lc_obs['phase'])
         # Components
         self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
         self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
@@ -259,9 +260,20 @@ class Watcher():
         # Initialise the figure
         title = menu[0][0]
         self.lc_plot = bk.plotting.figure(title=title, plot_height=500, plot_width=1200,
-            toolbar_location='above', y_axis_location="left")
+            toolbar_location='above', y_axis_location="left", x_axis_location=None)
         # Plot the lightcurve data
         self.lc_plot.scatter(x='phase', y='flux', source=self.lc_obs, size=5, color='black')
+
+        # also plot residuals
+        self.lc_res_plot = bk.plotting.figure(plot_height=250, plot_width=1200,
+            toolbar_location=None, y_axis_location="left",
+            x_range=self.lc_plot.x_range)#, y_range=self.lc_plot.y_range)
+        # Plot the lightcurve data
+        self.lc_res_plot.scatter(x='phase', y='res', source=self.lc_obs, size=5, color='red')
+        self.lc_res_plot.renderers.extend([
+            Span(location=0, dimension='width', line_color='green', line_width=1)
+            ])
+
 
         # # Plot the error bars - Bokeh doesnt have a built in errorbar!?!
         # # The following function does NOT remove old errorbars when new ones are supplied!
@@ -293,7 +305,7 @@ class Watcher():
 
         # Arrange the tab layout
         self.tab2_layout = column([
-            self.lc_plot,
+            column([self.lc_plot, self.lc_res_plot]),
             row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
             row([gridplot(self.par_sliders, ncols=4),
                  gridplot(self.par_sliders_complex, ncols=1)]),
@@ -452,12 +464,15 @@ class Watcher():
             line = [x for x in line if x != '']
 
             if 'gauss' in line:
-                min = float(line[2]) - (5*float(line[3]))
-                max = float(line[2]) + (5*float(line[3]))
-                line[2] = min
-                line[3] = max
+                prior_min = float(line[2]) - (5*float(line[3]))
+                prior_max = float(line[2]) + (5*float(line[3]))
+                line[2] = prior_min
+                line[3] = prior_max
 
-            line = [line[0], line[2], line[3]]
+            line = [float(line[0]), float(line[2]), float(line[3]), bool(int(line[-1]))]
+            print("Par: {:>15s}: Val: {:>6.3f}, prior range: {:>6.3f} - {:<6.3f}, fit?: {}".format(
+                param, line[0], line[1], line[2], line[3]
+            ))
 
             parameter = [float(x) for x in line]
             self.parDict[param] = list(parameter)
@@ -561,8 +576,10 @@ class Watcher():
                     stepData[w, :] = values
             lastStep /= float(self.nWalkers)
         except IndexError:
+            print("I got an index error!!! here's the line:")
             # Sometimes empty lines slip through. Catch the exceptions
             print(line)
+            print(len(line))
             flag = False
 
         if flag is True:
@@ -582,6 +599,15 @@ class Watcher():
 
             if not self.lastStep is None:
                 # print("\nUpdating the table with lastStep...")
+                # trim leading empty cell, and trailing likelihood
+                params = [p[0] for p in self.selectList][1:-1]
+
+
+                # print(self.lastStep)
+                # for i, p in enumerate(params):
+                    # print(i, p, self.lastStep[i])
+
+
                 for p in self.tableColumns:
                     get = p + "_{}"
 
@@ -589,12 +615,21 @@ class Watcher():
                     for i in range(self.necl):
                         # work out the name of the parameter
                         g = get.format(i)
-                        # get the index of that parameter in parNames
-                        index = self.parNames.index(g)
-                        # grab the value from lastStep
-                        val = self.lastStep[index]
+
+                        try:
+                            # grab the value from lastStep
+                            index = params.index(g)
+                            val = self.lastStep[index]
+                            # print("I want to get the parameter {}, from index {}".format(g, index))
+                            # print("Got a value of {} for parameter {}".format(val, g))
+                        except:
+                            # If the valus isn't in lastStep, take it from the parDict
+                            # print("The parameter {} is not fitted. Taking from initial condition:".format(g))
+                            val = self.parDict[g][0]
+                            # print("Got a value of {} for parameter {}".format(val, g))
                         # store
                         l.append(val)
+                        # print()
 
                     self.lastStep_CDS.data[p] = np.array(l)
 
@@ -648,20 +683,26 @@ class Watcher():
         label = str(self.plotPars.value)
         params = [par[0] for par in self.selectList]
         par = params.index(label)
+
+
+
         self.add_par_plot(label, par)
 
     def add_likelihood_plot(self):
         '''Add the global parameters to the page'''
 
+        # What column is the likelihood?
+        like_index = self.selectList.index(('Likelihood', 'Likelihood'))
+        print("I think the likelihood is index ", like_index)
         labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
-        pars = [-1, 5, 6, 9]
+        
+        pars = [like_index, 5, 6, 9]
         if self.GP:
             labels.extend(['ampin', 'ampout', 'tau'])
             if self.complex:
                 pars.extend([19, 20, 21])
             else:
                 pars.extend([16, 17, 18])
-
 
         for label, par in zip(labels, pars):
             self.add_par_plot(label, par)
@@ -670,6 +711,10 @@ class Watcher():
         '''Add a plot to the page'''
 
         print("Adding a plot to the page: Label, Par: {}, {}".format(label, par))
+
+        if not label in [x[0] for x in self.selectList]:
+            print("The parameter '{}' is NOT being fitted!".format(label))
+            return
 
         self.labels.append(label)
         self.pars.append(par)
@@ -740,7 +785,26 @@ class Watcher():
 
         # If we have s > 0, that means we've read in some chain. Get the last step.
         if self.s > 0:
-            stepData = self.lastStep
+            params = [p[0] for p in self.selectList][1:-1]
+
+            stepData = []
+            for par in parNames:
+                print("par: ",par)
+
+                try:
+                    # grab the value from lastStep
+                    index = params.index(par)
+                    val = self.lastStep[index]
+                    print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
+                    print("Got a value of {} for parameter {}".format(val, par))
+                except ValueError:
+                    # If the valus isn't in lastStep, take it from the parDict
+                    print("The parameter {} is not fitted. Taking from initial condition:".format(par))
+                    val = self.parDict[par][0]
+                    print("Got a value of {} for parameter {}".format(val, par))
+
+                stepData.append(val)
+
         else:
             print('Getting values from the parameter dict.')
             stepData = [self.parDict[key][0] for key in parNames]
@@ -789,6 +853,7 @@ class Watcher():
 
 
             self.lc_obs.data['calc']  = self.cv.calcFlux(pars, np.array(self.lc_obs.data['phase']))
+            self.lc_obs.data['res']   = self.lc_obs.data['calc'] - self.lc_obs.data['flux']
             # Components
             self.lc_obs.data['sec']   = self.cv.yrs
             self.lc_obs.data['bspot'] = self.cv.ys
@@ -834,10 +899,9 @@ class Watcher():
 
         self.parNames = list(parNames)
 
-        parNames.append('Likelihood')
-
-        self.selectList = [(par, par) for par in parNames]
+        self.selectList = [(par, par) for par in parNames if self.parDict[par][3]]
         self.selectList.insert(0, ('', ''))
+        self.selectList.append(('Likelihood', 'Likelihood'))
         self.plotPars.menu = self.selectList
 
     def update_complex(self, new):
@@ -953,6 +1017,7 @@ class Watcher():
 
         # Total mode lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
+        new_obs['res']  = new_obs['calc'] - new_obs['flux']
         # Components
         new_obs['sec']   = self.cv.yrs
         new_obs['bspot'] = self.cv.ys
