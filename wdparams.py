@@ -57,7 +57,7 @@ class wdModel(MutableSequence):
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
     # Reads in input file and splits it into lines
-    blob = np.loadtxt(file,dtype='string',delimiter='\n')
+    blob = np.loadtxt(file,dtype='str',delimiter='\n')
     input_dict = {}
     for line in blob:
         # Each line is then split at the equals sign
@@ -68,7 +68,7 @@ def parseInput(file):
 def model(thisModel,mask):
     t, g, p, ebv = thisModel
     d = thisModel.dist
-    
+
     # load bergeron models
     myLoc = realpath(__file__)
     myLoc = myLoc.split('/')[:-1]
