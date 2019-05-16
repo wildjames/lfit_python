@@ -37,9 +37,9 @@ class wdModel(MutableSequence):
 
     # these routines are needed so object will behave like a list
     def __getitem__(self,ind):
-        return self.data[ind]
+        return self.data[ind].currVal
     def __setitem__(self,ind,val):
-        self.data[ind] = val
+        self.data[ind].currVal = val
     def __delitem__(self,ind):
         self.data.remove(ind)
     def __len__(self):
@@ -52,7 +52,7 @@ class wdModel(MutableSequence):
 
     @property
     def dist(self):
-        return 1000./self.plax
+        return 1000./self.plax.currVal
 
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
@@ -116,14 +116,9 @@ def ln_prior(thisModel):
     param = thisModel.logg
     lnp += param.prior.ln_prob(param.currVal)
 
-    # distance, uniform between 50 and 10,000 pc
-    # (this is biassed against real distances vs actual prior)
-    # so we scale by volume of thin radius step dr (prop. to r**2/50**2)
-    param = thisModel.dist
-    loLim = param.prior.p1
-    val   = param.currVal
-    #lnp += (val/loLim)**2 * param.prior.ln_prob(val)
-    lnp += param.prior.ln_prob(val)
+    # Parallax, gaussian prior of the gaia value.
+    param = thisModel.plax
+    lnp += param.prior.ln_prob(param.currVal)
 
     # reddening, cannot exceed galactic value of 0.121
     param = thisModel.ebv
@@ -166,10 +161,13 @@ class Flux(object):
 def plotFluxes(fluxes,fluxes_err,mask,model):
 
     teff, logg, plax, ebv = model
-    d = model.dist
+    d = 1000. / plax
 
     # load bergeron models
-    data = numpy.loadtxt('Bergeron/da_ugrizkg5.txt')
+    myLoc = realpath(__file__)
+    myLoc = myLoc.split('/')[:-1]
+    myLoc = '/'.join(myLoc)
+    data = numpy.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -338,12 +336,15 @@ if __name__ == "__main__":
     scatter  = float( input_dict['scatter'] )
     thin     = int( input_dict['thin'] )
     toFit    = int( input_dict['fit'] )
+
     teff = Param.fromString('teff', input_dict['teff'] )
     logg = Param.fromString('logg', input_dict['logg'] )
     plax = Param.fromString('plax', input_dict['plax'] )
-    ebv = Param.fromString('ebv', input_dict['ebv'] )
+    ebv  = Param.fromString('ebv', input_dict['ebv'] )
+
     syserr = float( input_dict['syserr'] )
     neclipses = int( input_dict['neclipses'] )
+
     complex   = int( input_dict['complex'] )
     useGP     = int( input_dict['useGP'] )
     flat      = int( input_dict['flat'] )
@@ -356,15 +357,16 @@ if __name__ == "__main__":
     print("I have the following filters:\n", filters)
 
     # Load in chain file
-    file = input_dict['chain']
+    chain_file = input_dict['chain']
 
-    print("Reading in the chain file,", file)
+    print("Reading in the chain file,", chain_file)
     if flat:
-        fchain = readflatchain(file)
+        fchain = readflatchain(chain_file)
     else:
-        #chain = readchain(file)
-        chain = readchain_dask(file)
+        #chain = readchain(chain_file)
+        chain = readchain_dask(chain_file)
         nwalkers, nsteps, npars = chain.shape
+        print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
         fchain = flatchain(chain,npars,thin=thin)
     print("Done!")
 
@@ -430,6 +432,7 @@ if __name__ == "__main__":
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
     if uband_used:
         uband = []
+        print('u band eclipses: {}'.format(uband_filters))
         uband_filters = uband_filters[0]
         for i in uband_filters:
             if i == 0:
@@ -437,6 +440,7 @@ if __name__ == "__main__":
                 uband.extend(wdflux)
             else:
                 i = a*i + b
+                print("Getting the u flux from index {}".format(i))
                 wdflux = fchain[:,i]
                 uband.extend(wdflux)
 
@@ -567,14 +571,17 @@ if __name__ == "__main__":
 
     print("I'm using the filters:")
     temp = ['u', 'g', 'r','i' , 'z', 'kg5']
-    for t, m in zip(temp, mask):
-        print("{}: {}".format(t, m))
-    myModel = wdModel(teff,logg,dist,ebv)
+    for t, m, flux in zip(temp, mask, fluxes):
+        report = ''
+        if m:
+            report = ' - Mean Flux: {:3f}'.format(flux)
+        print("{}: {}{}".format(t, m, report))
+    myModel = wdModel(teff,logg,plax,ebv)
 
     npars = myModel.npars
 
     if toFit:
-        guessP = np.array(model)
+        guessP = np.array(myModel)
         nameList = ['Teff','log g','Parallax','E(B-V)']
 
         p0 = emcee.utils.sample_ball(guessP,scatter*guessP,size=nwalkers)
@@ -599,6 +606,7 @@ if __name__ == "__main__":
             bestPars.append(best)
         fig = thumbPlot(chain,nameList)
         fig.savefig('cornerPlot.pdf')
+        fig.show()
         plt.close()
     else:
         bestPars = [par for par in myModel]
