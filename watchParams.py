@@ -694,7 +694,7 @@ class Watcher():
         # What column is the likelihood?
         like_index = self.selectList.index(('Likelihood', 'Likelihood'))
         print("I think the likelihood is index ", like_index)
-        labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
+        labels = ["Likelihood", 'q', 'dphi', 'rwd']
 
         pars = [like_index, 5, 6, 9]
         if self.GP:
@@ -715,6 +715,11 @@ class Watcher():
         if not label in [x[0] for x in self.selectList]:
             print("The parameter '{}' is NOT being fitted!".format(label))
             return
+
+        names = {'q':"Mass Ratio", 'dphi':"Eclipse Duration", 'rwd':"White Dwarf Radius"}
+        if label in names:
+            label = names[label]
+
 
         self.labels.append(label)
         self.pars.append(par)
