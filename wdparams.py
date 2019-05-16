@@ -20,23 +20,26 @@ class wdModel(MutableSequence):
     can be passed to MCMC routines for calculating model and chisq, and prior prob
 
     also behaves like a list, of the current values of all parameters
-    this enables it to be seamlessly used with emcee'''
+    this enables it to be seamlessly used with emcee
+
+    Note that parallax should be provided in MILLIarcseconds.'''
+
 
     # arguments are Param objects (see mcmc_utils)
-    def __init__(self,teff,logg,dist,ebv):
+    def __init__(self,teff,logg,plax,ebv):
         self.teff = teff
         self.logg = logg
-        self.dist = dist
+        self.plax = plax
         self.ebv  = ebv
 
         # initialise list bit of object with parameters
-        self.data = [self.teff,self.logg,self.dist,self.ebv]
+        self.data = [self.teff,self.logg,self.plax,self.ebv]
 
     # these routines are needed so object will behave like a list
     def __getitem__(self,ind):
-        return self.data[ind].currVal
+        return self.data[ind]
     def __setitem__(self,ind,val):
-        self.data[ind].currVal = val
+        self.data[ind] = val
     def __delitem__(self,ind):
         self.data.remove(ind)
     def __len__(self):
@@ -46,6 +49,10 @@ class wdModel(MutableSequence):
     @property
     def npars(self):
         return len(self.data)
+
+    @property
+    def dist(self):
+        return 1000./self.plax
 
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
@@ -59,8 +66,9 @@ def parseInput(file):
     return input_dict
 
 def model(thisModel,mask):
-    t, g, d, ebv = thisModel
-
+    t, g, p, ebv = thisModel
+    d = thisModel.dist
+    
     # load bergeron models
     myLoc = realpath(__file__)
     myLoc = myLoc.split('/')[:-1]
@@ -157,16 +165,11 @@ class Flux(object):
 
 def plotFluxes(fluxes,fluxes_err,mask,model):
 
-    teff = model[0]
-    logg = model[1]
-    d = model[2]
-    ebv = model[3]
+    teff, logg, plax, ebv = model
+    d = model.dist
 
     # load bergeron models
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
+    data = numpy.loadtxt('Bergeron/da_ugrizkg5.txt')
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -337,7 +340,7 @@ if __name__ == "__main__":
     toFit    = int( input_dict['fit'] )
     teff = Param.fromString('teff', input_dict['teff'] )
     logg = Param.fromString('logg', input_dict['logg'] )
-    dist = Param.fromString('dist', input_dict['dist'] )
+    plax = Param.fromString('plax', input_dict['plax'] )
     ebv = Param.fromString('ebv', input_dict['ebv'] )
     syserr = float( input_dict['syserr'] )
     neclipses = int( input_dict['neclipses'] )
@@ -566,14 +569,13 @@ if __name__ == "__main__":
     temp = ['u', 'g', 'r','i' , 'z', 'kg5']
     for t, m in zip(temp, mask):
         print("{}: {}".format(t, m))
-    print(mask)
     myModel = wdModel(teff,logg,dist,ebv)
 
     npars = myModel.npars
 
     if toFit:
-        guessP = np.array([par for par in myModel])
-        nameList = ['Teff','log g','d','E(B-V)']
+        guessP = np.array(model)
+        nameList = ['Teff','log g','Parallax','E(B-V)']
 
         p0 = emcee.utils.sample_ball(guessP,scatter*guessP,size=nwalkers)
         sampler = emcee.EnsembleSampler(nwalkers,npars,ln_prob,args=[myModel,y,e,mask],threads=nthread)
