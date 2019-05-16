@@ -294,24 +294,18 @@ class GPLCModel(LCModel):
         else:
             dist_cp = self._dist_cp
 
-        '''# Find location of all changepoints
-        for iecl in range(self.necl):
-            changepoints = []
-            phi0 = self.getParam(phi0Template.format(iecl))
-            # the following range construction gives a list
-            # of all mid-eclipse phases within phi array
-            for n in range (int( phi.min() ), int( phi.max() )+1, 1):
-                changepoints.append(n+phi0.currVal-dist_cp)
-                changepoints.append(n+phi0.currVal+dist_cp) '''
 
         # Find location of all changepoints
-
+        min_ecl = int(np.floor(phi.min()))
+        max_ecl = int(np.ceil(phi.max()))
+        eclipses = [e for e in range(min_ecl, max_ecl+1) if np.logical_and(e>phi.min(), e<1 + phi.max())]
         changepoints = []
-        # the following range construction gives a list
-        # of all mid-eclipse phases within phi array
-        for n in range (int( phi.min() ), int( phi.max() )+1, 1):
-            changepoints.append(n-dist_cp)
-            changepoints.append(n+dist_cp)
+        for e in eclipses:
+            # When did the last eclipse end?
+            egress = (e-1) + dist_cp
+            # When does this eclipse start?
+            ingress = e - dist_cp
+            changepoints.append([egress, ingress])
 
         # save these values for speed
         if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
@@ -344,28 +338,14 @@ class GPLCModel(LCModel):
         changepoints = self.calcChangepoints(phi)
 
         # We need to make a fairly complex kernel.
-        # Initialise with an 'out of eclipse' kernel, that runs from negative infinity to the first changepoint.
-        kernel = ampout * g.kernels.Matern32Kernel(tau, block=(-np.inf, changepoints[0]) )
-        for i, _ in enumerate(changepoints):
-            # For each changepoint, and it's neighbour, check if we're:
-            # - inside an eclipse (odd i)
-            # - outside an eclipse (even i)
-            if i%2:
-                # If we're inside an eclipse, use ampout
-                egress = changepoints[i]
-                try:
-                    # If we fail, then we've reached the end. Set the upper limit to inf.
-                    ingress = changepoints[i+1]
-                except:
-                    ingress = np.inf
-                kernel += ampout * g.kernels.Matern32Kernel(tau, block=[egress, ingress])
-            else:
-                ingress = changepoints[i]
-                egress  = changepoints[i+1]
-                kernel += ampin * g.kernels.Matern32Kernel(tau, block=[ingress, egress])
+        # Global flicker
+        kernel = ampin * g.kernels.Matern32Kernel(tau)
+        # inter-eclipse flicker
+        for gap in changepoints:
+            kernel += ampout * g.kernels.Matern32Kernel(tau, block=gap)
 
         # Use that kernel to make a GP object
-        georgeGP = g.GP(kernel)
+        georgeGP = g.GP(kernel, solver=g.HODLRSolver)
 
         return georgeGP
 
