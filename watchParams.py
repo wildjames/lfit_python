@@ -588,6 +588,15 @@ class Watcher():
 
             if not self.lastStep is None:
                 # print("\nUpdating the table with lastStep...")
+                # trim leading empty cell, and trailing likelihood
+                params = [p[0] for p in self.selectList][1:-1]
+
+
+                # print(self.lastStep)
+                # for i, p in enumerate(params):
+                    # print(i, p, self.lastStep[i])
+
+
                 for p in self.tableColumns:
                     get = p + "_{}"
 
@@ -595,12 +604,21 @@ class Watcher():
                     for i in range(self.necl):
                         # work out the name of the parameter
                         g = get.format(i)
-                        # get the index of that parameter in parNames
-                        index = self.parNames.index(g)
-                        # grab the value from lastStep
-                        val = self.lastStep[index]
+
+                        try:
+                            # grab the value from lastStep
+                            index = params.index(g)
+                            val = self.lastStep[index]
+                            # print("I want to get the parameter {}, from index {}".format(g, index))
+                            # print("Got a value of {} for parameter {}".format(val, g))
+                        except:
+                            # If the valus isn't in lastStep, take it from the parDict
+                            # print("The parameter {} is not fitted. Taking from initial condition:".format(g))
+                            val = self.parDict[g][0]
+                            # print("Got a value of {} for parameter {}".format(val, g))
                         # store
                         l.append(val)
+                        # print()
 
                     self.lastStep_CDS.data[p] = np.array(l)
 
@@ -676,6 +694,10 @@ class Watcher():
 
         print("Adding a plot to the page: Label, Par: {}, {}".format(label, par))
 
+        if not label in [x[0] for x in self.selectList]:
+            print("The parameter '{}' is NOT being fitted!".format(label))
+            return
+
         self.labels.append(label)
         self.pars.append(par)
 
@@ -745,7 +767,26 @@ class Watcher():
 
         # If we have s > 0, that means we've read in some chain. Get the last step.
         if self.s > 0:
-            stepData = self.lastStep
+            params = [p[0] for p in self.selectList][1:-1]
+
+            stepData = []
+            for par in parNames:
+                print("par: ",par)
+
+                try:
+                    # grab the value from lastStep
+                    index = params.index(par)
+                    val = self.lastStep[index]
+                    print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
+                    print("Got a value of {} for parameter {}".format(val, par))
+                except ValueError:
+                    # If the valus isn't in lastStep, take it from the parDict
+                    print("The parameter {} is not fitted. Taking from initial condition:".format(par))
+                    val = self.parDict[par][0]
+                    print("Got a value of {} for parameter {}".format(val, par))
+
+                stepData.append(val)
+
         else:
             print('Getting values from the parameter dict.')
             stepData = [self.parDict[key][0] for key in parNames]
