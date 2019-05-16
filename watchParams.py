@@ -1,6 +1,6 @@
 import bokeh as bk
 from bokeh.layouts import row, column, gridplot, layout
-from bokeh.models import ColumnDataSource, Band, Whisker
+from bokeh.models import ColumnDataSource, Band, Whisker, Span
 from bokeh.models.annotations import Title
 from bokeh.plotting import curdoc, figure
 from bokeh.server.callbacks import NextTickCallback
@@ -260,9 +260,20 @@ class Watcher():
         # Initialise the figure
         title = menu[0][0]
         self.lc_plot = bk.plotting.figure(title=title, plot_height=500, plot_width=1200,
-            toolbar_location='above', y_axis_location="left")
+            toolbar_location='above', y_axis_location="left", x_axis_location=None)
         # Plot the lightcurve data
         self.lc_plot.scatter(x='phase', y='flux', source=self.lc_obs, size=5, color='black')
+
+        # also plot residuals
+        self.lc_res_plot = bk.plotting.figure(plot_height=250, plot_width=1200,
+            toolbar_location=None, y_axis_location="left",
+            x_range=self.lc_plot.x_range)#, y_range=self.lc_plot.y_range)
+        # Plot the lightcurve data
+        self.lc_res_plot.scatter(x='phase', y='res', source=self.lc_obs, size=5, color='red')
+        self.lc_res_plot.renderers.extend([
+            Span(location=0, dimension='width', line_color='green', line_width=1)
+            ])
+
 
         # # Plot the error bars - Bokeh doesnt have a built in errorbar!?!
         # # The following function does NOT remove old errorbars when new ones are supplied!
@@ -294,7 +305,7 @@ class Watcher():
 
         # Arrange the tab layout
         self.tab2_layout = column([
-            self.lc_plot,
+            column([self.lc_plot, self.lc_res_plot]),
             row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
             row([gridplot(self.par_sliders, ncols=4),
                  gridplot(self.par_sliders_complex, ncols=1)]),
