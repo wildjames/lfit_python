@@ -695,7 +695,7 @@ class Watcher():
         like_index = self.selectList.index(('Likelihood', 'Likelihood'))
         print("I think the likelihood is index ", like_index)
         labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
-        
+
         pars = [like_index, 5, 6, 9]
         if self.GP:
             labels.extend(['ampin', 'ampout', 'tau'])
@@ -789,19 +789,19 @@ class Watcher():
 
             stepData = []
             for par in parNames:
-                print("par: ",par)
+                # print("par: ",par)
 
                 try:
                     # grab the value from lastStep
                     index = params.index(par)
                     val = self.lastStep[index]
-                    print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
-                    print("Got a value of {} for parameter {}".format(val, par))
+                    # print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
+                    # print("Got a value of {} for parameter {}".format(val, par))
                 except ValueError:
                     # If the valus isn't in lastStep, take it from the parDict
-                    print("The parameter {} is not fitted. Taking from initial condition:".format(par))
+                    # print("The parameter {} is not fitted. Taking from initial condition:".format(par))
                     val = self.parDict[par][0]
-                    print("Got a value of {} for parameter {}".format(val, par))
+                    # print("Got a value of {} for parameter {}".format(val, par))
 
                 stepData.append(val)
 
