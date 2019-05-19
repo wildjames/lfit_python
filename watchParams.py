@@ -304,11 +304,14 @@ class Watcher():
         print("Made the write2input button")
 
         # Arrange the tab layout
-        self.tab2_layout = column([
-            column([self.lc_plot, self.lc_res_plot]),
-            row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
-            row([gridplot(self.par_sliders, ncols=4),
-                 gridplot(self.par_sliders_complex, ncols=1)]),
+        self.tab2_layout = row([
+            column([self.lc_plot, self.lc_res_plot,
+                row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
+            ]),
+            column([
+                gridplot(self.par_sliders, ncols=2),
+                gridplot(self.par_sliders_complex, ncols=2)
+            ])
         ])
 
         self.tab2 = Panel(child=self.tab2_layout, title="Lightcurve Inspector")
@@ -828,18 +831,22 @@ class Watcher():
             slider.on_change('value', self.update_lc_model)
 
         # Set the complex values, if needs be
-        if self.complex:
-            print("Setting the complex sliders")
-            complex_names = ['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0']
-            for par, slider in zip(complex_names, self.par_sliders_complex):
-                get = par.replace('_0', '_{}'.format(fileNumber))
-                index = parNames.index(get)
-                param = stepData[index]
+        try:
+            if self.complex:
+                print("Setting the complex sliders")
+                complex_names = ['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0']
+                for par, slider in zip(complex_names, self.par_sliders_complex):
+                    get = par.replace('_0', '_{}'.format(fileNumber))
+                    index = parNames.index(get)
+                    param = stepData[index]
 
-                print("Setting the slider for {} to {}".format(get, param))
-                slider.remove_on_change('value', self.update_lc_model)
-                slider.value = param
-                slider.on_change('value', self.update_lc_model)
+                    print("Setting the slider for {} to {}".format(get, param))
+                    slider.remove_on_change('value', self.update_lc_model)
+                    slider.value = param
+                    slider.on_change('value', self.update_lc_model)
+        except ValueError:
+            self.complex_button.active = False
+            self.update_complex()
 
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
