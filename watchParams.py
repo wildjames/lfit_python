@@ -21,19 +21,17 @@ from os import getcwd
 import sys
 
 from pprint import pprint
+import george as g
 
 try:
     from lfit import CV
     print("Successfully imported CV class from lfit!")
-except:
-    print("Failed to import lfit!!")
-    exit()
-
-try:
     import mcmc_utils as u
     print("Successfully imported mcmc_utils")
-except:
-    exit()
+    from trm import roche
+    print("Successfully imported trm.roche!")
+except ImportError:
+    raise ImportError("Failed to import model modules!")
 
 def parseInput(file):
     """Splits input file up making it easier to read"""
@@ -110,9 +108,7 @@ class Watcher():
             print("Using the simple BS model!")
 
         # Extra parameters for the GP
-        if self.GP:
-            print("Using the GP!")
-            parNames.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
+        parNames.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
 
         # Extend the parameter names for each eclipse
         for i in range(1, self.necl):
@@ -124,7 +120,8 @@ class Watcher():
         self.parDesc = ['White Dwarf Flux', 'Disc Flux', 'Bright Spot Flux', 'Secondary Flux', 'Mass Ratio',
             'Eclipse Duration', 'Disc Radius', 'Limb Darkening', 'White Dwarf Radius', 'Bright Spot Scale',
             'Bright Spot Azimuth', 'Isotropic Emission Fract.', 'Disc Profile', 'Phase Offset',
-            'BS Exponent 1', 'BS Exponent 2', 'BS Emission Tilt', 'BS Emission Yaw']
+            'BS Exponent 1', 'BS Exponent 2', 'BS Emission Tilt', 'BS Emission Yaw', 'GP amp. in', 'GP amp. out',
+            'GP timescale']
 
 
         #####################################################
@@ -193,9 +190,12 @@ class Watcher():
             'exp2_0': [ 2.00, 0.001,  5.0],
             'tilt_0': [45.00, 0.001,  180],
             'yaw_0':  [ 0.00, -90.0, 90.0],
+            'ampin':  [-9.99, -25.0, -1.0],
+            'ampout': [-9.99, -25.0, -1.0],
+            'tau':    [-5.00, -20.0, -1.0]
         }
         self.par_sliders_complex = []
-        for par, title in zip(self.parNames[14:], self.parDesc[14:]):
+        for par, title in zip(self.parNames[14:18], self.parDesc[14:18]):
             try:
                 param = self.parDict[par]
             except:
@@ -215,6 +215,27 @@ class Watcher():
                 slider.on_change('value', self.update_lc_model)
 
             self.par_sliders_complex.append(slider)
+
+        self.par_sliders_GP = []
+        for par, title in zip(['ampin_gp', 'ampout_gp', 'tau_gp'], self.parDesc[-3:]):
+            try:
+                param = self.parDict[par]
+            except:
+                param = defaults[par]
+            slider = Slider(
+                title = title,
+                start = param[1],
+                end   = param[2],
+                value = param[0],
+                step  = (param[2] - param[1]) / 100,
+                width = 200,
+                format='0.0000'
+            )
+            # slider.callback_throttle = 100 #ms?
+            # If we aren't using the GP, changing the slider shouldn't call the model update.
+            slider.on_change('value', self.update_GP_model)
+            
+            self.par_sliders_GP.append(slider)
         print("Made the sliders...")
 
         # Data file picker
@@ -232,6 +253,10 @@ class Watcher():
         self.complex_button.on_click(self.update_complex)
         print("Made the complex button...")
 
+        # Button to force GP update
+        self.GP_button = Button(label='Update GP', width=200)
+        self.GP_button.on_click(self.recalc_GP_model)
+
         print("Grabbing the observations...")
         # Grab the data from the file, to start with just use the first in the list
         self.lc_obs = read_csv(menu[0][1],
@@ -239,6 +264,7 @@ class Watcher():
                 header=None,
                 names=['phase', 'flux', 'err'],
                 skipinitialspace=True)
+        self.lc_obs.dropna(inplace=True, axis='index', how='any')
 
         # Total model lightcurve
         # TODO: This is slow, make the page with this empty at first, then populate the data in a callback afterwards
@@ -249,6 +275,9 @@ class Watcher():
         self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
         self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
         self.lc_obs['disc']  = np.zeros_like(self.lc_obs['phase'])
+        # GP
+        self.lc_obs['GP_up'] = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['GP_lo'] = np.zeros_like(self.lc_obs['phase'])
 
         print("Read in the observation, with the shape {}".format(self.lc_obs.shape))
 
@@ -270,9 +299,11 @@ class Watcher():
             x_range=self.lc_plot.x_range)#, y_range=self.lc_plot.y_range)
         # Plot the lightcurve data
         self.lc_res_plot.scatter(x='phase', y='res', source=self.lc_obs, size=5, color='red')
-        self.lc_res_plot.renderers.extend([
-            Span(location=0, dimension='width', line_color='green', line_width=1)
-            ])
+        self.lc_res_plot.renderers += [Span(location=0, dimension='width', line_color='green', line_width=1)]
+        # Plot the GP over the residuals
+        band = Band(base='phase', lower='GP_lo', upper='GP_up', source=self.lc_obs,
+                    level='underlay', fill_alpha=0.3, line_width=0, line_color='black', fill_color='red')
+        self.lc_res_plot.add_layout(band)
 
 
         # # Plot the error bars - Bokeh doesnt have a built in errorbar!?!
@@ -306,11 +337,12 @@ class Watcher():
         # Arrange the tab layout
         self.tab2_layout = row([
             column([self.lc_plot, self.lc_res_plot,
-                row([self.lc_change_fname_button, self.complex_button, self.lc_isvalid, self.write2input_button]),
+                row([self.lc_change_fname_button, self.complex_button, self.GP_button, self.lc_isvalid, self.write2input_button]),
             ]),
             column([
                 gridplot(self.par_sliders, ncols=2),
-                gridplot(self.par_sliders_complex, ncols=2)
+                gridplot(self.par_sliders_complex, ncols=2),
+                gridplot(self.par_sliders_GP, ncols=2)
             ])
         ])
 
@@ -846,10 +878,102 @@ class Watcher():
                     slider.on_change('value', self.update_lc_model)
         except ValueError:
             self.complex_button.active = False
-            self.update_complex()
+            self.update_complex(False)
 
+        print("Setting the GP sliders")
+        GP_names = ['ampin_gp', 'ampout_gp', 'tau_gp']
+        for get, slider in zip(GP_names, self.par_sliders_GP):
+                index = parNames.index(get)
+                param = stepData[index]
+
+                print("Setting the slider for {} to {}".format(get, param))
+                slider.remove_on_change('value', self.update_GP_model)
+                slider.value = param
+                slider.on_change('value', self.update_GP_model)
+        
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
+
+
+    def calcChangepoints(self):
+        # What data range are we looking at?
+        phi = self.lc_obs.data['phase']
+        # Also get object for dphi, q and rwd as this is required to determine changepoints
+        dphi = self.par_sliders[5].value
+        q = self.par_sliders[4].value
+        rwd = self.par_sliders[8].value
+
+        # Calculate inclination
+        inc = roche.findi(q,dphi)
+        # Calculate wd contact phases 3 and 4
+        phi3, phi4 = roche.wdphases(q, inc, rwd, ntheta=10)
+        # Calculate length of wd egress
+        dpwd = phi4 - phi3
+        # Distance from changepoints to mideclipse
+        dist_cp = (dphi+dpwd)/2.
+
+        # Find location of all changepoints
+        min_ecl = int(np.floor(np.nanmin(phi)))
+        max_ecl = int(np.ceil(np.nanmax(phi)))
+        eclipses = [e for e in range(min_ecl, max_ecl+1) if np.logical_and(e>phi.min(), e<1 + phi.max())]
+        changepoints = []
+        for e in eclipses:
+            # When did the last eclipse end?
+            egress = (e-1) + dist_cp
+            # When does this eclipse start?
+            ingress = e - dist_cp
+            changepoints.append([egress, ingress])
+
+        
+        return changepoints
+
+    def createGP(self):
+        """Constructs a kernel, which is used to create Gaussian processes.
+
+        Using values for the two hyperparameters (amp,tau), amp_ratio and dphi, this function:
+        creates kernels for both inside and out of eclipse, works out the location of any
+        changepoints present, constructs a single (mixed) kernel and uses this kernel to create GPs"""
+
+        # Get objects for ampin_gp, ampout_gp, tau_gp and find the exponential of their current values
+        ln_ampin, ln_ampout, ln_tau = [float(slider.value) for slider in self.par_sliders_GP]
+
+        ampin = np.exp(ln_ampin)
+        ampout = np.exp(ln_ampout)
+        tau = np.exp(ln_tau)
+
+        # Calculate kernels for both out of and in eclipse WD eclipse
+        # Kernel inside of WD has smaller amplitude than that of outside eclipse
+        # First, get the changepoints
+        changepoints = self.calcChangepoints()
+
+        # We need to make a fairly complex kernel.
+        # Global flicker
+        kernel = ampin * g.kernels.Matern32Kernel(tau)
+        # inter-eclipse flicker
+        for gap in changepoints:
+            kernel += ampout * g.kernels.Matern32Kernel(tau, block=gap)
+
+        # Use that kernel to make a GP object
+        georgeGP = g.GP(kernel, solver=g.HODLRSolver)
+
+        return georgeGP
+
+    def recalc_GP_model(self):
+        pars = [slider.value for slider in self.par_sliders]
+        if self.complex:
+            pars.extend([slider.value for slider in self.par_sliders_complex])
+
+        self.cv = CV(pars)
+        self.GP = self.createGP()
+        self.GP.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
+
+        # GP
+        samples = self.GP.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
+        mu = np.mean(samples,axis=0)
+        std = np.std(samples,axis=0)
+        self.lc_obs.data['GP_up'] = mu + std
+        self.lc_obs.data['GP_lo'] = mu - std
+
 
     def recalc_lc_model(self):
         try:
@@ -871,6 +995,7 @@ class Watcher():
             self.lc_obs.data['bspot'] = self.cv.ys
             self.lc_obs.data['wd']    = self.cv.ywd
             self.lc_obs.data['disc']  = self.cv.yd
+
             self.lc_isvalid.button_type = 'default'
             self.lc_isvalid.label = 'Get current step'
 
@@ -991,7 +1116,11 @@ class Watcher():
 
         print("Plotting data from file {}".format(fname))
         new_obs = read_csv(fname,
-                sep=' ', comment='#', header=None, names=['phase', 'flux', 'err'])
+                sep=' ', comment='#', header=None, names=['phase', 'flux', 'err']
+                )
+        # Remove any row with a nan in it
+        new_obs.dropna(inplace=True, axis='index', how='any')
+        print(new_obs['phase'])
         # new_obs['upper'] = new_obs['flux'] + new_obs['err']
         # new_obs['lower'] = new_obs['flux'] - new_obs['err']
 
@@ -1027,7 +1156,14 @@ class Watcher():
         if self.complex:
             pars.extend([slider.value for slider in self.par_sliders_complex])
 
-        # Total mode lightcurve
+
+        self.cv = CV(pars)
+
+        # GP
+        self.GP = self.createGP()
+        self.GP.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
+
+        # Total model lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
         new_obs['res']  = new_obs['calc'] - new_obs['flux']
         # Components
@@ -1035,6 +1171,14 @@ class Watcher():
         new_obs['bspot'] = self.cv.ys
         new_obs['wd']    = self.cv.ywd
         new_obs['disc']  = self.cv.yd
+
+        # GP
+        samples = self.GP.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
+        mu = np.mean(samples,axis=0)
+        std = np.std(samples,axis=0)
+        self.lc_obs.data['GP_up'] = mu + std
+        self.lc_obs.data['GP_lo'] = mu - std
+
 
         # Push that into the data frame
         self.lc_obs.data = dict(new_obs)
@@ -1049,6 +1193,10 @@ class Watcher():
     def update_lc_model(self, attr, old, new):
         '''Callback to redraw the model lightcurve in the second tab'''
         self.recalc_lc_model()
+    
+    def update_GP_model(self, attr, old, new):
+        '''callback to recalc the GP'''
+        self.recalc_GP_model()
 
     def make_header(self):
         '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
