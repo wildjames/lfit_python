@@ -792,7 +792,7 @@ class Watcher():
         new_plot.y_range.range_padding = 1
 
         # Make this add to the right tab
-        self.tab1_layout.children.append(row(new_plot))
+        self.tab1_layout.children += [row(new_plot)]
 
         self.lc_isvalid.label = 'Get current step'
         self.lc_isvalid.button_type = 'default'
@@ -867,8 +867,7 @@ class Watcher():
             if self.complex:
                 print("Setting the complex sliders")
                 complex_names = ['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0']
-                for par, slider in zip(complex_names, self.par_sliders_complex):
-                    get = par.replace('_0', '_{}'.format(fileNumber))
+                for get, slider in zip(complex_names, self.par_sliders_complex):
                     index = parNames.index(get)
                     param = stepData[index]
 
