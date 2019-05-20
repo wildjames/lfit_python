@@ -254,7 +254,7 @@ class Watcher():
         print("Made the complex button...")
 
         # Button to force GP update
-        self.GP_button = Button(label='Update GP', width=200)
+        self.GP_button = Button(label='Update GP', width=120)
         self.GP_button.on_click(self.recalc_GP_model)
 
         print("Grabbing the observations...")
@@ -776,7 +776,7 @@ class Watcher():
 
         print("Closed and re-opened the file!")
 
-        new_plot = bk.plotting.figure(title=label, plot_height=300, plot_width=1200,
+        new_plot = bk.plotting.figure(title=label, plot_height=300, plot_width=1600,
             toolbar_location='above', y_axis_location="right",
             tools="ypan,ywheel_zoom,ybox_zoom,reset")
             # tools=[])
