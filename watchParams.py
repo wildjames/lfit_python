@@ -733,7 +733,7 @@ class Watcher():
 
         pars = [like_index, 5, 6, 9]
         if self.GP:
-            labels.extend(['ampin_gp', 'ampout_gp', 'tau'])
+            labels.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
             if self.complex:
                 pars.extend([19, 20, 21])
             else:
@@ -1119,7 +1119,6 @@ class Watcher():
                 )
         # Remove any row with a nan in it
         new_obs.dropna(inplace=True, axis='index', how='any')
-        print(new_obs['phase'])
         # new_obs['upper'] = new_obs['flux'] + new_obs['err']
         # new_obs['lower'] = new_obs['flux'] - new_obs['err']
 
@@ -1157,6 +1156,7 @@ class Watcher():
 
 
         self.cv = CV(pars)
+        print("Re-initialised the CV model")
 
         # GP
         self.GP = self.createGP()
