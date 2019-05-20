@@ -372,9 +372,9 @@ class Watcher():
             TableColumn(field=par, title=par, formatter=tables.NumberFormatter(format='0.0000')) for par in self.tableColumns
         ]
         columns.insert(0,
-            TableColumn(field='file', title='File', width=800)
+            TableColumn(field='file', title='File', width=1200)
             )
-        self.parameter_table = DataTable(source=self.lastStep_CDS, columns=columns, width=1200)
+        self.parameter_table = DataTable(source=self.lastStep_CDS, columns=columns, width=1600)
 
         self.tab3_layout = column([self.parameter_table])
         self.tab3 = Panel(child=self.tab3_layout, title="Parameter table")
