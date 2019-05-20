@@ -19,6 +19,8 @@ import time
 from os import path
 from os import getcwd
 import sys
+import json
+import paramiko
 
 from pprint import pprint
 
@@ -80,6 +82,23 @@ class Watcher():
         # Save these, just in case I need to use them again later.
         self.mcmc_fname  = mcmc_input
         self.chain_fname = chain
+
+        fname = 'sync_details.json'
+        with open(fname, 'r') as deets:
+            details = json.load(deets)
+
+        hostname = details['hostname']
+        password = details['password']
+        source   = details['source']
+        username = details['username']
+        port = 22
+
+        self.t = paramiko.Transport((hostname, port))
+        self.t.connect(username=username, password=password)
+        self.sftp_client = self.t.open_sftp_client()
+        self.sftp_client.chdir(source)
+        print("Created an sftp buffer to the target directory")
+
         print("Looking for the mcmc input '{}', and the chain file {}".format(self.mcmc_fname, self.chain_fname))
 
         # Parse the mcmc_input file
@@ -234,11 +253,12 @@ class Watcher():
 
         print("Grabbing the observations...")
         # Grab the data from the file, to start with just use the first in the list
-        self.lc_obs = read_csv(menu[0][1],
-                sep=' ', comment='#',
-                header=None,
-                names=['phase', 'flux', 'err'],
-                skipinitialspace=True)
+        with self.sftp_client.open(menu[0][1], 'r') as data_file:
+            self.lc_obs = read_csv(data_file,
+                    sep=' ', comment='#',
+                    header=None,
+                    names=['phase', 'flux', 'err'],
+                    skipinitialspace=True)
 
         # Total model lightcurve
         # TODO: This is slow, make the page with this empty at first, then populate the data in a callback afterwards
@@ -427,7 +447,8 @@ class Watcher():
                 The number of product steps.
         '''
         print("Parsing the mcmc_input file, '{}'...".format(self.mcmc_fname))
-        self.mcmc_input_dict = parseInput(self.mcmc_fname)
+        mcmc_file = self.sftp_client.open(self.mcmc_fname, 'r')
+        self.mcmc_input_dict = parseInput(mcmc_file)
 
         # Gather the parameters we can use
         self.complex  = bool(int(self.mcmc_input_dict['complex']))
@@ -480,10 +501,10 @@ class Watcher():
     def open_file(self):
         '''Check if the chain file has been created yet. If not, do nothing. If it is, set it to self.f'''
         # Open the file, and keep it open
-        file = self.chain_fname
+        chain_file = self.chain_fname
         try:
-            self.f = open(file, 'r')
-            print("Found the file, '{}'!".format(file))
+            self.f = self.sftp_client.open(chain_file, 'r')
+            print("Found the file, '{}'!".format(chain_file))
         except:
             self.f = False
             self.doc.add_timeout_callback(self.open_file, 10000)
@@ -503,7 +524,7 @@ class Watcher():
         # Close and reopen the file to move the cursor back to the beginning.
         self.f.close()
         # We're at step 0 now
-        self.f = open(file, 'r')
+        self.f = self.sftp_client.open(chain_file, 'r')
 
         print("Expected {} walkers, got {} walkers in the file!".format(self.nWalkers, nWalkers))
         if nWalkers != self.nWalkers:
@@ -523,7 +544,7 @@ class Watcher():
         print('Adding next tick callback')
         self.doc.add_next_tick_callback(self.update_chain)
 
-        print("Succesfully opened the chain '{}'!".format(file))
+        print("Succesfully opened the chain '{}'!".format(chain_file))
 
     def readStep(self):
         '''Attempt to read in the next step of the chain file.
@@ -694,11 +715,11 @@ class Watcher():
         # What column is the likelihood?
         like_index = self.selectList.index(('Likelihood', 'Likelihood'))
         print("I think the likelihood is index ", like_index)
-        labels = ["Likelihood", "Mass Ratio", "Eclipse Duration", "White Dwarf Radius"]
-        
+        labels = ["Likelihood", 'q', 'dphi', 'rwd']
+
         pars = [like_index, 5, 6, 9]
         if self.GP:
-            labels.extend(['ampin', 'ampout', 'tau'])
+            labels.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
             if self.complex:
                 pars.extend([19, 20, 21])
             else:
@@ -716,6 +737,11 @@ class Watcher():
             print("The parameter '{}' is NOT being fitted!".format(label))
             return
 
+        names = {'q':"Mass Ratio", 'dphi':"Eclipse Duration", 'rwd':"White Dwarf Radius"}
+        if label in names:
+            label = names[label]
+
+
         self.labels.append(label)
         self.pars.append(par)
 
@@ -731,7 +757,7 @@ class Watcher():
         # Move the file cursor back to the beginning of the file
         if not self.f is False:
             self.f.close()
-            self.f = open(self.chain_fname, 'r')
+            self.f = self.sftp_client.open(self.chain_fname, 'r')
             self.s = 0
 
         print("Closed and re-opened the file!")
@@ -789,19 +815,19 @@ class Watcher():
 
             stepData = []
             for par in parNames:
-                print("par: ",par)
+                # print("par: ",par)
 
                 try:
                     # grab the value from lastStep
                     index = params.index(par)
                     val = self.lastStep[index]
-                    print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
-                    print("Got a value of {} for parameter {}".format(val, par))
+                    # print("I want to get the parameter {}, from index {} in lastStep".format(par, index))
+                    # print("Got a value of {} for parameter {}".format(val, par))
                 except ValueError:
                     # If the valus isn't in lastStep, take it from the parDict
-                    print("The parameter {} is not fitted. Taking from initial condition:".format(par))
+                    # print("The parameter {} is not fitted. Taking from initial condition:".format(par))
                     val = self.parDict[par][0]
-                    print("Got a value of {} for parameter {}".format(val, par))
+                    # print("Got a value of {} for parameter {}".format(val, par))
 
                 stepData.append(val)
 
@@ -963,7 +989,7 @@ class Watcher():
         # Move the file cursor back to the beginning of the file
         if not self.f is False:
             self.f.close()
-            self.f = open(self.chain_fname, 'r')
+            self.f = self.sftp_client.open(self.chain_fname, 'r')
             self.s = 0
 
         print("Closed and re-opened the file!")
@@ -978,7 +1004,8 @@ class Watcher():
         self.lc_obs_fname = fname
 
         print("Plotting data from file {}".format(fname))
-        new_obs = read_csv(fname,
+        data_file = self.sftp_client.open(fname)
+        new_obs = read_csv(data_file,
                 sep=' ', comment='#', header=None, names=['phase', 'flux', 'err'])
         # new_obs['upper'] = new_obs['flux'] + new_obs['err']
         # new_obs['lower'] = new_obs['flux'] - new_obs['err']
@@ -1105,7 +1132,7 @@ class Watcher():
 
         # Make a copy of the mcmc_input file and edit that.
         mcmc_file = []
-        with open(self.mcmc_fname, 'r') as f:
+        with self.sftp_client.open(self.mcmc_fname, 'r') as f:
             for line in f:
                 line_components = line.strip().split()
                 if len(line_components) > 0:
@@ -1129,7 +1156,7 @@ class Watcher():
 
         # Overwrite the old mcmc_input file.
         print('Writing new file, {}'.format(self.mcmc_fname))
-        with open(self.mcmc_fname, 'w') as f:
+        with self.sftp_client.open(self.mcmc_fname, 'w') as f:
             for line in mcmc_file:
                 f.write(line)
         self.parse_mcmc_input()
@@ -1138,7 +1165,7 @@ class Watcher():
         print("Making corner plots...")
         self.cornerReporter.text += "</br>Reading chain file (this can take a while)...  "
         print("Reading chain file...")
-        chainFile = open('chain_prod.txt', 'r')
+        chainFile = self.sftp_client.open('chain_prod.txt', 'r')
         chain = u.readchain(chainFile)
         self.cornerReporter.text += "Done!"
         print("Done!")
