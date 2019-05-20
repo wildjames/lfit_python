@@ -1160,7 +1160,7 @@ class Watcher():
 
         # GP
         self.GP = self.createGP()
-        self.GP.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
+        self.GP.compute(new_obs['phase'], new_obs['err'])
         print("Made the GP")
 
         # Total model lightcurve
