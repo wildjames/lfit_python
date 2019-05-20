@@ -1161,6 +1161,7 @@ class Watcher():
         # GP
         self.GP = self.createGP()
         self.GP.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
+        print("Made the GP")
 
         # Total model lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
@@ -1172,11 +1173,12 @@ class Watcher():
         new_obs['disc']  = self.cv.yd
 
         # GP
-        samples = self.GP.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
+        samples = self.GP.sample_conditional(new_obs['res'], new_obs['phase'], size = 300)
         mu = np.mean(samples,axis=0)
         std = np.std(samples,axis=0)
-        self.lc_obs.data['GP_up'] = mu + std
-        self.lc_obs.data['GP_lo'] = mu - std
+        new_obs['GP_up'] = mu + std
+        new_obs['GP_lo'] = mu - std
+        print("Drew GP samples")
 
 
         # Push that into the data frame
