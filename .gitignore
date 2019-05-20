@@ -36,3 +36,5 @@ weighted_input_phl1445_flick.txt
 weighted_sdss1507.txt
 mcmcfit_shared_edit.py
 mcmcfit_shared_flick.py
+
+sync_details.json
