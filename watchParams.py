@@ -890,7 +890,7 @@ class Watcher():
                 try:
                     index = parNames.index(get)
                     param = stepData[index]
-                else:
+                except:
                     param = defaults[get][0]
 
                 print("Setting the slider for {} to {}".format(get, param))
