@@ -867,8 +867,9 @@ class Watcher():
         try:
             if self.complex:
                 print("Setting the complex sliders")
-                complex_names = ['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0']
+                complex_names = ['exp1_{}', 'exp2_{}', 'tilt_{}', 'yaw_{}']
                 for get, slider in zip(complex_names, self.par_sliders_complex):
+                    get = get.format(fileNumber)
                     index = parNames.index(get)
                     param = stepData[index]
 
