@@ -369,9 +369,9 @@ class GPLCModel(LCModel):
             chisq = -0.5*self.chisq(phi,y,e,width)
             gp_ln_like = gp.log_likelihood(resids, True)
 
-            print("chisq:   {}".format(chisq))
-            print("GP like: {}".format(gp_ln_like))
-            print()
+            # print("chisq:   {}".format(chisq))
+            # print("GP like: {}".format(gp_ln_like))
+            # print()
 
             # Check for bugs in model
             if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
@@ -379,7 +379,6 @@ class GPLCModel(LCModel):
                 return -np.inf
 
             # Calculate ln_like using lnlikelihood function from GaussianProcess.py
-            print()
             lnlike += gp_ln_like
         return lnlike
 
