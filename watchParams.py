@@ -234,7 +234,7 @@ class Watcher():
             # slider.callback_throttle = 100 #ms?
             # If we aren't using the GP, changing the slider shouldn't call the model update.
             slider.on_change('value', self.update_GP_model)
-            
+
             self.par_sliders_GP.append(slider)
         print("Made the sliders...")
 
@@ -880,16 +880,24 @@ class Watcher():
             self.update_complex(False)
 
         print("Setting the GP sliders")
+        defaults = {
+            'ampin_gp':  [-9.99, -25.0, -1.0],
+            'ampout_gp': [-9.99, -25.0, -1.0],
+            'tau_gp':    [-5.00, -20.0, -1.0]
+        }
         GP_names = ['ampin_gp', 'ampout_gp', 'tau_gp']
         for get, slider in zip(GP_names, self.par_sliders_GP):
-                index = parNames.index(get)
-                param = stepData[index]
+                try:
+                    index = parNames.index(get)
+                    param = stepData[index]
+                else:
+                    param = defaults[get][0]
 
                 print("Setting the slider for {} to {}".format(get, param))
                 slider.remove_on_change('value', self.update_GP_model)
                 slider.value = param
                 slider.on_change('value', self.update_GP_model)
-        
+
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
 
@@ -923,7 +931,7 @@ class Watcher():
             ingress = e - dist_cp
             changepoints.append([egress, ingress])
 
-        
+
         return changepoints
 
     def createGP(self):
@@ -1194,7 +1202,7 @@ class Watcher():
     def update_lc_model(self, attr, old, new):
         '''Callback to redraw the model lightcurve in the second tab'''
         self.recalc_lc_model()
-    
+
     def update_GP_model(self, attr, old, new):
         '''callback to recalc the GP'''
         self.recalc_GP_model()
