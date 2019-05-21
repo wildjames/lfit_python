@@ -336,8 +336,9 @@ class Watcher():
 
         # Arrange the tab layout
         self.tab2_layout = row([
-            column([self.lc_plot, self.lc_res_plot,
+            column([
                 row([self.lc_change_fname_button, self.complex_button, self.GP_button, self.lc_isvalid, self.write2input_button]),
+                self.lc_plot, self.lc_res_plot,
             ]),
             column([
                 gridplot(self.par_sliders, ncols=2),
@@ -1166,11 +1167,6 @@ class Watcher():
         self.cv = CV(pars)
         print("Re-initialised the CV model")
 
-        # GP
-        self.GP = self.createGP()
-        self.GP.compute(new_obs['phase'], new_obs['err'])
-        print("Made the GP")
-
         # Total model lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
         new_obs['res']  = new_obs['calc'] - new_obs['flux']
@@ -1181,13 +1177,8 @@ class Watcher():
         new_obs['disc']  = self.cv.yd
 
         # GP
-        samples = self.GP.sample_conditional(new_obs['res'], new_obs['phase'], size = 300)
-        mu = np.mean(samples,axis=0)
-        std = np.std(samples,axis=0)
-        new_obs['GP_up'] = mu + std
-        new_obs['GP_lo'] = mu - std
-        print("Drew GP samples")
-
+        new_obs['GP_up'] = np.zeros_like(new_obs['phase'])
+        new_obs['GP_lo'] = np.zeros_like(new_obs['phase'])
 
         # Push that into the data frame
         self.lc_obs.data = dict(new_obs)
