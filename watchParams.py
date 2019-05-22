@@ -992,7 +992,7 @@ class Watcher():
 
         self.lnlike = self.gp.lnlikelihood(self.lc_obs.data['res'])
 
-        self.like_label.text = "         self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(chisq, self.lnlike)".format(self.lnlike, chisq)
+        self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
 
 
     def recalc_lc_model(self):
@@ -1035,7 +1035,7 @@ class Watcher():
         if self.lnlike is None:
             self.recalc_GP_model()
 
-        self.like_label.text = "         self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(chisq, self.lnlike)".format(self.lnlike, chisq)
+        self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
 
     def update_selectList(self):
         '''Change the options on self.plotPars to reflect how many eclipses are in the MCMC chain'''
