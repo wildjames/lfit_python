@@ -728,17 +728,15 @@ class Watcher():
         '''Add the global parameters to the page'''
 
         # What column is the likelihood?
-        like_index = self.selectList.index(('Likelihood', 'Likelihood'))
-        print("I think the likelihood is index ", like_index)
         labels = ["Likelihood", 'q', 'dphi', 'rwd']
 
-        pars = [like_index, 5, 6, 9]
         if self.GP:
             labels.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
-            if self.complex:
-                pars.extend([19, 20, 21])
-            else:
-                pars.extend([16, 17, 18])
+
+        pars = []
+        for p in labels:
+            if (p,p) in self.selectList:
+                pars.append( self.selectList.index( (p,p) ) )
 
         for label, par in zip(labels, pars):
             self.add_par_plot(label, par)
