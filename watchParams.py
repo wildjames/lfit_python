@@ -179,8 +179,6 @@ class Watcher():
                 width = 200,
                 format='0.0000'
             )
-            slider.on_change('value', self.update_lc_model)
-            # slider.callback_throttle = 100 #ms?
 
             self.par_sliders.append(slider)
 
@@ -209,10 +207,6 @@ class Watcher():
                 width = 200,
                 format='0.0000'
             )
-            # slider.callback_throttle = 100 #ms?
-            # If we aren't using a complex model, changing these shouldn't bother updating the model.
-            if self.complex:
-                slider.on_change('value', self.update_lc_model)
 
             self.par_sliders_complex.append(slider)
 
@@ -231,11 +225,15 @@ class Watcher():
                 width = 200,
                 format='0.0000'
             )
-            # slider.callback_throttle = 100 #ms?
-            # If we aren't using the GP, changing the slider shouldn't call the model update.
-            slider.on_change('value', self.update_GP_model)
-
             self.par_sliders_GP.append(slider)
+
+
+        # Add the callbacks:
+        for slider in self.par_sliders:
+            slider.on_change('value', self.update_lc_model)
+        if self.complex:
+            for slider in self.par_sliders_complex:
+                slider.on_change('value', self.update_lc_model)
         print("Made the sliders...")
 
         # Data file picker
@@ -325,25 +323,29 @@ class Watcher():
         # I want a button that'll turn red when the parameters are invalid. When clicked, it will either return the
         # model back to the initial values, or, if a chain has been read in, set the model to the last step read by the
         # watcher.
-        self.lc_isvalid = Button(label='Initial Parameters', width=200)
+        self.lc_isvalid = Button(label='Initial Parameters', width=150)
         self.lc_isvalid.on_click(self.reset_sliders)
         print("Made the valid parameters button")
 
         # Write the current slider values to mcmc_input.dat
-        self.write2input_button = Button(label='Write current values', width=200)
+        self.write2input_button = Button(label='Write current values', width=150)
         self.write2input_button.on_click(self.write2input)
         print("Made the write2input button")
+
+        self.lnlike = None
+        self.like_label = markups.Div(width=1000)
 
         # Arrange the tab layout
         self.tab2_layout = row([
             column([
                 row([self.lc_change_fname_button, self.complex_button, self.GP_button, self.lc_isvalid, self.write2input_button]),
-                self.lc_plot, self.lc_res_plot,
+            self.lc_plot, self.lc_res_plot,
             ]),
             column([
-                gridplot(self.par_sliders, ncols=2),
-                gridplot(self.par_sliders_complex, ncols=2),
-                gridplot(self.par_sliders_GP, ncols=2)
+                self.like_label,
+                gridplot(self.par_sliders, ncols=2, toolbar_options={'logo': None}),
+                gridplot(self.par_sliders_complex, ncols=2, toolbar_options={'logo': None}),
+                gridplot(self.par_sliders_GP, ncols=2, toolbar_options={'logo': None})
             ])
         ])
 
@@ -728,15 +730,21 @@ class Watcher():
         '''Add the global parameters to the page'''
 
         # What column is the likelihood?
-        labels = ["Likelihood", 'q', 'dphi', 'rwd']
+        search = ["Likelihood", 'q', 'dphi', 'rwd']
 
         if self.GP:
-            labels.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
+            search.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
 
         pars = []
-        for p in labels:
+        labels = []
+        for p in search:
+            print("Is {} in the selectList?".format(p))
             if (p,p) in self.selectList:
-                pars.append( self.selectList.index( (p,p) ) )
+                index = self.selectList.index( (p,p) )
+                print("Yes! at index {}".format(index))
+                pars.append(index)
+                labels.append(p)
+
 
         for label, par in zip(labels, pars):
             self.add_par_plot(label, par)
@@ -894,9 +902,7 @@ class Watcher():
                     param = defaults[get][0]
 
                 print("Setting the slider for {} to {}".format(get, param))
-                slider.remove_on_change('value', self.update_GP_model)
                 slider.value = param
-                slider.on_change('value', self.update_GP_model)
 
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
@@ -963,7 +969,7 @@ class Watcher():
         # Use that kernel to make a GP object
         georgeGP = g.GP(kernel, solver=g.HODLRSolver)
 
-        return georgeGP
+        self.gp = georgeGP
 
     def recalc_GP_model(self):
         pars = [slider.value for slider in self.par_sliders]
@@ -971,15 +977,22 @@ class Watcher():
             pars.extend([slider.value for slider in self.par_sliders_complex])
 
         self.cv = CV(pars)
-        self.GP = self.createGP()
-        self.GP.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
+        self.createGP()
+        self.gp.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
 
         # GP
-        samples = self.GP.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
+        samples = self.gp.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
         mu = np.mean(samples,axis=0)
         std = np.std(samples,axis=0)
         self.lc_obs.data['GP_up'] = mu + std
         self.lc_obs.data['GP_lo'] = mu - std
+
+        chisq =  self.lc_obs.data['res'] / self.lc_obs.data['err']
+        chisq = np.sum(chisq**2)
+
+        self.lnlike = self.gp.lnlikelihood(self.lc_obs.data['res'])
+
+        self.like_label.text = "         self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(chisq, self.lnlike)".format(self.lnlike, chisq)
 
 
     def recalc_lc_model(self):
@@ -1015,6 +1028,14 @@ class Watcher():
             print("Invalid parameters!")
             self.lc_isvalid.button_type = 'danger'
             self.lc_isvalid.label = 'Invalid Parameters'
+
+        chisq =  self.lc_obs.data['res'] / self.lc_obs.data['err']
+        chisq = np.sum(chisq**2)
+
+        if self.lnlike is None:
+            self.recalc_GP_model()
+
+        self.like_label.text = "         self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(chisq, self.lnlike)".format(self.lnlike, chisq)
 
     def update_selectList(self):
         '''Change the options on self.plotPars to reflect how many eclipses are in the MCMC chain'''
