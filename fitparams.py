@@ -19,13 +19,13 @@ def logg(m,r):
     m = m*MSUN*1000 #cgs units
     r = r*RSUN*100 #cgs units
     return numpy.log10(G*m/(r**2))
-    
+
 class Param:
     def __init__(self,shortString,longString,index):
         self.shortString = shortString
         self.longString = longString
         self.index = index
-        
+
 def plotMult(x,parsList,total,label):
     rowIndex = plotMult.axindex % 5
     colIndex = int(numpy.floor(plotMult.axindex / 5))
@@ -52,7 +52,7 @@ def plotMult(x,parsList,total,label):
     axis.yaxis.set_ticklabels([])
     axis.set_ylim(ymin=0)
     axis.tick_params(axis='x', which='major', labelsize=7, pad=2.5)
-    axis.tick_params(top='on',right='on')
+    axis.tick_params(top=True,right=True)
     plotMult.axindex += 1
 # add fig, axs objects to plotMult function for plot incrementing
 plotMult.fig, plotMult.axs = plt.subplots(5,2)
@@ -60,14 +60,14 @@ plotMult.fig.delaxes(plotMult.axs[4,1])
 plt.subplots_adjust(wspace=0.08)
 plotMult.axindex = 0
 
-    
+
 def plot(array,label,params):
-    (y,bins) = numpy.histogram(array,bins=50,normed=True)
+    (y,bins) = numpy.histogram(array,bins=50,density=True)
     x = 0.5*(bins[:-1] + bins[1:])
     y /= float(len(array))
     maxloc = y.argmax()
     yFit = fitfunc(params,x)
-    
+
     rowIndex = plot.axindex % 5
     colIndex = int(numpy.floor(plot.axindex / 5))
     axis = plot.axs[rowIndex,colIndex]
@@ -77,7 +77,7 @@ def plot(array,label,params):
     axis.yaxis.set_ticklabels([])
     axis.set_ylim(ymin=0)
     axis.tick_params(axis='x', which='major', labelsize=7, pad=2.5)
-    axis.tick_params(top='on',right='on')
+    axis.tick_params(top=True,right=True)
     plot.axindex += 1
 plot.fig, plot.axs = plt.subplots(5,2)
 plot.fig.delaxes(plot.axs[4,1])
@@ -85,7 +85,7 @@ plt.subplots_adjust(wspace=0.08)
 plot.axindex = 0
 
 def fitSkewedGaussian(array):
-    (y,bins) = numpy.histogram(array,bins=50,normed=True)
+    (y,bins) = numpy.histogram(array,bins=50, density=True)
     x = 0.5*(bins[:-1] + bins[1:])
     y /= float(len(array))
     maxloc = y.argmax()
@@ -96,7 +96,7 @@ def fitSkewedGaussian(array):
     if delta < 1:
         alpha = delta/numpy.sqrt(1-delta**2.0)
     else:
-        alpha = 0.99 
+        alpha = 0.99
     if gamma < 0:
         alpha *= -1
     params = numpy.array([mode,array.var(),alpha,y[maxloc]])
@@ -118,10 +118,10 @@ def percentile(x,y,perc):
 def getStatsPDF(x,y,label):
     maxloc = y.argmax()
     mode = x[maxloc]
-    # get 16th and 84th percentile (defines 1 sigma confidence range) 
+    # get 16th and 84th percentile (defines 1 sigma confidence range)
     conflim = [percentile(x,y,0.16),percentile(x,y,0.84)]
     print "%s = %.8f + %.8f - %.8f" % (label, mode, conflim[1]-mode, mode-conflim[0])
-    
+
 def getStats(array,shortLabel):
     (y,bins) = numpy.histogram(array,bins=50,normed=True)
     x = 0.5*(bins[:-1] + bins[1:])
@@ -148,7 +148,7 @@ if __name__ == "__main__":
                  Param('kr',r'$K_d ({\rm km\ s}^{-1})$',7),
                  Param('logg',r'${\rm log\ g\ }$',9)]
     '''
-                 
+
     paramList = [Param('q',r'$q\ $ ',0),
                  Param('m1',r'$M_1\ (\rm{M}_{\odot})$',1),
                  Param('r1',r'$R_1\ (\rm{R}_{\odot})$',2),
@@ -158,7 +158,7 @@ if __name__ == "__main__":
                  Param('a',r'$a\ (\rm{R}_{\odot})$',5),
                  Param('k1',r'$K_1\ ({\rm km\ s}^{-1})$',6),
                  Param('k2',r'$K_2\ (\rm {km\ s}^{-1})$',7),
-                 Param('logg',r'$\rm{log}\ g$',9)]            
+                 Param('logg',r'$\rm{log}\ g$',9)]
 
     while True:
         mode = raw_input('(S)ingle dataset or (M)ultiple datasets? ')
@@ -166,8 +166,8 @@ if __name__ == "__main__":
             break
         else:
             print "Please answer S or M "
-            
-            
+
+
     if mode.upper() == "S":
         asciiFile = raw_input('Give data file containing parameter samples: ')
         dataIn = numpy.loadtxt(asciiFile)
@@ -185,7 +185,7 @@ if __name__ == "__main__":
         for param in paramList:
             if param.index > 8:
                 continue
-            array=dataIn[:,param.index]         
+            array=dataIn[:,param.index]
             pars = fitSkewedGaussian(array)
             x = numpy.linspace(array.min(),array.max(),1000)
             result = fitfunc(pars,x)
@@ -205,12 +205,12 @@ if __name__ == "__main__":
                 r_negerr = r - percentile(x,result,0.16)
             i += 1
         plt.close(plot.fig)
-        
+
         logg = logg(m,r)
         logg_poserr = 0.434*np.sqrt(((m_poserr/m)**2)+((2*r_poserr)/r)**2)
         logg_negerr = 0.434*np.sqrt(((m_negerr/m)**2)+((2*r_negerr)/r)**2)
         print "log g = %.8f + %.8f - %.8f" % (logg,logg_poserr,logg_negerr)
-        
+
     else:
         dataList = []
         numSets = 0
@@ -234,7 +234,7 @@ if __name__ == "__main__":
                 else:
                     m = numpy.array(dataList[i][:,paramList[1].index],dtype='float64')
                     r = numpy.array(dataList[i][:,paramList[2].index],dtype='float64')
-                    array = logg(m,r)     
+                    array = logg(m,r)
                 minX = min(minX,array.min())
                 maxX = max(maxX,array.max())
                 parsList.append(fitSkewedGaussian(array))
@@ -242,9 +242,9 @@ if __name__ == "__main__":
             result = 1
             for i in range(numSets):
                 result *= fitfunc(parsList[i],x)
-                
+
             plotMult(x,parsList[0:],result,param.longString)
-            plotMult.fig.savefig('pdf.pdf')
+            plotMult.fig.savefig('parameter_prob_dists.pdf')
             getStatsPDF(x,result,param.shortString)
 
         plt.close(plotMult.fig)
