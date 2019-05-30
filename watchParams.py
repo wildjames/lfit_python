@@ -1009,7 +1009,7 @@ class Watcher():
 
 
             self.lc_obs.data['calc']  = self.cv.calcFlux(pars, np.array(self.lc_obs.data['phase']))
-            self.lc_obs.data['res']   = self.lc_obs.data['calc'] - self.lc_obs.data['flux']
+            self.lc_obs.data['res']   = self.lc_obs.data['flux'] - self.lc_obs.data['calc']
             # Components
             self.lc_obs.data['sec']   = self.cv.yrs
             self.lc_obs.data['bspot'] = self.cv.ys
@@ -1189,7 +1189,7 @@ class Watcher():
 
         # Total model lightcurve
         new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
-        new_obs['res']  = new_obs['calc'] - new_obs['flux']
+        new_obs['res']  = new_obs['flux'] - new_obs['calc']
         # Components
         new_obs['sec']   = self.cv.yrs
         new_obs['bspot'] = self.cv.ys
