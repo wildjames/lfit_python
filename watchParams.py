@@ -712,7 +712,6 @@ class Watcher():
                 # Add to the plot.
                 self.paramFollowSource.stream(newdata, self.tail)
 
-
     def add_tracking_plot(self, attr, old, new):
         '''Add a user-defined to the page'''
 
@@ -907,7 +906,6 @@ class Watcher():
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
 
-
     def calcChangepoints(self):
         # What data range are we looking at?
         phi = self.lc_obs.data['phase']
@@ -987,13 +985,23 @@ class Watcher():
         self.lc_obs.data['GP_up'] = mu + std
         self.lc_obs.data['GP_lo'] = mu - std
 
+        self.update_like_header(gp=True)
+
+    def update_like_header(self, gp=False):
+        print("res: {} data, err: {} data".format(len(self.lc_obs.data['res']), len(self.lc_obs.data['err'])))
         chisq =  self.lc_obs.data['res'] / self.lc_obs.data['err']
         chisq = np.sum(chisq**2)
 
-        self.lnlike = self.gp.lnlikelihood(self.lc_obs.data['res'])
+        print("Chisq = {}".format(chisq))
+        print("Updating header")
 
-        self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
+        if gp:
+            self.lnlike = self.gp.lnlikelihood(self.lc_obs.data['res'])
 
+
+        print("label text was before: {}".format(self.like_label.text))
+        self.like_label.text = "<i>GP ln(likelihood): <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
+        print("label text is now: {}".format(self.like_label.text))
 
     def recalc_lc_model(self):
         try:
@@ -1029,13 +1037,10 @@ class Watcher():
             self.lc_isvalid.button_type = 'danger'
             self.lc_isvalid.label = 'Invalid Parameters'
 
-        chisq =  self.lc_obs.data['res'] / self.lc_obs.data['err']
-        chisq = np.sum(chisq**2)
-
         if self.lnlike is None:
             self.recalc_GP_model()
 
-        self.like_label.text = "<i>GP like: <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
+        self.update_like_header(gp=False)
 
     def update_selectList(self):
         '''Change the options on self.plotPars to reflect how many eclipses are in the MCMC chain'''
@@ -1104,7 +1109,7 @@ class Watcher():
 
             self.complex_button.button_type = 'danger'
 
-        self.update_lc_model('value', None, None)
+        self.recalc_lc_model()
 
     def update_thinning(self, attr, old, new):
         thin = self.thin_input.value
@@ -1202,13 +1207,16 @@ class Watcher():
 
         # Push that into the data frame
         self.lc_obs.data = dict(new_obs)
+        self.recalc_GP_model()
 
         # Set the plotting area title
         fname = fname.split('/')[-1]
         print("Trying to change the title of the plot")
         print("Old title: {}".format(self.lc_plot.title.text))
         self.lc_plot.title.text = fname
-        print("The title should now be {}".format(self.lc_plot.title.text))
+        print("The title should now be {}!!".format(fname))
+
+        self.update_like_header(gp=self.GP)
 
     def update_lc_model(self, attr, old, new):
         '''Callback to redraw the model lightcurve in the second tab'''

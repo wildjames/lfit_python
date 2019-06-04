@@ -366,12 +366,8 @@ class GPLCModel(LCModel):
                 thisWidth=None
             resids = y[iecl] - self.calc(iecl,phi[iecl],thisWidth)
 
-            chisq = -0.5*self.chisq(phi,y,e,width)
-            gp_ln_like = gp.log_likelihood(resids, True)
-
-            # print("chisq:   {}".format(chisq))
-            # print("GP like: {}".format(gp_ln_like))
-            # print()
+            # the 'quiet' argument tells the GP to return -inf when you get an invalid kernel, rather than throwing an exception.
+            gp_ln_like = gp.log_likelihood(resids, quiet=True)
 
             # Check for bugs in model
             if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
