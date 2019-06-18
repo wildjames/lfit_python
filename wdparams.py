@@ -52,7 +52,10 @@ class wdModel(MutableSequence):
 
     @property
     def dist(self):
-        return 1000./self.plax.currVal
+        if self.plax.currVal < 0.0:
+            return 0.0
+        else:
+            return 1000./self.plax.currVal
 
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
