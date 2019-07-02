@@ -17,8 +17,7 @@ from mcmc_utils import Param
 import mcmc_utils as utils
 
 
-if __name__ in '__main__':
-    input_file = sys.argv[1]
+def construct_model(input_file):
     input_dict = configobj.ConfigObj(input_file)
 
     # Read in information about mcmc, neclipses, use of complex/GP etc.
@@ -152,12 +151,9 @@ if __name__ in '__main__':
         else:
             break
 
-    neclipses = ecl_i
-    print("Fitting {} eclipses.".format(neclipses))
 
-    #################################
-    # The model is now fully built. #
-    #################################
+if __name__ in '__main__':
+    model = construct_model(sys.argv[1])
 
     print("\nStructure:")
     pprint(model.structure)
