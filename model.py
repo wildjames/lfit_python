@@ -1112,6 +1112,12 @@ class GPEclipse(Eclipse):
 
             # Distance from changepoints to mideclipse
             dist_cp = (dphi.currVal+dpwd)/2.
+
+            # save these values for speed
+            self._dist_cp = dist_cp
+            self._oldq = q.currVal
+            self._olddphi = dphi.currVal
+            self._oldrwd = rwd.currVal
         else:
             # Use the old values
             dist_cp = self._dist_cp
@@ -1133,13 +1139,6 @@ class GPEclipse(Eclipse):
             # When does this eclipse start?
             ingress = e - dist_cp
             changepoints.append([egress, ingress])
-
-        # save these values for speed
-        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
-            self._dist_cp = dist_cp
-            self._oldq = q.currVal
-            self._olddphi = dphi.currVal
-            self._oldrwd = rwd.currVal
 
         return changepoints
 
