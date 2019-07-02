@@ -1,6 +1,7 @@
 *.ps
 *.pdf
 *.pyc
+*.ipynb
 *~
 data/**
 gp/**
