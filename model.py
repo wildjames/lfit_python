@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+import george
 import matplotlib.pyplot as plt
 
 from lfit import CV
@@ -1049,3 +1050,176 @@ class LCModel(Model):
 # Possibly will require either passing up of residuals, rather than chisq
 # (hard), or maybe the Eclipse subclass could have a second variant that
 # overrides Eclipse.calc() (easy?)
+
+class GPEclipse(Eclipse):
+    '''This is a subclass of the Eclipse class. It uses the Gaussian Process.
+
+
+    This version will, rather than evaluating via chisq, evaluate the
+    likelihood of the model by calculating the residuals between the model
+    and the data and computing the likelihood of those data given certain
+    Gaussian Process hyper-parameters. '''
+
+    # Set the initial values of q, rwd, and dphi. These will be used to
+    # caclulate the location of the GP changepoints. Setting to initially
+    # unrealistically high values will ensure that the first time
+    # calcChangepoints is called, the changepoints are calculated.
+    _olddphi = 9e99
+    _oldq = 9e99
+    _oldrwd = 9e99
+
+    # _dist_cp is initially set to whatever, it will be overwritten anyway.
+    _dist_cp = 9e99
+
+
+    def __init__(self, ampin_GP, ampout_GP, tau_GP, lightcurve, iscomplex,
+                 *args, **kwargs):
+
+        # GP hyperparameters
+        self.ampin = ampin_GP
+        self.ampout = ampout_GP
+        self.tau = tau_GP
+
+        super().__init__(lightcurve, iscomplex, *args, **kwargs)
+        # Initialise the GP
+        self.init_GP()
+
+    def calcChangepoints(self):
+        '''Caclulate the WD ingress and egresses, i.e. where we want to switch
+        on or off the extra GP amplitude'''
+
+        # Also get object for dphi, q and rwd as this is required to determine
+        # changepoints
+        dphi = getattr(self, 'dphi')
+        q = getattr(self, 'q')
+        rwd = getattr(self, 'rwd')
+        phi0 = getattr(self, 'phi0')
+
+        dphi_change = np.fabs(self._olddphi - dphi.currVal) / dphi.currVal
+        q_change = np.fabs(self._oldq - q.currVal) / q.currVal
+        rwd_change = np.fabs(self._oldrwd - rwd.currVal) / rwd.currVal
+
+        # Check to see if our model parameters have changed enough to
+        # significantly change the location of the changepoints.
+        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
+            # Calculate inclination
+            inc = roche.findi(q.currVal, dphi.currVal)
+
+            # Calculate wd contact phases 3 and 4
+            phi3, phi4 = roche.wdphases(q.currVal, inc, rwd.currVal, ntheta=10)
+
+            # Calculate length of wd egress
+            dpwd = phi4 - phi3
+
+            # Distance from changepoints to mideclipse
+            dist_cp = (dphi.currVal+dpwd)/2.
+        else:
+            # Use the old values
+            dist_cp = self._dist_cp
+
+        # Find location of all changepoints
+        min_ecl = int(np.floor(phi.min()))
+        max_ecl = int(np.ceil(phi.max()))
+        eclipses = [e for e in range(min_ecl, max_ecl+1)
+                    if np.logical_and(e > phi.min(), e < (1+phi.max()))]
+        changepoints = []
+        for e in eclipses:
+            # When did the last eclipse end?
+            egress = (e-1) + dist_cp
+            # When does this eclipse start?
+            ingress = e - dist_cp
+            changepoints.append([egress, ingress])
+
+        # save these values for speed
+        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
+            self._dist_cp = dist_cp
+            self._oldq = q.currVal
+            self._olddphi = dphi.currVal
+            self._oldrwd = rwd.currVal
+
+        return changepoints
+
+    def createGP(self):
+        """Constructs a kernel, which is used to create Gaussian processes.
+
+        Using values for the two hyperparameters (amp,tau), amp_ratio and dphi,
+        this function: creates kernels for both inside and out of eclipse,
+        works out the location of any changepoints present, constructs a single
+         (mixed) kernel and uses this kernel to create GPs"""
+
+        # Get objects for ampin_gp, ampout_gp, tau_gp and find the exponential
+        # of their current values
+        ln_ampin = self.ampin
+        ln_ampout = self.ampout
+        ln_tau = self.tau
+
+        ampin = np.exp(ln_ampin.currVal)
+        ampout = np.exp(ln_ampout.currVal)
+        tau = np.exp(ln_tau.currVal)
+
+        # Calculate kernels for both out of and in eclipse WD eclipse
+        # Kernel inside of WD has smaller amplitude than that of outside
+        # eclipse.
+
+        # First, get the changepoints
+        changepoints = self.calcChangepoints(phi)
+
+        # We need to make a fairly complex kernel.
+        # Global flicker
+        kernel = ampin * george.kernels.Matern32Kernel(tau)
+        # inter-eclipse flicker
+        for gap in changepoints:
+            kernel += ampout * george.kernels.Matern32Kernel(tau, block=gap)
+
+        # Use that kernel to make a GP object
+        georgeGP = george.GP(kernel, solver=george.HODLRSolver)
+
+        return georgeGP
+
+    def calc(self):
+        '''Overwrites the vanilla Eclipse calc function. We no longer want to
+        calculate chisq, rather return the flux of the model.
+
+        Calculate the residuals of the model of this eclipse, against the data
+        stored in its lightcurve object.'''
+
+        if self.cv is None:
+            self.initCV()
+
+        # TODO: When the model moves far enough, re-initialise the CV?
+
+        # Get the model CV lightcurve across our data.
+        flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+
+        # Calculate the residuals of this model.
+        residuals = self.lc.y - flx
+
+        if plot:
+            self.lc.plot(flx)
+
+        return residuals
+
+    def ln_like(self):
+        """Calculates the natural log of the likelihood.
+
+        This alternative ln_like function uses the createGP function to create
+        Gaussian processes"""
+
+        # For This eclipse, create (and compute) Gaussian process and calculate
+        #  the model
+        gp = self.createGP(self.lc.x)
+        gp.compute(self.lc.x, self.lc.ye)
+
+        # Get the residuals of the model
+        resids = self.calc()
+
+        # Check for bugs in model
+        if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
+            warnings.warn('GP gave nan or inf answers')
+            return -np.inf
+
+        # The 'quiet' argument tells the GP to return -inf when you get an
+        # invalid kernel, rather than throwing an exception.
+        gp_ln_like = gp.log_likelihood(resids, quiet=True)
+
+        return gp_ln_like
