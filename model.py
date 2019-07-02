@@ -737,8 +737,6 @@ class Eclipse(Model):
         if self.cv is None:
             self.initCV()
 
-        # TODO: When the model moves far enough, re-initialise the CV?
-
         # Get the model CV lightcurve across our data.
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
 
@@ -1044,16 +1042,8 @@ class LCModel(Model):
         return lnp
 
 
-# TODO: Add in a GP tier, which will probably be between the Eclipse and the
-# Band?
-#
-# Possibly will require either passing up of residuals, rather than chisq
-# (hard), or maybe the Eclipse subclass could have a second variant that
-# overrides Eclipse.calc() (easy?)
-
 class GPEclipse(Eclipse):
     '''This is a subclass of the Eclipse class. It uses the Gaussian Process.
-
 
     This version will, rather than evaluating via chisq, evaluate the
     likelihood of the model by calculating the residuals between the model
@@ -1071,18 +1061,14 @@ class GPEclipse(Eclipse):
     # _dist_cp is initially set to whatever, it will be overwritten anyway.
     _dist_cp = 9e99
 
-
-    def __init__(self, ampin_GP, ampout_GP, tau_GP, lightcurve, iscomplex,
-                 *args, **kwargs):
+    def __init__(self, ampin_GP, ampout_GP, tau_GP, *args, **kwargs):
 
         # GP hyperparameters
         self.ampin = ampin_GP
         self.ampout = ampout_GP
         self.tau = tau_GP
 
-        super().__init__(lightcurve, iscomplex, *args, **kwargs)
-        # Initialise the GP
-        self.init_GP()
+        super().__init__(*args, **kwargs)
 
     def calcChangepoints(self):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
@@ -1205,11 +1191,6 @@ class GPEclipse(Eclipse):
         This alternative ln_like function uses the createGP function to create
         Gaussian processes"""
 
-        # For This eclipse, create (and compute) Gaussian process and calculate
-        #  the model
-        gp = self.createGP(self.lc.x)
-        gp.compute(self.lc.x, self.lc.ye)
-
         # Get the residuals of the model
         resids = self.calc()
 
@@ -1217,6 +1198,11 @@ class GPEclipse(Eclipse):
         if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
             warnings.warn('GP gave nan or inf answers')
             return -np.inf
+
+        # For This eclipse, create (and compute) Gaussian process and calculate
+        #  the model
+        gp = self.createGP(self.lc.x)
+        gp.compute(self.lc.x, self.lc.ye)
 
         # The 'quiet' argument tells the GP to return -inf when you get an
         # invalid kernel, rather than throwing an exception.
