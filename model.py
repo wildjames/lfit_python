@@ -285,9 +285,9 @@ class Model:
         # Start at a log prior probablity of 0. We'll add to this for each node
         lnp = 0.0
 
-        # Get the sum of this node's prior probs
+        # Get the sum of this node's variable's prior probs
         for param in [getattr(self, name) for name in self.node_par_names]:
-            if param.isValid:
+            if param.isValid and param.isVar:
                 lnp += param.prior.ln_prob(param.currVal)
             else:
                 if verbose:
@@ -296,7 +296,10 @@ class Model:
                 return -np.inf
 
         if verbose:
-            print("The sum of parameter ln_priors of {} is {:.3f}!".format(
+            print("{} has the following Params:".format(self.name))
+            for i, par in enumerate(self.node_par_names[::4]):
+                print(self.node_par_names[i:i+4])
+            print("The sum of parameter ln_priors of {} is {:.3f}\n".format(
                 self.name, lnp))
 
         # Then recursively fetch my decendants
@@ -538,7 +541,7 @@ class Model:
             self.report_relatives()
         print("  Parameter vector, and labels:")
         for par, val in zip(self.par_names, self.par_val_list):
-            print("  {:>10}: {}".format(par, val))
+            print("  {:>10} = {:<.3f}".format(par, val))
         print("\n")
 
     def create_tree(self, G=None, called=True):
@@ -947,22 +950,24 @@ class Eclipse(Model):
     @property
     def cv_parlist(self):
         '''Construct the parameter list needed by the CV'''
-        cv_par_name_list = [
-            'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
-            'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
-        ]
+
         if self.iscomplex:
-            cv_par_name_list.extend(['exp1', 'exp2', 'tilt', 'yaw'])
+            cv_par_name_list = [
+                'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
+                'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0',
+                'exp1', 'exp2', 'tilt', 'yaw'
+            ]
+        else:
+            cv_par_name_list = [
+                'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
+                'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
+            ]
 
         par_dict = self.par_dict
 
-        try:
-            cv_parlist = [par_dict[key].currVal for key in cv_par_name_list]
-            return cv_parlist
-        except:
-            msg = 'Could not construct the CV parameter list from {}'
-            msg.format(self.name)
-            raise KeyError(msg)
+        cv_parlist = [par_dict[key].currVal for key in cv_par_name_list]
+
+        return cv_parlist
 
 
 class Band(Model):
