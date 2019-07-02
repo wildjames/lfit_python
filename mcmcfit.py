@@ -17,9 +17,8 @@ from mcmc_utils import Param
 import mcmc_utils as utils
 
 
-def main(input_file):
-    '''Execute the MCMC fit defined in the input file supplied.'''
-
+if __name__ in '__main__':
+    input_file = sys.argv[1]
     input_dict = configobj.ConfigObj(input_file)
 
     # Read in information about mcmc, neclipses, use of complex/GP etc.
@@ -31,6 +30,12 @@ def main(input_file):
     scatter_1 = float(input_dict['first_scatter'])
     scatter_2 = float(input_dict['second_scatter'])
     to_fit = int(input_dict['fit'])
+    is_complex = bool(int(input_dict['complex']))
+    use_gp = bool(int(input_dict['useGP']))
+    use_pt = bool(int(input_dict['usePT']))
+    corner = bool(int(input_dict['corner']))
+    double_burnin = bool(int(input_dict['double_burnin']))
+    comp_scat = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
@@ -39,32 +44,27 @@ def main(input_file):
     except KeyError:
         neclipses = -1
 
-    is_complex = bool(int(input_dict['complex']))
-    use_gp = bool(int(input_dict['useGP']))
-    use_pt = bool(int(input_dict['usePT']))
-    corner = bool(int(input_dict['corner']))
-    double_burnin = bool(int(input_dict['double_burnin']))
-    comp_scat = bool(int(input_dict['comp_scat']))
-
     if use_gp:
+        # TODO: Impliment the GP version of the Eclipses.
         # Read in GP params using fromString function from mcmc_utils.py
         ampin_gp = Param.fromString('ampin_gp', input_dict['ampin_gp'])
         ampout_gp = Param.fromString('ampout_gp', input_dict['ampout_gp'])
         tau_gp = Param.fromString('tau_gp', input_dict['tau_gp'])
 
     # Start by creating the overall Model. Gather the parameters:
+    core_par_names = ['rwd', 'dphi', 'q']
     core_pars = [Param.fromString(name, s) for name, s in input_dict.items()
-                 if name in ['rwd', 'dphi', 'q']]
+                 if name in core_par_names]
     # and make the model object with no children
     model = LCModel('core', core_pars)
 
     # Collect the bands and their params. Add them total model.
-    band_pars = ['wdFlux', 'rsFlux']
+    band_par_names = ['wdFlux', 'rsFlux']
 
     # Get a sub-dict of only band parameters
     band_dict = {}
     for key, string in input_dict.items():
-        if np.any([key.startswith(par) for par in band_pars]):
+        if np.any([key.startswith(par) for par in band_par_names]):
             band_dict[key] = string
 
     # Get a set of the bands we have in the input file
@@ -84,8 +84,8 @@ def main(input_file):
 
     # These are the entries to ignore.
     descriptors = ['file', 'plot', 'band']
-    descriptors += band_pars
-    descriptors += core_pars
+    descriptors += band_par_names
+    descriptors += core_par_names
     complex_desc = ['exp1', 'exp2', 'yaw', 'tilt']
     if not is_complex:
         print("Using the complex BS model. ")
@@ -186,9 +186,6 @@ def main(input_file):
         # Calculate ln_prior verbosley, for the user's benefit
         model.ln_prior(verbose=True)
 
-    # TODO:
-    # Get the above to plug into emcee.
-
     if not to_fit:
         model.draw()
         print("Model parameters:")
@@ -212,7 +209,10 @@ def main(input_file):
                 model.ln_prob()))
 
         # Plot the data and the final fit.
-        model.plot_data(save=True)
+        # model.plot_data(save=True)
+        for iecl in range(neclipses):
+            eclipse = model.search_Node('Eclipse', str(iecl))
+            eclipse.plot_data(save=True)
 
         exit()
 
@@ -220,6 +220,13 @@ def main(input_file):
     # MCMC Chain sampler, handled by emcee.                      #
     # The below plugs the above into emcee's relevant functions. #
     ##############################################################
+
+    # How many parameters do I have to deal with?
+    npars = len(model.par_val_list)
+
+    print("The MCMC has {:d} variables and {:d} walkers".format(
+        npars, nwalkers))
+    print("(It should have at least 2*npars, {:d} walkers)".format(2*npars))
 
     # p_0 is the initial position vector of the MCMC walker
     p_0 = model.par_val_list
@@ -278,9 +285,6 @@ def main(input_file):
         model.par_val_list = par_val_list
         return model.ln_like()
 
-    # How many parameters do I have to deal with?
-    npars = len(model.par_val_list)
-
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
     if use_pt:
@@ -320,6 +324,8 @@ def main(input_file):
     # re-initialise it.
     sampler.reset()
     print("Starting the main MCMC chain. Probably going to take a while!")
+
+    col_names = model.par_names
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
@@ -389,7 +395,3 @@ def main(input_file):
 
     # Plot the data and the final fit.
     model.plot_data(save=True)
-
-
-USER_SUPPLIED_FILE = sys.argv[1]
-main(USER_SUPPLIED_FILE)

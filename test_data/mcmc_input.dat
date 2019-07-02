@@ -1,0 +1,274 @@
+# MCMC run parameters
+nburn          = 1      # number of steps to use in burn-in phase
+nprod          = 20000  # number of steps to use in production phase
+nwalkers       = 350    # number of walkers per chain, must be even multiple of npars (npars = (3 or 6) + (11 or 15)*necl)
+ntemps         = 3      # number of chains of different temperatures for Parallel Tempering fitting
+nthread        = 7     # number of CPU threads to use
+first_scatter  = 0.05   # fractional scatter to add to starting ball of parameters in first burnin
+second_scatter = 0.05   # fractional scatter to add to starting ball of parameters in second burnin
+comp_scat      = 1      # vary scatter for different params (1), or add uniform scatter (0)
+fit            = 0      # actually fit (1), or just plot model as specified (0)
+usePT          = 1      # use parallel tempering (1), or standard fitting (0)
+double_burnin  = 0      # run two burnin phases (1), or just the one (0)
+
+# all model parameters have both a starting value and a prior
+# priors are specified by type, val1, val2
+# type can be one of 'gauss', 'uniform' or 'log_uniform'
+# if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
+# if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
+
+#neclipses = 10
+
+# what phases to plot/fit
+phi_start = -0.2
+phi_end = 0.3
+
+# plot corner plot, yes (1) or no (0)?
+corner = 0 #### Crashes the script before the fits are plotted ####
+
+# complex bright spot, yes (1) or no (0)?
+complex = 1
+
+# fit using Gaussian processes, yes (1) or no (0)?
+useGP = 0
+
+
+# eclipse independent parameters, is parameter to be fit (1) or not (0)?
+  ampin_gp =    -9.5118        uniform        -20.0         -2.0            1
+ ampout_gp =    -9.0953        uniform        -20.0         -2.0            1
+    tau_gp =    -2.2131        uniform         -6.9         -2.0            1
+
+
+         q =       0.1037      uniform       0.0300       0.5000            1
+      dphi =       0.0392      uniform       0.0100       0.1000            1
+       rwd =       0.0187      uniform       0.0010       0.1000            1
+
+
+  wdFlux_g =       0.0528      uniform       0.0010       0.2000            1
+  rsFlux_g =       0.0131      uniform       0.0010       0.2000            1
+
+wdFlux_KG5 =       0.0539      uniform       0.0010       0.2000            1
+rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
+
+  wdFlux_r =       0.0324      uniform       0.0010       0.2000            1
+  rsFlux_r =       0.0262      uniform       0.0010       0.2000            1
+
+
+
+# remaining parameters vary from eclipse to eclipse
+# the following lines should have an entry for each individual eclipse
+
+### g Data
+    file_0 =  lightcurves/SDSSJ0748_0_g_binned.calib
+    plot_0 =  SDSSJ0748_0_g
+    band_0 = g
+
+   dFlux_0 =       0.0607      uniform       0.0010       0.2000            1
+   sFlux_0 =       0.0813      uniform       0.0010       0.2000            1
+   ulimb_0 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_0 =       0.4953      uniform       0.2000       0.7000            1
+   scale_0 =       0.0330  log_uniform       0.0010       0.2000            1
+      az_0 =     127.2343      uniform      50.0000     175.0000            1
+     fis_0 =       0.0480      uniform       0.0010       1.0000            1
+    dexp_0 =       1.9000  log_uniform       0.0010       2.0000            1
+    phi0_0 =      -0.0003      uniform      -0.2000       0.2000            1
+    exp1_0 =       1.6090      uniform       0.0010       5.0000            1
+    exp2_0 =       0.9879      uniform       0.5000       5.0000            1
+     yaw_0 =      -0.0464      uniform     -90.0000      90.0000            1
+    tilt_0 =      48.5079      uniform       0.0010     180.0000            1
+
+
+    file_1 =  lightcurves/SDSSJ0748_0_2018-12-17_g.calib
+    plot_1 =  SDSSJ0748_0_2018-12-17_g
+    band_1 = g
+
+   dFlux_1 =       0.1238      uniform       0.0010       0.2000            1
+   sFlux_1 =       0.1518      uniform       0.0010       0.2000            1
+   ulimb_1 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_1 =       0.5214      uniform       0.2000       0.7000            1
+   scale_1 =       0.0497  log_uniform       0.0010       0.2000            1
+      az_1 =     122.0724      uniform      50.0000     175.0000            1
+     fis_1 =       0.1684      uniform       0.0010       1.0000            1
+    dexp_1 =       1.9539  log_uniform       0.0010       2.0000            1
+    phi0_1 =      -0.0013      uniform      -0.2000       0.2000            1
+    exp1_1 =       3.4876      uniform       0.0010       5.0000            1
+    exp2_1 =       1.4429      uniform       0.5000       5.0000            1
+     yaw_1 =      15.6635      uniform     -90.0000      90.0000            1
+    tilt_1 =      52.4720      uniform       0.0010     180.0000            1
+
+
+
+### KG5 Data
+    file_2 =  lightcurves/SDSSJ0748_0_KG5_binned.calib
+    plot_2 =  SDSSJ0748_0_KG5
+    band_2 = KG5
+
+   dFlux_2 =       0.0496      uniform       0.0010       0.2000            1
+   sFlux_2 =       0.0631      uniform       0.0010       0.2000            1
+   ulimb_2 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_2 =       0.5487      uniform       0.2000       0.7000            1
+   scale_2 =       0.0410  log_uniform       0.0010       0.2000            1
+      az_2 =     125.1563      uniform      50.0000     175.0000            1
+     fis_2 =       0.0467      uniform       0.0010       1.0000            1
+    dexp_2 =       0.7073  log_uniform       0.0010       2.0000            1
+    phi0_2 =      -0.0004      uniform      -0.2000       0.2000            1
+    exp1_2 =       2.7938      uniform       0.0010       5.0000            1
+    exp2_2 =       1.2241      uniform       0.5000       5.0000            1
+     yaw_2 =      -1.3957      uniform     -90.0000      90.0000            1
+    tilt_2 =      49.0896      uniform       0.0010     180.0000            1
+
+
+    file_3 =  lightcurves/SDSSJ0748_0_2017-01-22_KG5_binned.calib
+    plot_3 = SDSSJ0748_0_2017-01-22_KG5
+    band_3 = KG5
+
+   dFlux_3 =       0.0938      uniform       0.0010       0.2000            1
+   sFlux_3 =       0.0618      uniform       0.0010       0.2000            1
+   ulimb_3 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_3 =       0.4212      uniform       0.2000       0.7000            1
+   scale_3 =       0.0430  log_uniform       0.0010       0.2000            1
+      az_3 =     125.1298      uniform      50.0000     175.0000            1
+     fis_3 =       0.1099      uniform       0.0010       1.0000            1
+    dexp_3 =       1.0794  log_uniform       0.0010       2.0000            1
+    phi0_3 =      -0.0002      uniform      -0.2000       0.2000            1
+    exp1_3 =       0.2859      uniform       0.0010       5.0000            1
+    exp2_3 =       0.9702      uniform       0.5000       5.0000            1
+     yaw_3 =      -2.4394      uniform     -90.0000      90.0000            1
+    tilt_3 =      52.2358      uniform       0.0010     180.0000            1
+
+
+### r Data
+    file_4 =  lightcurves/SDSSJ0748_0_2018-02-04_r.calib
+    plot_4 =  SDSSJ0748_0_2018-02-04_r
+    band_4 = r
+
+   dFlux_4 =       0.1267      uniform       0.0010       0.2000            1
+   sFlux_4 =       0.1084      uniform       0.0010       0.2000            1
+   ulimb_4 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_4 =       0.5954      uniform       0.2000       0.7000            1
+   scale_4 =       0.0487  log_uniform       0.0010       0.2000            1
+      az_4 =      99.1185      uniform      50.0000     175.0000            1
+     fis_4 =       0.0317      uniform       0.0010       1.0000            1
+    dexp_4 =       1.4333  log_uniform       0.0010       2.0000            1
+    phi0_4 =       0.0004      uniform      -0.2000       0.2000            1
+    exp1_4 =       2.9879      uniform       0.0010       5.0000            1
+    exp2_4 =       1.2802      uniform       0.5000       5.0000            1
+     yaw_4 =      22.7125      uniform     -90.0000      90.0000            1
+    tilt_4 =     138.7462      uniform       0.0010     180.0000            1
+
+
+    file_5 =  lightcurves/SDSSJ0748_0_2017-02-24_r_binned.calib
+    plot_5 =  SDSSJ0748_0_2018-02-24_r
+    band_5 = r
+
+   dFlux_5 =       0.0845      uniform       0.0010       0.2000            1
+   sFlux_5 =       0.0697      uniform       0.0010       0.2000            1
+   ulimb_5 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_5 =       0.5702      uniform       0.2000       0.7000            1
+   scale_5 =       0.0191  log_uniform       0.0010       0.2000            1
+      az_5 =     120.9071      uniform      50.0000     175.0000            1
+     fis_5 =       0.0506      uniform       0.0010       1.0000            1
+    dexp_5 =       1.7123  log_uniform       0.0010       2.0000            1
+    phi0_5 =      -0.0000      uniform      -0.2000       0.2000            1
+    exp1_5 =       3.0050      uniform       0.0010       5.0000            1
+    exp2_5 =       1.3828      uniform       0.5000       5.0000            1
+     yaw_5 =       8.6757      uniform     -90.0000      90.0000            1
+    tilt_5 =     111.5294      uniform       0.0010     180.0000            1
+
+
+    file_6 =  lightcurves/SDSSJ0748_0_2018-12-17_r_binned.calib
+    plot_6 =  SDSSJ0748_0_2018-12-17_r
+    band_6 = r
+
+   dFlux_6 =       0.1109      uniform       0.0010       0.2000            1
+   sFlux_6 =       0.0773      uniform       0.0010       0.2000            1
+   ulimb_6 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_6 =       0.5556      uniform       0.2000       0.7000            1
+   scale_6 =       0.0472  log_uniform       0.0010       0.2000            1
+      az_6 =     112.9155      uniform      50.0000     175.0000            1
+     fis_6 =       0.0641      uniform       0.0010       1.0000            1
+    dexp_6 =       1.5766  log_uniform       0.0010       2.0000            1
+    phi0_6 =      -0.0006      uniform      -0.2000       0.2000            1
+    exp1_6 =       3.7206      uniform       0.0010       5.0000            1
+    exp2_6 =       1.5720      uniform       0.5000       5.0000            1
+     yaw_6 =       8.8007      uniform     -90.0000      90.0000            1
+    tilt_6 =     138.9885      uniform       0.0010     180.0000            1
+
+
+    file_7 =  lightcurves/SDSSJ0748_0_2018-02-05_r.calib
+    plot_7 =  SDSSJ0748_0_2018-02-05_r
+    band_7 = r
+
+   dFlux_7 =       0.0991      uniform       0.0010       0.2000            1
+   sFlux_7 =       0.0906      uniform       0.0010       0.2000            1
+   ulimb_7 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_7 =       0.3993      uniform       0.2000       0.7000            1
+   scale_7 =       0.0315  log_uniform       0.0010       0.2000            1
+      az_7 =      93.0097      uniform      50.0000     175.0000            1
+     fis_7 =       0.3810      uniform       0.0010       1.0000            1
+    dexp_7 =       1.6910  log_uniform       0.0010       2.0000            1
+    phi0_7 =       0.0010      uniform      -0.2000       0.2000            1
+    exp1_7 =       0.3443      uniform       0.0010       5.0000            1
+    exp2_7 =       0.9392      uniform       0.5000       5.0000            1
+     yaw_7 =      28.3818      uniform     -90.0000      90.0000            1
+    tilt_7 =      47.1937      uniform       0.0010     180.0000            1
+
+
+
+
+## ULTRACAM observations
+    file_8 =  lightcurves/SDSSJ0748_ucam_2017-03-20_r_binned.calib
+    plot_8 =  SDSSJ0748_2017-03-20_r
+    band_8 = r
+
+   dFlux_8 =       0.1025      uniform       0.0010       0.2000            1
+   sFlux_8 =       0.0813      uniform       0.0010       0.2000            1
+   ulimb_8 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_8 =       0.6048      uniform       0.2000       0.7000            1
+   scale_8 =       0.0143  log_uniform       0.0010       0.2000            1
+      az_8 =      81.6971      uniform      50.0000     175.0000            1
+     fis_8 =       0.1605      uniform       0.0010       1.0000            1
+    dexp_8 =       1.4872  log_uniform       0.0010       2.0000            1
+    phi0_8 =      -0.0004      uniform      -0.2000       0.2000            1
+    exp1_8 =       1.2894      uniform       0.0010       5.0000            1
+    exp2_8 =       0.7682      uniform       0.5000       5.0000            1
+     yaw_8 =      30.5932      uniform     -90.0000      90.0000            1
+    tilt_8 =     141.4596      uniform       0.0010     180.0000            1
+
+
+    file_9 =  lightcurves/SDSSJ0748_ucam_2017-03-20_g_binned.calib
+    plot_9 =  SDSSJ0748_2017-03-20_g
+    band_9 = g
+
+   dFlux_9 =       0.0427      uniform       0.0001       0.2000            1
+   sFlux_9 =       0.0674      uniform       0.0010       0.2000            1
+   ulimb_9 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_9 =       0.5565      uniform       0.2000       0.7000            1
+   scale_9 =       0.0277  log_uniform       0.0010       0.2000            1
+      az_9 =      93.4395      uniform      50.0000     175.0000            1
+     fis_9 =       0.1131      uniform       0.0010       1.0000            1
+    dexp_9 =       1.5307  log_uniform       0.0010       2.0000            1
+    phi0_9 =      -0.0004      uniform      -0.2000       0.2000            1
+    exp1_9 =       0.7152      uniform       0.0010       5.0000            1
+    exp2_9 =       0.8114      uniform       0.5000       5.0000            1
+     yaw_9 =      19.9663      uniform     -90.0000      90.0000            1
+    tilt_9 =     129.9575      uniform       0.0010     180.0000            1
+
+
+#   file_10 =  lightcurves/SDSSJ0748_2017-03-20_u.calib
+#   plot_10 =  SDSSJ0748_2017-03-20_u
+# wdFlux_10 =       0.0367      uniform       0.0010       0.2000            1
+#  dFlux_10 =       0.0754      uniform       0.0010       0.2000            1
+#  sFlux_10 =       0.0507      uniform       0.0010       0.2000            1
+# rsFlux_10 =       0.0023      uniform       0.0001       0.2000            1
+#  ulimb_10 =       0.2840        gauss       0.2840       0.0010            1
+#  rdisc_10 =       0.5192      uniform       0.2000       0.7000            1
+#  scale_10 =       0.0206  log_uniform       0.0010       0.2000            1
+#     az_10 =      86.2122      uniform      50.0000     175.0000            1
+#    fis_10 =       0.2420      uniform       0.0010       1.0000            1
+#   dexp_10 =       1.6683  log_uniform       0.0010       2.0000            1
+#   phi0_10 =       0.0000      uniform      -0.2000       0.2000            1
+#   exp1_10 =       0.9475      uniform       0.0010       5.0000            1
+#   exp2_10 =       0.7772      uniform       0.5010       5.0000            1
+#    yaw_10 =      31.1219      uniform     -90.0000      90.0000            1
+#   tilt_10 =     127.8854      uniform       0.0010     180.0000            1

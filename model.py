@@ -277,12 +277,13 @@ class Model:
 
         # Get the sum of this node's prior probs
         for param in [getattr(self, name) for name in self.node_par_names]:
-            if not param.isValid:
+            if param.isValid:
+                lnp += param.prior.ln_prob(param.currVal)
+            else:
                 if verbose:
                     print("Param {} in {} is invalid!".format(
                         param.name, self.name))
                 return -np.inf
-            lnp += param.prior.ln_prob(param.currVal)
 
         if verbose:
             print("The sum of parameter ln_priors of {} is {:.3f}!".format(
@@ -293,7 +294,7 @@ class Model:
             lnp += child.ln_prior(verbose=verbose)
 
             # If my child returns negative infinite prob, terminate here.
-            if not np.isfinite(lnp):
+            if np.isinf(lnp):
                 return lnp
 
         # Pass it up the chain, or back to the main program
@@ -469,7 +470,7 @@ class Model:
     def add_child(self, children):
         # This check allows XXX.add_child(Param) to be valid
         if not isinstance(children, list):
-            children = list(children)
+            children = [children]
 
         new_children = self.children + children
 
