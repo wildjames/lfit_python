@@ -239,6 +239,15 @@ class Model:
                     pass
             return None
 
+    def add_child(self, children):
+        # This check allows XXX.add_child(Param) to be valid
+        if not isinstance(children, list):
+            children = [children]
+
+        new_children = self.children + children
+
+        self.children = new_children
+
     # Tree evaluation methods
     def chisq(self, plot=False):
         '''Call the calc on each of my children. Overwrite this for the
@@ -468,15 +477,6 @@ class Model:
         for child in self.__children:
             child.__parent = self
 
-    def add_child(self, children):
-        # This check allows XXX.add_child(Param) to be valid
-        if not isinstance(children, list):
-            children = [children]
-
-        new_children = self.children + children
-
-        self.children = new_children
-
     @property
     def par_names(self):
         '''A list of the keys to self.par_val_list'''
@@ -511,6 +511,13 @@ class Model:
         return len(self.children) == 0
 
     # Diagnostic methods
+    @property
+    def structure(self):
+        '''Return the tree structure below me as a str, generated from nx.'''
+        self.create_tree()
+
+        return nx.readwrite.tree_data(self.nx_graph, self.name)
+
     def report_relatives(self):
         '''This is a pretty crappy, inflexible way of doing this. Can I
         come up with a nicer, perhaps recursive way of it?'''
@@ -525,13 +532,6 @@ class Model:
             print("      {}".format(child.name))
             for grandchild in child.children:
                 print("       - {}".format(grandchild.name))
-
-    @property
-    def structure(self):
-        '''Return the tree structure below me as a str, generated from nx.'''
-        self.create_tree()
-
-        return nx.readwrite.tree_data(self.nx_graph, self.name)
 
     def report(self, also_relatives=True):
         if also_relatives:
@@ -586,9 +586,17 @@ class Model:
         G = self.create_tree()
         pos = self.hierarchy_pos(G)
 
+        # Figure has two inches of width per node
+        figsize = (2*float(G.number_of_nodes()), 8.0)
+        print("Figure will be {}".format(figsize))
+
+        fig, ax = plt.subplots(figsize=figsize)
+
         nx.draw(
             G,
-            pos=pos, with_labels=True, node_color='grey', font_weight='heavy')
+            ax=ax,
+            pos=pos, with_labels=True,
+            node_color='grey', font_weight='heavy')
         plt.show()
 
     def hierarchy_pos(self, G,
@@ -1076,10 +1084,10 @@ class GPEclipse(Eclipse):
 
         # Also get object for dphi, q and rwd as this is required to determine
         # changepoints
-        dphi = getattr(self, 'dphi')
-        q = getattr(self, 'q')
-        rwd = getattr(self, 'rwd')
-        phi0 = getattr(self, 'phi0')
+        dphi = self.par_dict['dphi']
+        q = self.par_dict['q']
+        rwd = self.par_dict['rwd']
+        phi0 = self.par_dict['phi0']
 
         dphi_change = np.fabs(self._olddphi - dphi.currVal) / dphi.currVal
         q_change = np.fabs(self._oldq - q.currVal) / q.currVal
@@ -1104,10 +1112,15 @@ class GPEclipse(Eclipse):
             dist_cp = self._dist_cp
 
         # Find location of all changepoints
-        min_ecl = int(np.floor(phi.min()))
-        max_ecl = int(np.ceil(phi.max()))
+        min_ecl = int(np.floor(self.lc.x.min()))
+        max_ecl = int(np.ceil(self.lc.x.max()))
+
         eclipses = [e for e in range(min_ecl, max_ecl+1)
-                    if np.logical_and(e > phi.min(), e < (1+phi.max()))]
+                    if np.logical_and(e > self.lc.x.min(),
+                                      e < 1+self.lc.x.max()
+                                      )
+                    ]
+
         changepoints = []
         for e in eclipses:
             # When did the last eclipse end?
@@ -1148,7 +1161,7 @@ class GPEclipse(Eclipse):
         # eclipse.
 
         # First, get the changepoints
-        changepoints = self.calcChangepoints(phi)
+        changepoints = self.calcChangepoints()
 
         # We need to make a fairly complex kernel.
         # Global flicker
@@ -1162,7 +1175,7 @@ class GPEclipse(Eclipse):
 
         return georgeGP
 
-    def calc(self):
+    def calc(self, plot=False):
         '''Overwrites the vanilla Eclipse calc function. We no longer want to
         calculate chisq, rather return the flux of the model.
 
@@ -1178,21 +1191,7 @@ class GPEclipse(Eclipse):
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
 
         # Calculate the residuals of this model.
-        residuals = self.lc.y - flx
-
-        if plot:
-            self.lc.plot(flx)
-
-        return residuals
-
-    def ln_like(self):
-        """Calculates the natural log of the likelihood.
-
-        This alternative ln_like function uses the createGP function to create
-        Gaussian processes"""
-
-        # Get the residuals of the model
-        resids = self.calc()
+        resids = self.lc.y - flx
 
         # Check for bugs in model
         if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
@@ -1201,11 +1200,19 @@ class GPEclipse(Eclipse):
 
         # For This eclipse, create (and compute) Gaussian process and calculate
         #  the model
-        gp = self.createGP(self.lc.x)
+        gp = self.createGP()
         gp.compute(self.lc.x, self.lc.ye)
 
         # The 'quiet' argument tells the GP to return -inf when you get an
         # invalid kernel, rather than throwing an exception.
-        gp_ln_like = gp.log_likelihood(resids, quiet=True)
+        ln_like = gp.log_likelihood(resids, quiet=True)
 
-        return gp_ln_like
+        if plot:
+            self.lc.plot(flx)
+
+        return ln_like
+
+    def ln_like(self):
+        '''No longer statistically accurate to return half the chisq,
+        just get the likelihood from the GP and return that. '''
+        return self.chisq()
