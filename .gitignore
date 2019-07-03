@@ -15,6 +15,7 @@ Chains/**
 !test_data/*
 !test_data/*.dat
 
+example.py
 Benchmarking.py
 chain_wd.txt
 fudgeChains.py

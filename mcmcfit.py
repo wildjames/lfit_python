@@ -183,6 +183,33 @@ if __name__ in '__main__':
 
         # Calculate ln_prior verbosley, for the user's benefit
         model.ln_prior(verbose=True)
+    
+    input_dict = configobj.ConfigObj(sys.argv[1])
+
+    # Read in information about mcmc
+    nburn = int(input_dict['nburn'])
+    nprod = int(input_dict['nprod'])
+    nthreads = int(input_dict['nthread'])
+    nwalkers = int(input_dict['nwalkers'])
+    ntemps = int(input_dict['ntemps'])
+    scatter_1 = float(input_dict['first_scatter'])
+    scatter_2 = float(input_dict['second_scatter'])
+    to_fit = int(input_dict['fit'])
+    use_gp = bool(int(input_dict['useGP']))
+    use_pt = bool(int(input_dict['usePT']))
+    corner = bool(int(input_dict['corner']))
+    double_burnin = bool(int(input_dict['double_burnin']))
+    comp_scat = bool(int(input_dict['comp_scat']))
+
+    # neclipses no longer strictly necessary, but can be used to limit the
+    # maximum number of fitted eclipses
+    try:
+        neclipses = int(input_dict['neclipses'])
+    except KeyError:
+        neclipses = 0
+        while model.search_Node('Eclipse', str(neclipses)) is not None:
+            neclipses += 1
+        print("The model has {} eclipses.".format(neclipses))
 
     if not to_fit:
         model.draw()
