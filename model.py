@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 import george
 import matplotlib.pyplot as plt
+import os
 
 from lfit import CV
 from trm import roche
@@ -152,13 +153,14 @@ class Model:
     function defined in order to terminate the recursive chisq function.
 
     Parameter lists for the tree can be retrieved and set from any level.
-    e.g., Trunk.par_val_list contains the parameters for all nodes, but
-    Branch2.par_val_list contains only those of Branch2, leaf3, and leaf4.
-    Setting X.par_val_list sorts the parameters to the correct nodes, provided
-    it's in the correct order (which can be retrieved with X.par_names)
+    e.g., Trunk.dynasty_par_vals contains the parameters for all nodes, but
+    Branch2.dynasty_par_vals contains only those of Branch2, leaf3, and leaf4.
+    Setting X.dynasty_par_vals sorts the parameters to the correct nodes,
+    provided it's in the correct order (which can be retrieved with
+    X.dynasty_par_names)
 
-    Conversely, leaf4.par_dict moves the other way. It will contain ONLY the
-    parameters of leaf4, Branch2, and Trunk.
+    Conversely, leaf4.ancestor_param_dict moves the other way. It will contain
+    ONLY the parameters of leaf4, Branch2, and Trunk.
 
     Should be subclassed with the self.node_par_names variable defined, as this
     is a blank slate. Without that variable, this model cannot store
@@ -240,6 +242,21 @@ class Model:
                     pass
             return None
 
+    def search_node_type(self, class_type, nodes=None):
+        '''Construct a set of all the nodes of a given type below me'''
+
+        if nodes is None:
+            nodes = set()
+
+        for child in self.children:
+            child_nodes = child.search_node_type(class_type, nodes)
+            nodes.union(child_nodes)
+
+        if str(self.__class__.__name__) == class_type:
+            nodes.add(self)
+
+        return nodes
+
     def add_child(self, children):
         # This check allows XXX.add_child(Param) to be valid
         if not isinstance(children, list):
@@ -250,33 +267,31 @@ class Model:
         self.children = new_children
 
     # Tree evaluation methods
-    def chisq(self, plot=False):
-        '''Attempt to call the calc on each of my children. When it reaches a
-        Node with a 'calc' method, that method is called and its result added
-        to chisq.
+    def evaluate_model(self):
+        '''Overwrite this method for the nodes capable of evaluating the model.
+        Called by ln_like. Example would be having this call a chisq function
+        and return the output.'''
 
-        If plot is true, ask the calc method to plot the data.
-        '''
-
-        chisq = 0.0
-
-        # If I'm at the bottom of the tree, then I need to call the model
-        # evaluation function.
-        if not hasattr(self, 'calc'):
-            print("{} has no calc function! Skipping...".format(self.name))
+        if self.is_leaf:
+            msg = "Leaf {} of the model do not have an evaluation function!"
+            msg.format(self.name)
+            raise NotImplementedError(msg)
         else:
-            calc = getattr(self, 'calc')
-            calc(plot)
+            raise NotImplementedError
 
-        # If I have children, check them.
-        for child in self.children:
-            chisq += child.chisq(plot)
+    def ln_like(self, *args, **kwargs):
+        '''Calculate the log likelihood, via chi squared.
+        Extra arguments can be supplied to the model evaluation
+        via args and kwargs.'''
+        ln_like = 0.0
 
-        return chisq
+        try:
+            ln_like += self.evaluate_model(*args, **kwargs)
+        except:
+            for child in self.children:
+                ln_like += child.ln_like(*args, **kwargs)
 
-    def ln_like(self):
-        '''Calculate the log likelihood, via chi squared.'''
-        return -0.5 * self.chisq()
+        return ln_like
 
     def ln_prior(self, verbose=False):
         """Return the natural log of the prior probability of the Param objects
@@ -485,23 +500,23 @@ class Model:
             child.__parent = self
 
     @property
-    def par_names(self):
-        '''A list of the keys to self.par_val_list'''
+    def dynasty_par_names(self):
+        '''A list of the keys to self.dynasty_par_vals'''
         return self.__get_descendant_parameter_names__()
 
     @property
-    def par_val_list(self):
+    def dynasty_par_vals(self):
         '''A list of the variable parameter values below this node'''
         return self.__get_descendant_parameter_vector__()
 
-    @par_val_list.setter
-    def par_val_list(self, par_val_list):
-        if not len(par_val_list) >= len(self.par_val_list):
+    @dynasty_par_vals.setter
+    def dynasty_par_vals(self, dynasty_par_vals):
+        if not len(dynasty_par_vals) >= len(self.dynasty_par_vals):
             raise ValueError('Fail on {}'.format(self.name))
-        self.__set_parameter_vector__(par_val_list)
+        self.__set_parameter_vector__(dynasty_par_vals)
 
     @property
-    def par_dict(self):
+    def ancestor_param_dict(self):
         '''A dict of the Param objects ABOVE! this node'''
         return {key: val for key, val in
                 zip(self.__get_inherited_parameter_names__(),
@@ -544,7 +559,7 @@ class Model:
         if also_relatives:
             self.report_relatives()
         print("  Parameter vector, and labels:")
-        for par, val in zip(self.par_names, self.par_val_list):
+        for par, val in zip(self.dynasty_par_names, self.dynasty_par_vals):
             print("  {:>10} = {:<.3f}".format(par, val))
         print("\n")
 
@@ -574,18 +589,6 @@ class Model:
 
         self.nx_graph = G
         return G
-
-    def plot_data(self, save=False):
-        '''Cycles down the tree until we find a leaf. Then, call it's data
-        plotting method, X.__plot_data.
-        If save is True, save the figure'''
-        if self.is_leaf:
-            if hasattr(self, '_plot_data'):
-                plot = getattr(self, '_plot_data')
-                plot(save=save)
-        else:
-            for child in self.children:
-                child.plot_data(save=save)
 
     def draw(self):
         '''Draw a hierarchical node map of the model.'''
@@ -745,17 +748,24 @@ class Eclipse(Model):
         self.cv = CV(self.cv_parlist)
         # print("Created a CV object for eclipse {}...".format(self.label))
 
-    def calc(self, plot=False):
-        '''Calculate the chisq of this eclipse, against the data stored in its
-        lightcurve object.
-        
-        If plot is True, also plot the data in a figure.'''
+    def calcFlux(self):
+        '''Fetch the CV parameter vector, and generate it's model lightcurve'''
 
         if self.cv is None:
             self.initCV()
 
         # Get the model CV lightcurve across our data.
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+
+        return flx
+
+    def evaluate_model(self, plot=False):
+        '''Calculate the chisq of this eclipse, against the data stored in its
+        lightcurve object.
+
+        If plot is True, also plot the data in a figure.'''
+
+        flx = self.calcFlux()
 
         # Calculate the chisq of this model.
         chisq = (self.lc.y - flx)**2
@@ -764,9 +774,9 @@ class Eclipse(Model):
         if plot:
             self.lc.plot(flx)
 
-        return chisq
+        return -0.5 * chisq
 
-    def ln_prior(self, verbose):
+    def ln_prior(self, verbose, *args, **kwargs):
         '''At the eclipse level, three constrains must be validated for each
         leaf of the tree.
 
@@ -781,7 +791,7 @@ class Eclipse(Model):
 
         # Before we start, I'm going to collect the necessary parameters. By
         # only calling this once, we save a little effort.
-        par_dict = self.par_dict
+        ancestor_param_dict = self.ancestor_param_dict
 
         ##############################################
         # ~~ Is the disc large enough to precess? ~~ #
@@ -792,11 +802,11 @@ class Eclipse(Model):
         rdisc_max_a = 0.46
 
         # get the location of the L1 point from q
-        q = par_dict['q'].currVal
+        q = ancestor_param_dict['q'].currVal
         xl1 = roche.xl1(q)
 
         # Get the rdisc, scaled to the Roche Radius
-        rdisc = par_dict['rdisc'].currVal
+        rdisc = ancestor_param_dict['rdisc'].currVal
         rdisc_a = rdisc * xl1
 
         if rdisc_a > rdisc_max_a:
@@ -820,13 +830,13 @@ class Eclipse(Model):
         ##############################################
 
         # Get the WD radius.
-        rwd = par_dict['rwd'].currVal
+        rwd = ancestor_param_dict['rwd'].currVal
 
         # Enforce the BS scale being within these limits
         rmax = rwd * 3.
         rmin = rwd / 3.
 
-        scale = par_dict['scale'].currVal
+        scale = ancestor_param_dict['scale'].currVal
 
         if scale > rmax or scale < rmin:
             if verbose:
@@ -845,7 +855,7 @@ class Eclipse(Model):
         slope = 80.0
         try:
             # q, rdisc_a were previously retrieved
-            az = par_dict['az'].currVal
+            az = ancestor_param_dict['az'].currVal
 
             # If the stream does not intersect the disc, this throws an error
             x, y, vx, vy = roche.bspot(q, rdisc_a)
@@ -875,13 +885,10 @@ class Eclipse(Model):
             return -np.inf
 
         # If we pass all that, then calculate the ln_prior normally
-        return super().ln_prior(verbose=verbose)
+        return super().ln_prior(verbose=verbose, *args, **kwargs)
 
-    def _plot_data(self, save=False, figsize=(11., 8.)):
-        '''When a (grand)parent is asked to plot its data, it will recursively
-        ask its children for the X._plot_data method. This is that method,
-        terminating the recursion.
-
+    def plot_data(self, save=False, figsize=(11., 8.)):
+        '''Create a plot of the eclipse's data.
         If save is True, a copy of the figure is saved.
         '''
 
@@ -958,22 +965,21 @@ class Eclipse(Model):
         '''Construct the parameter list needed by the CV'''
 
         if self.iscomplex:
-            cv_par_name_list = [
+            par_name_list = [
                 'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
                 'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0',
                 'exp1', 'exp2', 'tilt', 'yaw'
             ]
         else:
-            cv_par_name_list = [
+            par_name_list = [
                 'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
                 'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
             ]
 
-        par_dict = self.par_dict
+        param_dict = self.ancestor_param_dict
+        parlist = [param_dict[key].currVal for key in par_name_list]
 
-        cv_parlist = [par_dict[key].currVal for key in cv_par_name_list]
-
-        return cv_parlist
+        return parlist
 
 
 class Band(Model):
@@ -1014,6 +1020,18 @@ class LCModel(Model):
 
     # Set the parameter names for this layer
     node_par_names = ('q', 'dphi', 'rwd')
+
+    def chisq(self, verbose=False):
+        '''Calculate the sum chisq of all my eclispses.'''
+        chisq = 0.0
+
+        eclipses = self.search_node_type('Eclipse')
+        for eclipse in eclipses:
+            # multiply the evaluate_model() by -2, to undo the -0.5
+            # it does to itself
+            chisq += -2.0 * eclipse.evaluate_model()
+
+        return chisq
 
     def ln_prior(self, verbose=False):
         '''Before we calculate the ln_prior of myself or my children, I check
@@ -1060,9 +1078,22 @@ class LCModel(Model):
         lnp += super().ln_prior(verbose=verbose)
         return lnp
 
+    def plot_data(self, save=False, figsize=(11.0, 8.0)):
+        '''For each eclipse descended from me, plot their data.
+        
+        If save is True, save the figures.
+        Figsize is passed to matplotlib.
+        '''
 
-class GPEclipse(Eclipse):
-    '''This is a subclass of the Eclipse class. It uses the Gaussian Process.
+        eclipses = self.search_node_type('Eclipses')
+        for eclipse in eclipses:
+            eclipse.plot_data(save, figsize)
+
+
+class GPLCModel(LCModel):
+    # TODO: reimpliment this as a Model subclass, i.e. handle the GP at 
+    # the root, not the eclipse level.
+    '''This is a subclass of the LCModel class. It uses the Gaussian Process.
 
     This version will, rather than evaluating via chisq, evaluate the
     likelihood of the model by calculating the residuals between the model
@@ -1089,10 +1120,10 @@ class GPEclipse(Eclipse):
 
         # Also get object for dphi, q and rwd as this is required to determine
         # changepoints
-        dphi = self.par_dict['dphi']
-        q = self.par_dict['q']
-        rwd = self.par_dict['rwd']
-        phi0 = self.par_dict['phi0']
+        dphi = self.ancestor_param_dict['dphi']
+        q = self.ancestor_param_dict['q']
+        rwd = self.ancestor_param_dict['rwd']
+        phi0 = self.ancestor_param_dict['phi0']
 
         dphi_change = np.fabs(self._olddphi - dphi.currVal) / dphi.currVal
         q_change = np.fabs(self._oldq - q.currVal) / q.currVal

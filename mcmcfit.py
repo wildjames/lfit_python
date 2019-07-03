@@ -232,14 +232,14 @@ if __name__ in '__main__':
     ##############################################################
 
     # How many parameters do I have to deal with?
-    npars = len(model.par_val_list)
+    npars = len(model.dynasty_par_vals)
 
     print("The MCMC has {:d} variables and {:d} walkers".format(
         npars, nwalkers))
     print("(It should have at least 2*npars, {:d} walkers)".format(2*npars))
 
     # p_0 is the initial position vector of the MCMC walker
-    p_0 = model.par_val_list
+    p_0 = model.dynasty_par_vals
 
     # We cant to scatter that, so create an array of our scatter values.
     # This will allow us to tweak the scatter value for each individual
@@ -271,7 +271,7 @@ if __name__ in '__main__':
             'tilt':   2,
         }
 
-        for par_i, name in enumerate(model.par_names):
+        for par_i, name in enumerate(model.dynasty_par_names):
             # Get the parameter of this parName, striping off the node encoding
             key = name.split("_")[0]
 
@@ -283,16 +283,16 @@ if __name__ in '__main__':
 
     # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
     # in order to pickle them :(
-    def ln_prior(par_val_list):
-        model.par_val_list = par_val_list
+    def ln_prior(dynasty_par_vals):
+        model.dynasty_par_vals = dynasty_par_vals
         return model.ln_prior()
 
-    def ln_prob(par_val_list):
-        model.par_val_list = par_val_list
+    def ln_prob(dynasty_par_vals):
+        model.dynasty_par_vals = dynasty_par_vals
         return model.ln_prob()
 
-    def ln_like(par_val_list):
-        model.par_val_list = par_val_list
+    def ln_like(dynasty_par_vals):
+        model.dynasty_par_vals = dynasty_par_vals
         return model.ln_like()
 
     # Initialise the sampler. If we're using parallel tempering, do that.
@@ -335,7 +335,7 @@ if __name__ in '__main__':
     sampler.reset()
     print("Starting the main MCMC chain. Probably going to take a while!")
 
-    col_names = model.par_names
+    col_names = model.dynasty_par_names
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
@@ -369,7 +369,7 @@ if __name__ in '__main__':
 
         # Save the results for later
         chain_results = []
-        for i, name in enumerate(model.par_names):
+        for i, name in enumerate(model.dynasty_par_names):
             # Get the results of each parameter
             par = chain[:, i]
             lolim, best, uplim = np.percentile(par, [16, 50, 84])
@@ -383,7 +383,7 @@ if __name__ in '__main__':
             file_obj.write("{},{},{},{}\n".format(name, best, uplim, lolim))
 
         # Set the model parameters to the results of the chain.
-        model.par_val_list = chain_results
+        model.dynasty_par_vals = chain_results
 
         # Evaluate the final model. Save to file.
         print("\n\nFor this model;\n")
