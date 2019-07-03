@@ -150,6 +150,8 @@ def construct_model(input_file):
             # print("\n\n")
         else:
             break
+        
+    return model
 
 
 if __name__ in '__main__':
