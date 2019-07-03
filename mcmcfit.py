@@ -21,20 +21,8 @@ def construct_model(input_file):
     input_dict = configobj.ConfigObj(input_file)
 
     # Read in information about mcmc, neclipses, use of complex/GP etc.
-    nburn = int(input_dict['nburn'])
-    nprod = int(input_dict['nprod'])
-    nthreads = int(input_dict['nthread'])
-    nwalkers = int(input_dict['nwalkers'])
-    ntemps = int(input_dict['ntemps'])
-    scatter_1 = float(input_dict['first_scatter'])
-    scatter_2 = float(input_dict['second_scatter'])
-    to_fit = int(input_dict['fit'])
     is_complex = bool(int(input_dict['complex']))
     use_gp = bool(int(input_dict['useGP']))
-    use_pt = bool(int(input_dict['usePT']))
-    corner = bool(int(input_dict['corner']))
-    double_burnin = bool(int(input_dict['double_burnin']))
-    comp_scat = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
@@ -51,14 +39,14 @@ def construct_model(input_file):
         tau_gp = Param.fromString('tau_gp', input_dict['tau_gp'])
 
     # Start by creating the overall Model. Gather the parameters:
-    core_par_names = ['rwd', 'dphi', 'q']
-    core_pars = [Param.fromString(name, s) for name, s in input_dict.items()
-                 if name in core_par_names]
+    core_par_names = LCModel.node_par_names
+    core_pars = [Param.fromString(name, input_dict[name])
+                 for name in core_par_names]
     # and make the model object with no children
     model = LCModel('core', core_pars)
 
     # Collect the bands and their params. Add them total model.
-    band_par_names = ['wdFlux', 'rsFlux']
+    band_par_names = Band.node_par_names
 
     # Get a sub-dict of only band parameters
     band_dict = {}
@@ -126,9 +114,6 @@ def construct_model(input_file):
                     # i.e. strip off the tail code
                     name = key.replace("_{}".format(ecl_i), '')
 
-                    # print("{} has the parameter {}, calling it {}".format(
-                    #     ecl_i, key, name))
-
                     # Make the Param object from the string, and add it to
                     # our list of pars.
                     param = Param.fromString(name, string)
@@ -150,7 +135,7 @@ def construct_model(input_file):
             # print("\n\n")
         else:
             break
-        
+
     return model
 
 

@@ -30,12 +30,12 @@ class Lightcurve:
         '''
 
         data = np.loadtxt(fname, delimiter=' ', comments='#')
-        phase, flux, error = data[:, 0], data[:, 1], data[:, 2]
+        phase, flux, error = data.T
         width = np.mean(np.diff(phase))*np.ones_like(phase)/2.
 
         # Set the name of this eclipse as the filename of the data file.
         if name is None:
-            name = fname.split('/')[-1]
+            _, name = os.path.split(fname)
         return cls(fname, phase, flux, error, width, fname=fname)
 
     def trim(self, lo, hi):
@@ -166,10 +166,10 @@ class Model:
     branches or leaves without them sharing any parameters.
     '''
 
-    # Init the node_par_names to be empty and a list
+    # Init the node_par_names to be empty and a tuple
     node_par_names = ()
 
-    def __init__(self, label, parameter_objects, parent=None, children=None):
+    def __init__(self, label, parameter_objects, parent=None, children=None, DEBUG=False):
         '''Store parameter values to the parameter names, and track the parent
         and children, if necessary.'''
 
@@ -181,8 +181,9 @@ class Model:
         assert isinstance(label, str), "Label must be a string!"
         self.label = label
 
-        # print("Creating a new {}, labelled {}".format(
-        #     self.__class__.__name__, self.label))
+        if DEBUG:
+            print("Creating a new {}, labelled {}".format(
+                self.__class__.__name__, self.label))
 
         # Check that the user defined their parameter names!
         if len(self.node_par_names) != len(parameter_objects):
@@ -250,23 +251,26 @@ class Model:
 
     # Tree evaluation methods
     def chisq(self, plot=False):
-        '''Call the calc on each of my children. Overwrite this for the
-        bottom layer Model!'''
+        '''Attempt to call the calc on each of my children. When it reaches a
+        Node with a 'calc' method, that method is called and its result added
+        to chisq.
+
+        If plot is true, ask the calc method to plot the data.
+        '''
 
         chisq = 0.0
 
-        if self.is_leaf:
-            if not hasattr(self, 'calc'):
-                print("{} has no calc function! Skipping...".format(self.name))
-            else:
-                calc = getattr(self, 'calc')
-                calc(plot)
+        # If I'm at the bottom of the tree, then I need to call the model
+        # evaluation function.
+        if not hasattr(self, 'calc'):
+            print("{} has no calc function! Skipping...".format(self.name))
+        else:
+            calc = getattr(self, 'calc')
+            calc(plot)
 
+        # If I have children, check them.
         for child in self.children:
-            try:
-                chisq += child.calc(plot)
-            except:
-                chisq += child.chisq(plot)
+            chisq += child.chisq(plot)
 
         return chisq
 
@@ -743,7 +747,9 @@ class Eclipse(Model):
 
     def calc(self, plot=False):
         '''Calculate the chisq of this eclipse, against the data stored in its
-        lightcurve object.'''
+        lightcurve object.
+        
+        If plot is True, also plot the data in a figure.'''
 
         if self.cv is None:
             self.initCV()
@@ -1074,14 +1080,8 @@ class GPEclipse(Eclipse):
     # _dist_cp is initially set to whatever, it will be overwritten anyway.
     _dist_cp = 9e99
 
-    def __init__(self, ampin_GP, ampout_GP, tau_GP, *args, **kwargs):
-
-        # GP hyperparameters
-        self.ampin = ampin_GP
-        self.ampout = ampout_GP
-        self.tau = tau_GP
-
-        super().__init__(*args, **kwargs)
+    # Add the GP params
+    node_par_names = Eclipse.node_par_names + ('ampin_gp', 'ampout_gp', 'tau_gp')
 
     def calcChangepoints(self):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
@@ -1199,7 +1199,6 @@ class GPEclipse(Eclipse):
 
         # Check for bugs in model
         if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
-            warnings.warn('GP gave nan or inf answers')
             return -np.inf
 
         # For This eclipse, create (and compute) Gaussian process and calculate
