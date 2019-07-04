@@ -8,6 +8,7 @@ gp/**
 Results/**
 Chains/**
 *.dat
+.vscode
 
 !input.dat
 !Hamada/mr_hamada.dat

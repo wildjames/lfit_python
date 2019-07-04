@@ -7,7 +7,7 @@ nthread        = 7     # number of CPU threads to use
 first_scatter  = 0.05   # fractional scatter to add to starting ball of parameters in first burnin
 second_scatter = 0.05   # fractional scatter to add to starting ball of parameters in second burnin
 comp_scat      = 1      # vary scatter for different params (1), or add uniform scatter (0)
-fit            = 0      # actually fit (1), or just plot model as specified (0)
+fit            = 1      # actually fit (1), or just plot model as specified (0)
 usePT          = 1      # use parallel tempering (1), or standard fitting (0)
 double_burnin  = 0      # run two burnin phases (1), or just the one (0)
 
