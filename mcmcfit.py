@@ -145,12 +145,12 @@ if __name__ in '__main__':
     print("\nStructure:")
     pprint(model.structure)
     # Get the model's graph
-    # model.draw()
-    # model.plot_data(save=True)
+    model.draw()
+    model.plot_data()
 
     print("\n\nInitial guess has a chisq of {:.3f},".format(
         model.chisq(False)))
-    print("a ln_prob of {:.3f},".format(model.ln_prob(verbose=True)))
+    print("a ln_prob of {:.3f},".format(model.ln_prob(verbose=False)))
     print("and a ln_prior of {:.3f}".format(model.ln_prior()))
     print()
     if np.isinf(model.ln_prior()):
@@ -168,7 +168,7 @@ if __name__ in '__main__':
 
         # Calculate ln_prior verbosley, for the user's benefit
         model.ln_prior(verbose=True)
-    
+
     input_dict = configobj.ConfigObj(sys.argv[1])
 
     # Read in information about mcmc
