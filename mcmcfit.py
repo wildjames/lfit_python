@@ -9,18 +9,22 @@ from pprint import pprint
 import sys
 import numpy as np
 import configobj
+import matplotlib.pyplot as plt
 
 import emcee
 
-from model import Eclipse, Band, LCModel, Lightcurve
+from model import *
 from mcmc_utils import Param
 import mcmc_utils as utils
 
 
 def construct_model(input_file):
+    '''Takes an input filename, and parses it into a model tree.
+    Returns that model tree. '''
+
     input_dict = configobj.ConfigObj(input_file)
 
-    # Read in information about mcmc, neclipses, use of complex/GP etc.
+    # Do we use the complex model? Do we use the GP?
     is_complex = bool(int(input_dict['complex']))
     use_gp = bool(int(input_dict['useGP']))
 
@@ -29,21 +33,32 @@ def construct_model(input_file):
     try:
         neclipses = int(input_dict['neclipses'])
     except KeyError:
+        # Read in all the available eclipses
         neclipses = -1
 
-    if use_gp:
-        # TODO: Impliment the GP version of the Eclipses.
-        # Read in GP params using fromString function from mcmc_utils.py
-        ampin_gp = Param.fromString('ampin_gp', input_dict['ampin_gp'])
-        ampout_gp = Param.fromString('ampout_gp', input_dict['ampout_gp'])
-        tau_gp = Param.fromString('tau_gp', input_dict['tau_gp'])
+    # # # # # # # # # # # # # # # # #
+    # Get the initial model setup # #
+    # # # # # # # # # # # # # # # # #
 
     # Start by creating the overall Model. Gather the parameters:
-    core_par_names = LCModel.node_par_names
-    core_pars = [Param.fromString(name, input_dict[name])
-                 for name in core_par_names]
-    # and make the model object with no children
-    model = LCModel('core', core_pars)
+    if use_gp:
+        core_par_names = GPLCModel.node_par_names
+        core_pars = [Param.fromString(name, input_dict[name])
+                     for name in core_par_names]
+
+        # and make the model object with no children
+        model = GPLCModel('core', core_pars)
+    else:
+        core_par_names = LCModel.node_par_names
+        core_pars = [Param.fromString(name, input_dict[name])
+                     for name in core_par_names]
+
+        # and make the model object with no children
+        model = LCModel('core', core_pars)
+
+    # # # # # # # # # # # # # # # # #
+    # # # Now do the band names # # #
+    # # # # # # # # # # # # # # # # #
 
     # Collect the bands and their params. Add them total model.
     band_par_names = Band.node_par_names
@@ -57,8 +72,6 @@ def construct_model(input_file):
     # Get a set of the bands we have in the input file
     defined_bands = [key.split('_')[-1] for key in band_dict]
     defined_bands = set(defined_bands)
-    print("I found definitions of the following bands: {}".format(
-        defined_bands))
 
     for band in defined_bands:
         band_pars = []
@@ -69,72 +82,36 @@ def construct_model(input_file):
 
         band = Band(band, band_pars, parent=model)
 
-    # These are the entries to ignore.
-    descriptors = ['file', 'plot', 'band']
-    descriptors += band_par_names
-    descriptors += core_par_names
-    complex_desc = ['exp1', 'exp2', 'yaw', 'tilt']
-    if not is_complex:
-        print("Using the complex BS model. ")
-        descriptors.extend(complex_desc)
+    # # # # # # # # # # # # # # # # #
+    # # Finally, get the eclipses # #
+    # # # # # # # # # # # # # # # # #
 
-    ecl_i = -1
-    while True:
-        ecl_i += 1
+    # Use the Eclipse class to find the parameters we're interested in
+    ecl_pars = Eclipse.node_par_names
+    if is_complex:
+        ecl_pars += ('exp1', 'exp2', 'yaw', 'tilt')
 
-        # The user can limit the number if eclipses to fit.
-        if ecl_i == neclipses:
-            break
+    # Collect the suffixes of the eclipses.
+    file_keys = [key for key in input_dict if key.startswith('file_')]
+    defined_eclipses = [key[5:] for key in file_keys]
 
-        # Collect this eclipses' parameters.
-        ecl_exists = [key.endswith("_{}".format(ecl_i)) for key in input_dict]
-        if np.any(ecl_exists):
-            # Initialise this eclipses's stuff.
-            eclipse_pars = []
+    for label in defined_eclipses[:neclipses]:
+        # Get the list of parameters, and their priors
+        params = []
+        for par_name in ecl_pars:
+            key = "{}_{}".format(par_name, label)
+            param = Param.fromString(par_name, input_dict[key])
 
-            # What band are we going to be looking at?
-            band = input_dict['band_{}'.format(ecl_i)]
-            # Retrieve the band object, so we can request it as a parent later
-            band = model.search_Node('Band', band)
+            params.append(param)
 
-            # print("Eclipse {} belongs to the {}".format(ecl_i, band.name))
+        # Get the observational data
+        lc_fname = input_dict['file_{}'.format(label)]
 
-            # Loop through the input dict, searching for keys that have a tail
-            # matching this eclipse
-            for key, string in input_dict.items():
-                if key.endswith("_{}".format(ecl_i)):
+        # Get the band object that this eclipse belongs to
+        my_band = input_dict['band_{}'.format(label)]
+        my_band = model.search_Node('Band', my_band)
 
-                    # Make sure we don't create a parameter from any of the
-                    # descriptors. Check none of the forbidden keys are in this
-                    test = [d in key for d in descriptors]
-                    if np.any(test):
-                        continue
-
-                    # Construct the name of the parameter,
-                    # i.e. strip off the tail code
-                    name = key.replace("_{}".format(ecl_i), '')
-
-                    # Make the Param object from the string, and add it to
-                    # our list of pars.
-                    param = Param.fromString(name, string)
-                    eclipse_pars.append(param)
-
-            # Read in the datafile associated with this eclipse
-            fname = input_dict['file_{}'.format(ecl_i)]
-            eclipse_data = Lightcurve.from_calib(fname)
-
-            # Trim the eclipse down to our desired range.
-            start = float(input_dict['phi_start'])
-            end = float(input_dict['phi_end'])
-            eclipse_data.trim(start, end)
-
-            # Construct the eclipse object
-            Eclipse(eclipse_data, is_complex, str(ecl_i), eclipse_pars,
-                    parent=band)
-
-            # print("\n\n")
-        else:
-            break
+        Eclipse(lc_fname, is_complex, label, params, parent=my_band)
 
     return model
 
@@ -146,12 +123,27 @@ if __name__ in '__main__':
     pprint(model.structure)
     # Get the model's graph
     model.draw()
-    model.plot_data()
 
-    print("\n\nInitial guess has a chisq of {:.3f},".format(
-        model.chisq(False)))
-    print("a ln_prob of {:.3f},".format(model.ln_prob(verbose=False)))
-    print("and a ln_prior of {:.3f}".format(model.ln_prior()))
+    # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
+    # in order to pickle them :(
+    def ln_prior(param_vector):
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prior()
+        return val
+
+    def ln_prob(param_vector):
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prob()
+        return val
+
+    def ln_like(param_vector):
+        model.dynasty_par_vals = param_vector
+        val = model.ln_like()
+        return val
+
+    print("\n\nInitial guess has a chisq of {:.3f},".format(model.chisq()))
+    print("a ln_prob of {:.3f},".format(ln_prob(model.dynasty_par_vals)))
+    print("and a ln_prior of {:.3f}".format(ln_prior(model.dynasty_par_vals)))
     print()
     if np.isinf(model.ln_prior()):
         print("ERROR: Starting position violates priors!")
@@ -170,6 +162,11 @@ if __name__ in '__main__':
         model.ln_prior(verbose=True)
 
     input_dict = configobj.ConfigObj(sys.argv[1])
+
+    for key, item in input_dict.items():
+        if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
+            print("Scold the user for their bad practice")
+            input_dict['ln_'+key] = item
 
     # Read in information about mcmc
     nburn = int(input_dict['nburn'])
@@ -197,7 +194,6 @@ if __name__ in '__main__':
         print("The model has {} eclipses.".format(neclipses))
 
     if not to_fit:
-        model.draw()
         print("Model parameters:")
         with open('model_parameters.txt', 'w') as file_obj:
             # Evaluate the final model.
@@ -219,15 +215,12 @@ if __name__ in '__main__':
                 model.ln_prob()))
 
         # Plot the data and the final fit.
-        # model.plot_data(save=True)
-        for iecl in range(neclipses):
-            eclipse = model.search_Node('Eclipse', str(iecl))
-            eclipse.plot_data(save=True)
+        model.plot_data(save=True)
 
         exit()
 
     ##############################################################
-    # MCMC Chain sampler, handled by emcee.                      #
+    # MCMC Chain sampler, handled by emcee.  # # # # # # # # # # #
     # The below plugs the above into emcee's relevant functions. #
     ##############################################################
 
@@ -281,20 +274,6 @@ if __name__ in '__main__':
         # Create another array for second burn-in
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
 
-    # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
-    # in order to pickle them :(
-    def ln_prior(dynasty_par_vals):
-        model.dynasty_par_vals = dynasty_par_vals
-        return model.ln_prior()
-
-    def ln_prob(dynasty_par_vals):
-        model.dynasty_par_vals = dynasty_par_vals
-        return model.ln_prob()
-
-    def ln_like(dynasty_par_vals):
-        model.dynasty_par_vals = dynasty_par_vals
-        return model.ln_like()
-
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
     if use_pt:
@@ -313,7 +292,7 @@ if __name__ in '__main__':
                                         ln_prob, threads=nthreads)
 
     # Run the burnin phase
-    print("Executing the burn-in phase...")
+    print("\n\nExecuting the burn-in phase...")
     pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
 
     # Do we want to do that again?
@@ -335,24 +314,22 @@ if __name__ in '__main__':
     sampler.reset()
     print("Starting the main MCMC chain. Probably going to take a while!")
 
-    col_names = model.dynasty_par_names
+    # Get the column keys. Otherwise, we can't parse the results!
+    col_names = ','.join(model.dynasty_par_names) + ',Likelihood'
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
         sampler = utils.run_ptmcmc_save(sampler, pos, nprod,
-                                        "chain_prod.txt", col_names)
+                                        "chain_prod.txt", col_names=col_names)
 
         # get chain for zero temp walker. Higher temp walkers DONT sample the
         # right landscape!
         # chain shape = (ntemps,nwalkers*nsteps,ndim)
         chain = sampler.flatchain[0, ...]
-
-        # Save flattened chain
-        np.savetxt('chain_flat.txt', chain, delimiter=' ')
     else:
         # Run production stage of non-parallel tempered mcmc
         sampler = utils.run_mcmc_save(sampler, pos, nprod, state,
-                                      "chain_prod.txt", col_names)
+                                      "chain_prod.txt", col_names=col_names)
 
         # lnprob is in sampler.ln(probability) and is shape (nwalkers, nsteps)
         # sampler.chain has shape (nwalkers, nsteps, npars)
@@ -360,8 +337,8 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-        # Save flattened chain
-        np.savetxt('chain_flat.txt', chain, delimiter=' ')
+    # Save flattened chain
+    np.savetxt('chain_flat.txt', chain, delimiter=' ')
 
     print("Model parameters:")
     with open('model_parameters.txt', 'w') as file_obj:

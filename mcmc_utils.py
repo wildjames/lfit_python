@@ -224,12 +224,16 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     return pos, prob, state
 
 
-def run_mcmc_save(sampler, startPos, nSteps, rState, file,
+def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
                   progress=True, **kwargs):
     '''runs an MCMC chain with emcee, and saves steps to a file'''
     # open chain save file
+    print("col_names: {}".format(col_names))
     if file:
         f = open(file, "w")
+        f.write(col_names)
+        if col_names:
+            f.write("\n")
         f.close()
     iStep = 0
     if progress:
@@ -259,6 +263,7 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file,
 def run_ptmcmc_save(sampler, startPos, nSteps, file,
                     progress=True, col_names='', **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
+    print("col_names: {}".format(col_names))
     if file:
         f = open(file, "w")
         f.write(col_names)
@@ -301,9 +306,9 @@ def flatchain(chain, npars=None, nskip=0, thin=1):
     return chain[:, nskip::thin, :].reshape((-1, npars))
 
 
-def readchain(file, nskip=0, thin=1):
+def readchain(file, **kwargs):
     data = pd.read_csv(file, header=None, compression=None,
-                       delim_whitespace=True)
+                       delim_whitespace=True, **kwargs)
     data = np.array(data)
     nwalkers = int(data[:, 0].max()+1)
     nprod = int(data.shape[0]/nwalkers)
@@ -312,9 +317,9 @@ def readchain(file, nskip=0, thin=1):
     return chain
 
 
-def readchain_dask(file, nskip=0, thin=1):
+def readchain_dask(file, **kwargs):
     data = dd.io.read_csv(file, engine='c', header=None, compression=None,
-                          na_filter=False, delim_whitespace=True)
+                          na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
     data = np.array(data)
     nwalkers = int(data[:, 0].max()+1)

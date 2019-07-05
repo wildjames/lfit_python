@@ -6,20 +6,20 @@ import model as toy
 import configobj
 from mcmcfit import construct_model
 
-colnames = 'chain_colnames.txt'
+
 chain_fname = 'chain_prod.txt'
-input_fname = 'input.dat'
+input_fname = 'mcmc_input.dat'
 
-
-# Gather the results of the file
-with open(colnames, 'r') as f:
-    colKeys = f.read().strip().split(',')
+# Grab the column names from the top.
+with open(chain_fname, 'r') as chain_file:
+    colKeys = chain_file.readline().split(',')
 
 print("Reading in the chain file...")
-data = u.readchain_dask(chain_fname)
+data = u.readchain_dask(chain_fname, skiprows=1)
 chain = u.flatchain(data)
 
 result = np.mean(chain, axis=0)
+lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
 
 print("Result has the shape: {}".format(result.shape))
 
@@ -35,12 +35,10 @@ for n, r in zip(colKeys, result):
 ###############################################
 model = construct_model(input_fname)
 
-
 # Set the parameters of the model to the results of the chain
 for key, value in resultDict.items():
-    if key in model.parNames:
-        msg = "\n\n"
-        msg += "Setting the model parameter {} to the result value of {:.3f}"
+    if key in model.dynasty_par_names:
+        msg = "\nSetting the model parameter {} to the result value of {:.3f}"
         msg.format(key, value)
         print(msg)
 
@@ -48,13 +46,10 @@ for key, value in resultDict.items():
         label = key[1]
         name = key[0]
 
-        msg = "Searching for model.search_Par({}, {}) "
-        mag += "gave a Param object with the name {}"
-        msg.format(label, name, model.search_Par(label, name).name)
-        print(msg)
-
-        model.search_Par(label, name).currVal = value
+        model.search_par(label, name).currVal = value
 model.report()
+
+# model.search_par('0', 'sFlux').currVal = 0.080
 
 #################################
 # The model is now fully built. #
@@ -62,4 +57,5 @@ model.report()
 
 # Get the model's graph
 # model.draw()
+print("Model evaluated to ln_prob of {:.3f}".format(model.ln_prob()))
 model.plot_data(save=True)

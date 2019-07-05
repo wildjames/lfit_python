@@ -560,7 +560,7 @@ class Model:
             self.report_relatives()
         print("  Parameter vector, and labels:")
         for par, val in zip(self.dynasty_par_names, self.dynasty_par_vals):
-            print("  {:>10} = {:<.3f}".format(par, val))
+            print("  {:>10s} = {:<.3f}".format(par, val))
         print("\n")
 
     def create_tree(self, G=None, called=True):
@@ -590,15 +590,16 @@ class Model:
         self.nx_graph = G
         return G
 
-    def draw(self):
+    def draw(self, figsize=None):
         '''Draw a hierarchical node map of the model.'''
 
         G = self.create_tree()
         pos = self.hierarchy_pos(G)
 
-        # Figure has two inches of width per node
-        figsize = (2*float(G.number_of_nodes()), 8.0)
-        print("Figure will be {}".format(figsize))
+        if figsize is None:
+            # Figure has two inches of width per node
+            figsize = (2*float(G.number_of_nodes()), 8.0)
+            print("Figure will be {}".format(figsize))
 
         fig, ax = plt.subplots(figsize=figsize)
 
@@ -607,6 +608,8 @@ class Model:
             ax=ax,
             pos=pos, with_labels=True,
             node_color='grey', font_weight='heavy')
+
+        plt.tight_layout()
         plt.show()
 
     def hierarchy_pos(self, G,
@@ -936,7 +939,7 @@ class Eclipse(Model):
             yerr=self.lc.ye,
             linestyle='none', ecolor='grey', zorder=1
             )
-        axs[1].step(self.lc.x, self.lc.y-flx, where='mid', color='darkred')
+        axs[1].step(self.lc.x, self.lc.y-flx, where='mid', color='black')
 
         # 0 residuals line, to guide the eye
         axs[1].axhline(0.0, linestyle='--', color='black', alpha=0.7,
@@ -956,9 +959,8 @@ class Eclipse(Model):
         if save:
             fig_name = self.lc.name.replace('.calib', '.pdf')
             plt.savefig(fig_name)
-        plt.show()
 
-        return
+        return fig, axs
 
     @property
     def cv_parlist(self):
@@ -1005,7 +1007,7 @@ class Band(Model):
 
 class LCModel(Model):
     '''Top layer Model class. Contains Bands, which contain Eclipses.
-        Inputs:
+    Inputs:
     -------
       label; str:
         A label to apply to the node. Mostly used when searching trees.
@@ -1078,27 +1080,37 @@ class LCModel(Model):
         lnp += super().ln_prior(verbose=verbose)
         return lnp
 
-    def plot_data(self, save=False, figsize=(11.0, 8.0)):
+    def plot_data(self, save=False, figsize=None):
         '''For each eclipse descended from me, plot their data.
-        
+
         If save is True, save the figures.
         Figsize is passed to matplotlib.
         '''
 
-        eclipses = self.search_node_type('Eclipses')
+        eclipses = self.search_node_type('Eclipse')
         for eclipse in eclipses:
-            eclipse.plot_data(save, figsize)
+            fig, ax = eclipse.plot_data(save, figsize)
+            plt.show()
 
 
 class GPLCModel(LCModel):
-    # TODO: reimpliment this as a Model subclass, i.e. handle the GP at 
-    # the root, not the eclipse level.
     '''This is a subclass of the LCModel class. It uses the Gaussian Process.
 
     This version will, rather than evaluating via chisq, evaluate the
     likelihood of the model by calculating the residuals between the model
     and the data and computing the likelihood of those data given certain
-    Gaussian Process hyper-parameters. '''
+    Gaussian Process hyper-parameters.
+
+    These parameters require some explaination.
+    ln_tau_gp:
+      the ln(timescale) of the covariance matrix
+    ln_ampin_gp:
+      The base amplitude of the covariance matrix
+    ln_ampout_gp:
+      The additional amplitude of the covariance matrix, when the WD
+      is visible
+
+    '''
 
     # Set the initial values of q, rwd, and dphi. These will be used to
     # caclulate the location of the GP changepoints. Setting to initially
@@ -1112,18 +1124,24 @@ class GPLCModel(LCModel):
     _dist_cp = 9e99
 
     # Add the GP params
-    node_par_names = Eclipse.node_par_names + ('ampin_gp', 'ampout_gp', 'tau_gp')
+    node_par_names = LCModel.node_par_names
+    node_par_names += ('ln_ampin_gp', 'ln_ampout_gp', 'ln_tau_gp')
 
-    def calcChangepoints(self):
+    def calcChangepoints(self, eclipse):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
-        on or off the extra GP amplitude'''
+        on or off the extra GP amplitude.
+
+        Requires an eclipse object, since this is specific to a given phase
+        range.
+        '''
 
         # Also get object for dphi, q and rwd as this is required to determine
         # changepoints
         dphi = self.ancestor_param_dict['dphi']
         q = self.ancestor_param_dict['q']
         rwd = self.ancestor_param_dict['rwd']
-        phi0 = self.ancestor_param_dict['phi0']
+
+        phi0 = eclipse.phi0.currVal
 
         dphi_change = np.fabs(self._olddphi - dphi.currVal) / dphi.currVal
         q_change = np.fabs(self._oldq - q.currVal) / q.currVal
@@ -1154,99 +1172,147 @@ class GPLCModel(LCModel):
             dist_cp = self._dist_cp
 
         # Find location of all changepoints
-        min_ecl = int(np.floor(self.lc.x.min()))
-        max_ecl = int(np.ceil(self.lc.x.max()))
+        min_ecl = int(np.floor(eclipse.lc.x.min()))
+        max_ecl = int(np.ceil(eclipse.lc.x.max()))
 
         eclipses = [e for e in range(min_ecl, max_ecl+1)
-                    if np.logical_and(e > self.lc.x.min(),
-                                      e < 1+self.lc.x.max()
+                    if np.logical_and(e > eclipse.lc.x.min(),
+                                      e < 1+eclipse.lc.x.max()
                                       )
                     ]
 
         changepoints = []
         for e in eclipses:
             # When did the last eclipse end?
-            egress = (e-1) + dist_cp
+            egress = (e-1) + dist_cp + phi0
             # When does this eclipse start?
-            ingress = e - dist_cp
+            ingress = e - dist_cp + phi0
             changepoints.append([egress, ingress])
 
         return changepoints
 
-    def createGP(self):
+    def create_GP(self, eclipse):
         """Constructs a kernel, which is used to create Gaussian processes.
 
-        Using values for the two hyperparameters (amp,tau), amp_ratio and dphi,
-        this function: creates kernels for both inside and out of eclipse,
+        Creates kernels for both inside and out of eclipse,
         works out the location of any changepoints present, constructs a single
-         (mixed) kernel and uses this kernel to create GPs"""
+        (mixed) kernel and uses this kernel to create GPs
 
-        # Get objects for ampin_gp, ampout_gp, tau_gp and find the exponential
+        Requires an Eclipse object to create the GP for. """
+
+        # Get objects for ln_ampin_gp, ln_ampout_gp, ln_tau_gp and find the exponential
         # of their current values
-        ln_ampin = self.ampin
-        ln_ampout = self.ampout
-        ln_tau = self.tau
+        ln_ampin = self.ln_ampin_gp
+        ln_ampout = self.ln_ampout_gp
+        ln_tau = self.ln_tau_gp
 
-        ampin = np.exp(ln_ampin.currVal)
-        ampout = np.exp(ln_ampout.currVal)
-        tau = np.exp(ln_tau.currVal)
+        ln_ampin_gp = np.exp(ln_ampin.currVal)
+        ln_ampout_gp = np.exp(ln_ampout.currVal)
+        ln_tau_gp = np.exp(ln_tau.currVal)
 
         # Calculate kernels for both out of and in eclipse WD eclipse
         # Kernel inside of WD has smaller amplitude than that of outside
         # eclipse.
 
         # First, get the changepoints
-        changepoints = self.calcChangepoints()
+        changepoints = self.calcChangepoints(eclipse)
 
         # We need to make a fairly complex kernel.
         # Global flicker
-        kernel = ampin * george.kernels.Matern32Kernel(tau)
+        kernel = ln_ampin_gp * george.kernels.Matern32Kernel(ln_tau_gp)
         # inter-eclipse flicker
         for gap in changepoints:
-            kernel += ampout * george.kernels.Matern32Kernel(tau, block=gap)
+            kernel += ln_ampout_gp * george.kernels.Matern32Kernel(
+                ln_tau_gp,
+                block=gap
+            )
 
         # Use that kernel to make a GP object
         georgeGP = george.GP(kernel, solver=george.HODLRSolver)
 
         return georgeGP
 
-    def calc(self, plot=False):
-        '''Overwrites the vanilla Eclipse calc function. We no longer want to
-        calculate chisq, rather return the flux of the model.
+    def evaluate_model(self):
+        '''The GP sits at the top of the tree. It replaces the LCModel
+        class. When the evaluate_model function is called, this class should
+        hijack it, calculate the residuals of all the eclipses in the tree,
+        and find the likelihood of each of those residuals given the current GP
+        hyper-parameters.
 
-        Calculate the residuals of the model of this eclipse, against the data
-        stored in its lightcurve object.'''
+        Inputs:
+        -------
+        label; str:
+            A label to apply to the node. Mostly used when searching trees.
+        parameter_objects; list(Param), or Param:
+            The parameter objects that correspond to this node. Single Param is
+            also accepted.
+        parent; Model, optional:
+            The parent of this node.
+        children; list(Model), or Model:
+            The children of this node. Single Model is also accepted
+        '''
 
-        if self.cv is None:
-            self.initCV()
+        # Get a list of all my eclipse children
+        eclipses = self.search_node_type('Eclipse')
 
-        # TODO: When the model moves far enough, re-initialise the CV?
+        # For each eclipse, I want to know the log likelihood of its residuals
+        gp_ln_like = 0.0
+        for eclipse in eclipses:
+            # Get the residuals of the model
+            residuals = eclipse.lc.y - eclipse.calcFlux()
+            # Did the model turn out ok?
+            if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
+                return -np.inf
 
-        # Get the model CV lightcurve across our data.
-        flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+            # Create the GP of this eclipse
+            gp = self.create_GP(eclipse)
+            # Compute the GP
+            gp.compute(eclipse.lc.x, eclipse.lc.ye)
 
-        # Calculate the residuals of this model.
-        resids = self.lc.y - flx
+            # The 'quiet' argument tells the GP to return -inf when you get
+            # an invalid kernel, rather than throwing an exception.
+            gp_ln_like += gp.log_likelihood(residuals, quiet=True)
 
-        # Check for bugs in model
-        if np.any(np.isinf(resids)) or np.any(np.isnan(resids)):
-            return -np.inf
+        return gp_ln_like
 
-        # For This eclipse, create (and compute) Gaussian process and calculate
-        #  the model
-        gp = self.createGP()
-        gp.compute(self.lc.x, self.lc.ye)
+    def plot_data(self, save=False, figsize=None):
+        '''For each eclipse descended from me, plot their data.
 
-        # The 'quiet' argument tells the GP to return -inf when you get an
-        # invalid kernel, rather than throwing an exception.
-        ln_like = gp.log_likelihood(resids, quiet=True)
+        If save is True, save the figures.
+        Figsize is passed to matplotlib.
+        '''
 
-        if plot:
-            self.lc.plot(flx)
+        eclipses = self.search_node_type('Eclipse')
+        for eclipse in eclipses:
+            # Get the figure and axes from the eclipse
+            fig, ax = eclipse.plot_data(save, figsize)
 
-        return ln_like
+            # Get the residuals of the model
+            residuals = eclipse.lc.y - eclipse.calcFlux()
+            # Did the model turn out ok?
+            if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
+                return -np.inf
 
-    def ln_like(self):
-        '''No longer statistically accurate to return half the chisq,
-        just get the likelihood from the GP and return that. '''
-        return self.chisq()
+            # Create the GP of this eclipse
+            gp = self.create_GP(eclipse)
+            # Compute the GP
+            gp.compute(eclipse.lc.x, eclipse.lc.ye)
+
+            # Draw samples from the GP
+            samples = gp.sample_conditional(residuals, eclipse.lc.x, size=300)
+
+            # Get the mean, mu, standard deviation, and
+            mu = np.mean(samples, axis=0)
+            std = np.std(samples, axis=0)
+            fmu, _ = gp.predict(residuals, eclipse.lc.x)
+
+            ax[1].fill_between(
+                eclipse.lc.x,
+                mu + (1.0*std),
+                mu - (1.0*std),
+                color='r',
+                alpha=0.4,
+                zorder=20
+            )
+
+            plt.show()
