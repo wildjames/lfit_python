@@ -29,8 +29,6 @@ with open(chain_fname, 'r') as chain_file:
 data = np.array(data)
 
 print("data shape: {}".format(data.shape))
-print("Data slice")
-print(data[0, 59, :])
 nwalkers, nsteps, npars = data.shape
 chain = u.flatchain(data)
 
@@ -70,7 +68,7 @@ for key, value in resultDict.items():
 # Get the model's graph
 # model.draw()
 print("Model evaluated to ln_prob of {:.3f}".format(model.ln_prob()))
-# model.plot_data(save=False)
+model.plot_data(save=True)
 
 # Plot an image of the walker likelihoods over time
 # data is shape (nwalkers, nsteps, ndim+1)
@@ -78,4 +76,13 @@ print("Reading in the chain file for likelihoods...")
 likes = data[:, :, -1].T
 
 ax = plt.imshow(likes)
+plt.show()
+
+# Plot the mean likelihood evolution
+likes = np.mean(likes, axis=0)
+print(likes.shape)
+plt.plot(likes)
+plt.title('SDSS J0748 g_binned only')
+plt.xlabel("Step")
+plt.ylabel("-ln_like")
 plt.show()
