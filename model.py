@@ -1288,7 +1288,8 @@ class GPLCModel(LCModel):
 
             # The 'quiet' argument tells the GP to return -inf when you get
             # an invalid kernel, rather than throwing an exception.
-            gp_ln_like += gp.log_likelihood(residuals, quiet=True)
+            gp_lnl = gp.log_likelihood(residuals, quiet=True)
+            gp_ln_like += gp_lnl
 
         return gp_ln_like
 
@@ -1321,7 +1322,6 @@ class GPLCModel(LCModel):
             # Get the mean, mu, standard deviation, and
             mu = np.mean(samples, axis=0)
             std = np.std(samples, axis=0)
-            fmu, _ = gp.predict(residuals, eclipse.lc.x)
 
             ax[1].fill_between(
                 eclipse.lc.x,
