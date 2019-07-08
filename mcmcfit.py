@@ -40,7 +40,7 @@ def construct_model(input_file):
         neclipses = int(input_dict['neclipses'])
     except KeyError:
         # Read in all the available eclipses
-        neclipses = -1
+        neclipses = 9e99
 
     # # # # # # # # # # # # # # # # #
     # Get the initial model setup # #
@@ -69,37 +69,55 @@ def construct_model(input_file):
     # Collect the bands and their params. Add them total model.
     band_par_names = Band.node_par_names
 
-    # Get a sub-dict of only band parameters
-    band_dict = {}
-    for key, string in input_dict.items():
-        if np.any([key.startswith(par) for par in band_par_names]):
-            band_dict[key] = string
-
-    # Get a set of the bands we have in the input file
-    defined_bands = [key.split('_')[-1] for key in band_dict]
-    defined_bands = set(defined_bands)
-
-    for band in defined_bands:
-        band_pars = []
-        for key, string in band_dict.items():
-            if key.endswith("_{}".format(band)):
-                name = key.split("_")[0]
-                band_pars.append(Param.fromString(name, string))
-
-        band = Band(band, band_pars, parent=model)
-
-    # # # # # # # # # # # # # # # # #
-    # # Finally, get the eclipses # #
-    # # # # # # # # # # # # # # # # #
-
     # Use the Eclipse class to find the parameters we're interested in
     ecl_pars = Eclipse.node_par_names
     if is_complex:
         ecl_pars += ('exp1', 'exp2', 'yaw', 'tilt')
 
-    # Collect the suffixes of the eclipses.
-    file_keys = [key for key in input_dict if key.startswith('file_')]
-    defined_eclipses = [key[5:] for key in file_keys]
+    # I care about the order in which eclipses and bands are defined.
+    # Collect that order here.
+    defined_bands = []
+    defined_eclipses = []
+    with open(input_file, 'r') as input_file_obj:
+        for line in input_file_obj:
+            line = line.strip().split()
+
+            if len(line):
+                key = line[0]
+
+                # Check that the key starts with any of the band pars
+                if np.any([key.startswith(par) for par in band_par_names]):
+                    # Strip off the variable part, and keep only the label
+                    key = '_'.join(key.split('_')[1:])
+                    if key not in defined_bands:
+                        defined_bands.append(key)
+
+                # Check that the key starts with any of the eclipse pars
+                if np.any([key.startswith(par) for par in ecl_pars]):
+                    # Strip off the variable part, and keep only the label
+                    key = '_'.join(key.split('_')[1:])
+                    if key not in defined_eclipses:
+                        defined_eclipses.append(key)
+
+    # Collect the band params into their Band objects.
+    for label in defined_bands:
+        band_pars = []
+
+        # Build the Param objects for this band
+        for par in band_par_names:
+                # Construct the parameter key and retrieve the string
+                key = "{}_{}".format(par, label)
+                string = input_dict[key]
+
+                # Make the Param object, and save it
+                band_pars.append(Param.fromString(par, string))
+
+        # Define the band as a child of the model.
+        Band(label, band_pars, parent=model)
+
+    # # # # # # # # # # # # # # # # #
+    # # Finally, get the eclipses # #
+    # # # # # # # # # # # # # # # # #
 
     lo = float(input_dict['phi_start'])
     hi = float(input_dict['phi_end'])
@@ -107,9 +125,9 @@ def construct_model(input_file):
     for label in defined_eclipses[:neclipses]:
         # Get the list of parameters, and their priors
         params = []
-        for par_name in ecl_pars:
-            key = "{}_{}".format(par_name, label)
-            param = Param.fromString(par_name, input_dict[key])
+        for par in ecl_pars:
+            key = "{}_{}".format(par, label)
+            param = Param.fromString(par, input_dict[key])
 
             params.append(param)
 
@@ -123,6 +141,9 @@ def construct_model(input_file):
         my_band = model.search_Node('Band', my_band)
 
         Eclipse(lc, is_complex, label, params, parent=my_band)
+
+    # Make sure that all the model's Band have eclipses. Otherwise, prune them
+    model.children = [band for band in model.children if len(band.children)]
 
     return model
 
@@ -216,22 +237,23 @@ if __name__ in '__main__':
 
     eclipses = model.search_node_type('Eclipse')
     for eclipse in eclipses:
-        eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
+        fig, ax = eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
+        plt.show()
 
     if not to_fit:
-        with open('model_parameters.txt', 'w') as file_obj:
-            # Evaluate the final model.
-            file_obj.write("  Chisq             = {:.3f}\n".format(
-                model.chisq()))
+        # with open('model_parameters.txt', 'w') as file_obj:
+        #     # Evaluate the final model.
+        #     file_obj.write("  Chisq             = {:.3f}\n".format(
+        #         model.chisq()))
 
-            file_obj.write("  ln prior          = {:.3f}\n".format(
-                model.ln_prior()))
+        #     file_obj.write("  ln prior          = {:.3f}\n".format(
+        #         model.ln_prior()))
 
-            file_obj.write("  ln like           = {:.3f}\n".format(
-                model.ln_like()))
+        #     file_obj.write("  ln like           = {:.3f}\n".format(
+        #         model.ln_like()))
 
-            file_obj.write("  ln prob           = {:.3f}\n".format(
-                model.ln_prob()))
+        #     file_obj.write("  ln prob           = {:.3f}\n".format(
+        #         model.ln_prob()))
 
         # Plot the data and the final fit.
         # model.plot_data(save=True)
@@ -249,6 +271,8 @@ if __name__ in '__main__':
     print("\n\nThe MCMC has {:d} variables and {:d} walkers".format(
         npars, nwalkers))
     print("(It should have at least 2*npars, {:d} walkers)".format(2*npars))
+    if nwalkers < 2*npars:
+        exit()
 
     # p_0 is the initial position vector of the MCMC walker
     p_0 = model.dynasty_par_vals
@@ -334,7 +358,7 @@ if __name__ in '__main__':
     print("Starting the main MCMC chain. Probably going to take a while!")
 
     # Get the column keys. Otherwise, we can't parse the results!
-    col_names = ','.join(model.dynasty_par_names) + ',Likelihood'
+    col_names = ','.join(model.dynasty_par_names) + ',ln_prob'
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
