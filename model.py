@@ -37,9 +37,10 @@ class Lightcurve:
         # Set the name of this eclipse as the filename of the data file.
         if name is None:
             _, name = os.path.split(fname)
-        return cls(fname, phase, flux, error, width, fname=fname)
+        return cls(name, phase, flux, error, width, fname=fname)
 
     def trim(self, lo, hi):
+        '''Trim the data, so that all points are in the x range lo > xi > hi'''
         xt = self.x
 
         mask = (xt > lo) & (xt < hi)
@@ -200,10 +201,6 @@ class Model:
         for par in parameter_objects:
             setattr(self, par.name, par)
 
-        # Save the variable param names as a list
-        self.node_varpars = [par.name for par in parameter_objects
-                             if par.isVar]
-
         # Handle the family
         if children is None:
             children = []
@@ -262,9 +259,7 @@ class Model:
         if not isinstance(children, list):
             children = [children]
 
-        new_children = self.children + children
-
-        self.children = new_children
+        self.children.extend(children)
 
     # Tree evaluation methods
     def evaluate_model(self):
@@ -308,16 +303,20 @@ class Model:
         for param in [getattr(self, name) for name in self.node_par_names]:
             if param.isValid and param.isVar:
                 lnp += param.prior.ln_prob(param.currVal)
+
             else:
                 if verbose:
                     print("Param {} in {} is invalid!".format(
                         param.name, self.name))
                 return -np.inf
 
+        # Reporting, if necessary
         if verbose:
             print("{} has the following Params:".format(self.name))
-            for i, par in enumerate(self.node_par_names[::4]):
-                print(self.node_par_names[i:i+4])
+            for i, _ in enumerate(self.node_par_names[::4]):
+                j = 4*i
+                k = j+4
+                print(self.node_par_names[j:k])
             print("The sum of parameter ln_priors of {} is {:.3f}\n".format(
                 self.name, lnp))
 
@@ -399,8 +398,8 @@ class Model:
 
         for child in self.children:
             child_params, child_node_names = child.__get_descendant_params__()
-            params += child_params
-            node_names += child_node_names
+            params.extend(child_params)
+            node_names.extend(child_node_names)
 
         return params, node_names
 
@@ -430,21 +429,20 @@ class Model:
         '''Take a parameter vector, and pop values off the back until all this
         models' variables are set. Then pass the remainder to the children of
         this model, in order.'''
-
-        vector_values = list(vector_values)
+        vector = list(vector_values)
 
         # I need to read off the children backwards
         for child in self.children[::-1]:
-            vector_values = child.__set_parameter_vector__(vector_values)
+            vector = child.__set_parameter_vector__(vector)
 
         # Now, add my own.
         # Remember, backwards!
-        for name in self.node_varpars[::-1]:
-            val = vector_values.pop()
+        for name, val in zip(self.node_varpars[::-1], vector[::-1]):
             par = getattr(self, name)
             par.currVal = val
 
-        return vector_values
+        n_used = len(vector) - len(self.node_varpars)
+        return vector[:n_used]
 
     def __check_par_assignments__(self):
         '''Loop through my variables, and make sure that the Param.name is the
@@ -455,8 +453,7 @@ class Model:
 
         for key, value in param_dict.items():
             if key != value.name:
-                fail_msg = "Incorrect parameter name, {} assigned to {}. "
-                fail_msg += "Parameters are taken in the order {}".format(
+                fail_msg = "Incorrect parameter name, {} assigned to {}. \nParameters are taken in the order {}".format(
                     value.name, key, self.node_par_names
                 )
                 raise NameError(fail_msg)
@@ -512,7 +509,7 @@ class Model:
     @dynasty_par_vals.setter
     def dynasty_par_vals(self, dynasty_par_vals):
         if not len(dynasty_par_vals) >= len(self.dynasty_par_vals):
-            raise ValueError('Fail on {}'.format(self.name))
+            raise ValueError('Wrong vector length on {} - Expected {}, got {}'.format(self.name, len(self.dynasty_par_vals), len(dynasty_par_vals)))
         self.__set_parameter_vector__(dynasty_par_vals)
 
     @property
@@ -521,6 +518,17 @@ class Model:
         return {key: val for key, val in
                 zip(self.__get_inherited_parameter_names__(),
                     self.__get_inherited_parameter_vector__())}
+
+    @property
+    def node_varpars(self):
+        '''Returns the list of THIS node's variable parameter names.'''
+        varpars = []
+        for name in self.node_par_names:
+            par = getattr(self, name)
+            if par.isVar:
+                varpars.append(par.name)
+
+        return varpars
 
     @property
     def is_root(self):
@@ -722,12 +730,11 @@ class Eclipse(Model):
     def __init__(self, lightcurve, iscomplex, *args, **kwargs):
         # If we're a complex eclipse, add the complex parameter names
         if iscomplex:
-            complex_parNames = (
+            self.node_par_names = (
+                'dFlux', 'sFlux', 'ulimb', 'rdisc',
+                'scale', 'az', 'fis', 'dexp', 'phi0',
                 'exp1', 'exp2', 'yaw', 'tilt'
             )
-            self.node_par_names += complex_parNames
-
-        self.iscomplex = iscomplex
 
         super().__init__(*args, **kwargs)
 
@@ -771,7 +778,7 @@ class Eclipse(Model):
         flx = self.calcFlux()
 
         # Calculate the chisq of this model.
-        chisq = (self.lc.y - flx)**2
+        chisq = ((self.lc.y - flx) / self.lc.ye)**2
         chisq = np.sum(chisq)
 
         if plot:
@@ -814,9 +821,7 @@ class Eclipse(Model):
 
         if rdisc_a > rdisc_max_a:
             if verbose:
-                msg = "The disc radius of {} is large enough to precess!"
-                msg += "Value: {:.3f}"
-                msg.format(self.name, rdisc)
+                msg = "The disc radius of {} is large enough to precess! Value: {:.3f}".format(self.name, rdisc)
                 print(msg)
             return -np.inf
 
@@ -843,8 +848,7 @@ class Eclipse(Model):
 
         if scale > rmax or scale < rmin:
             if verbose:
-                msg = "Leaf {} has a BS scale that lies outside valid range!"
-                print(msg.format(self.name))
+                print("Leaf {} has a BS scale that lies outside valid range!".format(self.name))
                 print("Rwd: {:.3f}".format(rwd))
                 print("Scale: {:.3f}".format(scale))
                 print("Range: {:.3f} - {:.3f}".format(rmin, rmax))
@@ -883,16 +887,21 @@ class Eclipse(Model):
 
         except:
             if verbose:
-                msg = "The mass stream of leaf {} does not intersect the disc!"
-                print(msg.format(self.name))
+                print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
             return -np.inf
 
         # If we pass all that, then calculate the ln_prior normally
-        return super().ln_prior(verbose=verbose, *args, **kwargs)
+        lnp = super().ln_prior(verbose=verbose, *args, **kwargs)
 
-    def plot_data(self, save=False, figsize=(11., 8.)):
+        return lnp
+
+    def plot_data(self, save=False, figsize=(11., 8.), fname=None):
         '''Create a plot of the eclipse's data.
+
         If save is True, a copy of the figure is saved.
+
+        If fname is defined, save the figure with that filename. Otherwise,
+        infer one from the data filename
         '''
 
         cv_par_name_list = [
@@ -957,8 +966,9 @@ class Eclipse(Model):
         fig.subplots_adjust(wspace=0, hspace=0)
 
         if save:
-            fig_name = self.lc.name.replace('.calib', '.pdf')
-            plt.savefig(fig_name)
+            if fname is None:
+                fname = self.lc.name.replace('.calib', '.pdf')
+            plt.savefig(fname)
 
         return fig, axs
 
@@ -967,21 +977,26 @@ class Eclipse(Model):
         '''Construct the parameter list needed by the CV'''
 
         if self.iscomplex:
-            par_name_list = [
+            par_name_list = (
                 'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
                 'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0',
                 'exp1', 'exp2', 'tilt', 'yaw'
-            ]
+            )
         else:
-            par_name_list = [
+            par_name_list = (
                 'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
                 'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
-            ]
+            )
 
         param_dict = self.ancestor_param_dict
         parlist = [param_dict[key].currVal for key in par_name_list]
 
         return parlist
+
+    @property
+    def iscomplex(self):
+        '''True if the eclipse uses the complex model. False otherwise'''
+        return len(self.node_par_names) == 13
 
 
 class Band(Model):
@@ -1031,7 +1046,9 @@ class LCModel(Model):
         for eclipse in eclipses:
             # multiply the evaluate_model() by -2, to undo the -0.5
             # it does to itself
-            chisq += -2.0 * eclipse.evaluate_model()
+            ecl_chisq = (eclipse.lc.y - eclipse.calcFlux()) / eclipse.lc.ye
+            ecl_chisq = ecl_chisq**2
+            chisq += np.sum(ecl_chisq)
 
         return chisq
 
