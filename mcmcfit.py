@@ -17,6 +17,12 @@ from model import Lightcurve, Eclipse, Band, LCModel, GPLCModel
 from mcmc_utils import Param
 import mcmc_utils as utils
 
+def extract_par_and_key(key):
+    '''As stated. For example,
+    extract_par_and_key("wdFlux_long_complex_key_label)
+    >>> "long_complex_key_label"
+    '''
+    return key.split('_')[0], '_'.join(key.split('_')[1:])
 
 def construct_model(input_file):
     '''Takes an input filename, and parses it into a model tree.
@@ -88,14 +94,14 @@ def construct_model(input_file):
                 # Check that the key starts with any of the band pars
                 if np.any([key.startswith(par) for par in band_par_names]):
                     # Strip off the variable part, and keep only the label
-                    key = '_'.join(key.split('_')[1:])
+                    _, key = extract_par_and_key(key)
                     if key not in defined_bands:
                         defined_bands.append(key)
 
                 # Check that the key starts with any of the eclipse pars
                 if np.any([key.startswith(par) for par in ecl_pars]):
                     # Strip off the variable part, and keep only the label
-                    key = '_'.join(key.split('_')[1:])
+                    _, key = extract_par_and_key(key)
                     if key not in defined_eclipses:
                         defined_eclipses.append(key)
 
@@ -236,9 +242,13 @@ if __name__ in '__main__':
         model.ln_prior(verbose=True)
 
     eclipses = model.search_node_type('Eclipse')
-    for eclipse in eclipses:
-        fig, ax = eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
-        plt.show()
+
+    if 'GPLC' in model.name:
+        model.plot_data()
+    else:
+        for eclipse in eclipses:
+            fig, ax = eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
+            plt.show()
 
     if not to_fit:
         # with open('model_parameters.txt', 'w') as file_obj:
@@ -309,7 +319,11 @@ if __name__ in '__main__':
 
         for par_i, name in enumerate(model.dynasty_par_names):
             # Get the parameter of this parName, striping off the node encoding
-            key = name.split("_")[0]
+            key, _ = extract_par_and_key(name)
+
+            # Skip the GP params
+            if key.startswith('ln'):
+                continue
 
             # Multiply it by the relevant factor
             p0_scatter_1[par_i] *= scat_fract[key]
