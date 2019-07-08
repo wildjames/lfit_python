@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 import emcee
 
-from model import *
+from model import Lightcurve, Eclipse, Band, LCModel, GPLCModel
 from mcmc_utils import Param
 import mcmc_utils as utils
 
@@ -23,6 +23,12 @@ def construct_model(input_file):
     Returns that model tree. '''
 
     input_dict = configobj.ConfigObj(input_file)
+
+    for key, item in input_dict.items():
+        if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
+            print("OI! Don't use {0}, use ln_{0}!!".format(key))
+            input_dict['ln_'+key] = item
+            input("As punishment, you have to hit enter to continue:\n> ")
 
     # Do we use the complex model? Do we use the GP?
     is_complex = bool(int(input_dict['complex']))
@@ -95,6 +101,9 @@ def construct_model(input_file):
     file_keys = [key for key in input_dict if key.startswith('file_')]
     defined_eclipses = [key[5:] for key in file_keys]
 
+    lo = float(input_dict['phi_start'])
+    hi = float(input_dict['phi_end'])
+
     for label in defined_eclipses[:neclipses]:
         # Get the list of parameters, and their priors
         params = []
@@ -106,12 +115,14 @@ def construct_model(input_file):
 
         # Get the observational data
         lc_fname = input_dict['file_{}'.format(label)]
+        lc = Lightcurve.from_calib(lc_fname)
+        lc.trim(lo, hi)
 
         # Get the band object that this eclipse belongs to
         my_band = input_dict['band_{}'.format(label)]
         my_band = model.search_Node('Band', my_band)
 
-        Eclipse(lc_fname, is_complex, label, params, parent=my_band)
+        Eclipse(lc, is_complex, label, params, parent=my_band)
 
     return model
 
@@ -141,31 +152,10 @@ if __name__ in '__main__':
         val = model.ln_like()
         return val
 
-    print("\n\nInitial guess has a chisq of {:.3f},".format(model.chisq()))
-    print("a ln_prob of {:.3f},".format(ln_prob(model.dynasty_par_vals)))
-    print("and a ln_prior of {:.3f}".format(ln_prior(model.dynasty_par_vals)))
-    print()
-    if np.isinf(model.ln_prior()):
-        print("ERROR: Starting position violates priors!")
-        print("Offending parameters are:")
-
-        pars, names = model.__get_descendant_Params__()
-        for par, name in zip(pars, names):
-            print("{:>15s}_{:<5s}: Valid?: {}".format(
-                par.name, name, par.isValid))
-
-            if not par.isValid:
-                print("  -> {}_{}".format(par.name, name))
-        print("\n\n")
-
-        # Calculate ln_prior verbosley, for the user's benefit
-        model.ln_prior(verbose=True)
-
     input_dict = configobj.ConfigObj(sys.argv[1])
 
     for key, item in input_dict.items():
         if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
-            print("Scold the user for their bad practice")
             input_dict['ln_'+key] = item
 
     # Read in information about mcmc
@@ -193,29 +183,58 @@ if __name__ in '__main__':
             neclipses += 1
         print("The model has {} eclipses.".format(neclipses))
 
+    # Wok out how many degrees of freedom we have in the model
+    eclipses = model.search_node_type('Eclipse')
+    # How many data points do we have?
+    dof = np.sum([ecl.lc.x.size for ecl in eclipses])
+    # Subtract a DoF for each variable
+    dof -= len(model.dynasty_par_names)
+    # Subtract one DoF for the fit
+    dof -= 1
+
+    print("\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).".format(model.chisq(), dof))
+    print("\nFrom the wrapper functions, we get;")
+    pars = model.dynasty_par_vals
+    print("a ln_prior of {:.3f}".format(ln_prior(pars)))
+    print("a ln_like of {:.3f}".format(ln_like(pars)))
+    print("a ln_prob of {:.3f}".format(ln_prob(pars)))
+    print()
+    if np.isinf(model.ln_prior()):
+        print("ERROR: Starting position violates priors!")
+        print("Offending parameters are:")
+
+        pars, names = model.__get_descendant_params__()
+        for par, name in zip(pars, names):
+            print("{:>15s}_{:<5s}: Valid?: {}".format(
+                par.name, name, par.isValid))
+
+            if not par.isValid:
+                print("  -> {}_{}".format(par.name, name))
+
+        # Calculate ln_prior verbosley, for the user's benefit
+        model.ln_prior(verbose=True)
+
+    eclipses = model.search_node_type('Eclipse')
+    for eclipse in eclipses:
+        eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
+
     if not to_fit:
-        print("Model parameters:")
         with open('model_parameters.txt', 'w') as file_obj:
             # Evaluate the final model.
-            print("\n\nFor this model;\n")
-            print("  Chisq             = {:.3f}".format(model.chisq()))
             file_obj.write("  Chisq             = {:.3f}\n".format(
                 model.chisq()))
 
-            print("  ln prior          = {:.3f}".format(model.ln_prior()))
             file_obj.write("  ln prior          = {:.3f}\n".format(
                 model.ln_prior()))
 
-            print("  ln like           = {:.3f}".format(model.ln_like()))
             file_obj.write("  ln like           = {:.3f}\n".format(
                 model.ln_like()))
 
-            print("  ln prob           = {:.3f}".format(model.ln_prob()))
             file_obj.write("  ln prob           = {:.3f}\n".format(
                 model.ln_prob()))
 
         # Plot the data and the final fit.
-        model.plot_data(save=True)
+        # model.plot_data(save=True)
 
         exit()
 
@@ -227,7 +246,7 @@ if __name__ in '__main__':
     # How many parameters do I have to deal with?
     npars = len(model.dynasty_par_vals)
 
-    print("The MCMC has {:d} variables and {:d} walkers".format(
+    print("\n\nThe MCMC has {:d} variables and {:d} walkers".format(
         npars, nwalkers))
     print("(It should have at least 2*npars, {:d} walkers)".format(2*npars))
 
