@@ -307,12 +307,14 @@ def flatchain(chain, npars=None, nskip=0, thin=1):
 
 
 def readchain(file, **kwargs):
+    # TODO: Both this function and the dask version are bugged, and return a
+    # mangled form of the desired output.
     data = pd.read_csv(file, header=None, compression=None,
                        delim_whitespace=True, **kwargs)
     data = np.array(data)
     nwalkers = int(data[:, 0].max()+1)
     nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID, last is ln_prob
+    npars = data.shape[1] - 1  # first is walker ID
     chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
     return chain
 
@@ -324,7 +326,7 @@ def readchain_dask(file, **kwargs):
     data = np.array(data)
     nwalkers = int(data[:, 0].max()+1)
     nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID, last is ln_prob
+    npars = data.shape[1] - 1  # first is walker ID
     chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
     return chain
 
