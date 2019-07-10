@@ -230,31 +230,32 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
     # open chain save file
     print("col_names: {}".format(col_names))
     if file:
-        f = open(file, "w")
-        f.write(col_names)
-        if col_names:
-            f.write("\n")
-        f.close()
+        with open(file, "w") as f:
+            f.write(col_names)
+            if col_names:
+                f.write("\n")
+
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
+
     for pos, prob, state in sampler.sample(startPos,
                                            iterations=nSteps, rstate0=rState,
                                            storechain=True, **kwargs):
-        if file:
-            f = open(file, "a")
+
         iStep += 1
         if progress:
             bar.update()
+
         for k in range(pos.shape[0]):
             # loop over all walkers and append to file
             thisPos = pos[k]
             thisProb = prob[k]
-            if file:
+
+            with open(file, 'a') as f:
                 f.write("{0:4d} {1:s} {2:f}\n".format(
                     k, " ".join(map(str, thisPos)), thisProb))
-        if file:
-            f.close()
+
     if progress:
         bar.close()
     return sampler
@@ -265,18 +266,19 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file,
     '''runs PT MCMC and saves zero temperature chain to a file'''
     print("col_names: {}".format(col_names))
     if file:
-        f = open(file, "w")
-        f.write(col_names)
-        if col_names:
-            f.write("\n")
-        f.close()
+        with open(file, "w") as f:
+            f.write(col_names)
+            if col_names:
+                f.write("\n")
+
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
+
     for pos, prob, like in sampler.sample(startPos,
                                           iterations=nSteps,
                                           storechain=True, **kwargs):
-        f = open(file, "a")
+
         iStep += 1
         if progress:
             bar.update()
@@ -285,12 +287,15 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file,
         # loop over all walkers for first temp and append to file
         zpos = pos[0, ...]
         zprob = prob[0, ...]
+
         for k in range(zpos.shape[0]):
             thisPos = zpos[k]
             thisProb = zprob[k]
-            f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
+
+            with open(file, 'a') as f:
+                f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
                 map(str, thisPos)), thisProb))
-        f.close()
+
     if progress:
         bar.close()
     return sampler

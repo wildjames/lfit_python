@@ -17,12 +17,24 @@ from model import Lightcurve, Eclipse, Band, LCModel, GPLCModel
 from mcmc_utils import Param
 import mcmc_utils as utils
 
+from func_timeout import func_timeout, FunctionTimedOut
+
 def extract_par_and_key(key):
     '''As stated. For example,
     extract_par_and_key("wdFlux_long_complex_key_label)
-    >>> "long_complex_key_label"
+    >>> ("wdFlux", "long_complex_key_label")
     '''
-    return key.split('_')[0], '_'.join(key.split('_')[1:])
+
+    if key.startswith("ln_"):
+        key = key.split("_")
+
+        par = "_".join(key[:3])
+        label = "_".join(key[3:])
+
+    else:
+        par, label = key.split('_')[0], '_'.join(key.split('_')[1:])
+
+    return par, label
 
 def construct_model(input_file):
     '''Takes an input filename, and parses it into a model tree.
@@ -155,7 +167,14 @@ def construct_model(input_file):
 
 
 if __name__ in '__main__':
-    model = construct_model(sys.argv[1])
+
+    try:
+        input_fname = sys.argv[1]
+    except:
+        print("No input file supplied!!")
+        exit()
+
+    model = construct_model(input_fname)
 
     print("\nStructure:")
     pprint(model.structure)
@@ -166,20 +185,47 @@ if __name__ in '__main__':
     # in order to pickle them :(
     def ln_prior(param_vector):
         model.dynasty_par_vals = param_vector
-        val = model.ln_prior()
+        try:
+            val = func_timeout(
+                60,
+                model.ln_prior
+            )
+        except FunctionTimedOut as e:
+            print("Model Parameters:")
+            model.report()
+            val = -np.inf
+            print(e)
         return val
 
     def ln_prob(param_vector):
         model.dynasty_par_vals = param_vector
-        val = model.ln_prob()
+        try:
+            val = func_timeout(
+                60,
+                model.ln_prob
+            )
+        except FunctionTimedOut as e:
+            print("Model Parameters:")
+            model.report()
+            val = -np.inf
+            print(e)
         return val
 
     def ln_like(param_vector):
         model.dynasty_par_vals = param_vector
-        val = model.ln_like()
+        try:
+            val = func_timeout(
+                60,
+                model.ln_like
+            )
+        except FunctionTimedOut as e:
+            print("Model Parameters:")
+            model.report()
+            val = -np.inf
+            print(e)
         return val
 
-    input_dict = configobj.ConfigObj(sys.argv[1])
+    input_dict = configobj.ConfigObj(input_fname)
 
     for key, item in input_dict.items():
         if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
@@ -194,9 +240,7 @@ if __name__ in '__main__':
     scatter_1 = float(input_dict['first_scatter'])
     scatter_2 = float(input_dict['second_scatter'])
     to_fit = int(input_dict['fit'])
-    use_gp = bool(int(input_dict['useGP']))
     use_pt = bool(int(input_dict['usePT']))
-    corner = bool(int(input_dict['corner']))
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
@@ -238,17 +282,10 @@ if __name__ in '__main__':
             if not par.isValid:
                 print("  -> {}_{}".format(par.name, name))
 
-        # Calculate ln_prior verbosley, for the user's benefit
+        # Calculate ln_prior verbosely, for the user's benefit
         model.ln_prior(verbose=True)
+    model.plot_data()
 
-    eclipses = model.search_node_type('Eclipse')
-
-    if 'GPLC' in model.name:
-        model.plot_data()
-    else:
-        for eclipse in eclipses:
-            fig, ax = eclipse.plot_data(save=True, fname='lightcurves/initial_{}.pdf'.format(eclipse.name))
-            plt.show()
 
     if not to_fit:
         # with open('model_parameters.txt', 'w') as file_obj:
@@ -270,10 +307,10 @@ if __name__ in '__main__':
 
         exit()
 
-    ##############################################################
-    # MCMC Chain sampler, handled by emcee.  # # # # # # # # # # #
-    # The below plugs the above into emcee's relevant functions. #
-    ##############################################################
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+    #  MCMC Chain sampler, handled by emcee.                      #
+    #  The below plugs the above into emcee's relevant functions  #
+    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
     # How many parameters do I have to deal with?
     npars = len(model.dynasty_par_vals)
@@ -422,7 +459,7 @@ if __name__ in '__main__':
         # Evaluate the final model. Save to file.
         print("\n\nFor this model;\n")
         print("  Chisq             = {:.3f}".format(model.chisq()))
-        file_obj.write("  Chisq             = {:.3f}\n".format(
+        file_obj.write("\n\n  Chisq             = {:.3f}\n".format(
             model.chisq()))
 
         print("  ln prior          = {:.3f}".format(model.ln_prior()))

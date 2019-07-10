@@ -184,6 +184,7 @@ class Model:
         assert isinstance(label, str), "Label must be a string!"
         self.label = label
 
+        self.DEBUG = bool(DEBUG)
         if DEBUG:
             print("Creating a new {}, labelled {}".format(
                 self.__class__.__name__, self.label))
@@ -262,7 +263,7 @@ class Model:
         self.children.extend(children)
 
     # Tree evaluation methods
-    def evaluate_model(self):
+    def evaluate_model(self, *args, **kwargs):
         '''Overwrite this method for the nodes capable of evaluating the model.
         Called by ln_like. Example would be having this call a chisq function
         and return the output.'''
@@ -281,10 +282,17 @@ class Model:
         ln_like = 0.0
 
         try:
+            #Execute the model evaluation with a deadline.
             ln_like += self.evaluate_model(*args, **kwargs)
-        except:
+
+        except NotImplementedError:
             for child in self.children:
                 ln_like += child.ln_like(*args, **kwargs)
+
+                if np.isinf(ln_like):
+                    return -np.inf
+        except:
+            return -np.inf
 
         return ln_like
 
@@ -354,9 +362,10 @@ class Model:
     # Dunder methods that are generally hidden from the user.
     def __get_inherited_parameter_names__(self):
         '''Construct a list of the variable parameters that I have, and append
-        it with the variables stored in my parents.
+        it with the names of those stored in my parents.
 
-        This is a list of ONLY the names of the parameters.
+        This is a list of ONLY the names of the parameters, regardless of if
+        they're variable.
         '''
         names = []
 
@@ -518,6 +527,16 @@ class Model:
         return {key: val for key, val in
                 zip(self.__get_inherited_parameter_names__(),
                     self.__get_inherited_parameter_vector__())}
+
+    @property
+    def ancestor_par_names(self):
+        '''Construct a list of the variable parameters that I have, and append
+        it with the names of those stored in my parents.
+
+        This is a list of ONLY the names of the parameters, regardless of if
+        they're variable.
+        '''
+        return self.__get_inherited_parameter_names__()
 
     @property
     def node_varpars(self):
@@ -769,20 +788,26 @@ class Eclipse(Model):
 
         return flx
 
-    def evaluate_model(self, plot=False):
-        '''Calculate the chisq of this eclipse, against the data stored in its
-        lightcurve object.
-
-        If plot is True, also plot the data in a figure.'''
-
+    def chisq(self):
+        '''Return the chisq of this eclipse, given current params.'''
         flx = self.calcFlux()
 
         # Calculate the chisq of this model.
         chisq = ((self.lc.y - flx) / self.lc.ye)**2
         chisq = np.sum(chisq)
 
+        return chisq
+
+    def evaluate_model(self, plot=False):
+        '''Calculate the chisq of this eclipse, against the data stored in its
+        lightcurve object.
+
+        If plot is True, also plot the data in a figure.'''
+
         if plot:
-            self.lc.plot(flx)
+            self.plot_data()
+
+        chisq = self.chisq()
 
         return -0.5 * chisq
 
@@ -895,7 +920,7 @@ class Eclipse(Model):
 
         return lnp
 
-    def plot_data(self, save=False, figsize=(11., 8.), fname=None):
+    def plot_data(self, save=False, figsize=(11., 8.), fname=None, save_dir='.'):
         '''Create a plot of the eclipse's data.
 
         If save is True, a copy of the figure is saved.
@@ -966,8 +991,22 @@ class Eclipse(Model):
         fig.subplots_adjust(wspace=0, hspace=0)
 
         if save:
+            # Check that save_dir exists
+            if not os.path.isdir(save_dir):
+                os.mkdir(save_dir)
+
+            # If we didnt get told to use a certain fname, use this node's name
             if fname is None:
                 fname = self.lc.name.replace('.calib', '.pdf')
+
+            # Make the filename
+            fname = '/'.join([save_dir, fname])
+
+            # If the user specified a path like './figs/', then the above could
+            # return './figs//Eclipse_N.pdf'; I want to be robust against that.
+            while '//' in fname:
+                fname = fname.replace('//', '/')
+
             plt.savefig(fname)
 
         return fig, axs
@@ -1044,11 +1083,7 @@ class LCModel(Model):
 
         eclipses = self.search_node_type('Eclipse')
         for eclipse in eclipses:
-            # multiply the evaluate_model() by -2, to undo the -0.5
-            # it does to itself
-            ecl_chisq = (eclipse.lc.y - eclipse.calcFlux()) / eclipse.lc.ye
-            ecl_chisq = ecl_chisq**2
-            chisq += np.sum(ecl_chisq)
+            chisq += eclipse.chisq()
 
         return chisq
 
@@ -1097,7 +1132,7 @@ class LCModel(Model):
         lnp += super().ln_prior(verbose=verbose)
         return lnp
 
-    def plot_data(self, save=False, figsize=None):
+    def plot_data(self, save=False, *args, **kwargs):
         '''For each eclipse descended from me, plot their data.
 
         If save is True, save the figures.
@@ -1106,8 +1141,11 @@ class LCModel(Model):
 
         eclipses = self.search_node_type('Eclipse')
         for eclipse in eclipses:
-            fig, ax = eclipse.plot_data(save, figsize)
-            plt.show()
+            fig, ax = eclipse.plot_data(save, *args, **kwargs)
+            if not save:
+                plt.show()
+            else:
+                plt.close()
 
 
 class GPLCModel(LCModel):
@@ -1219,9 +1257,9 @@ class GPLCModel(LCModel):
 
         # Get objects for ln_ampin_gp, ln_ampout_gp, ln_tau_gp and find the exponential
         # of their current values
-        ln_ampin = self.ln_ampin_gp
-        ln_ampout = self.ln_ampout_gp
-        ln_tau = self.ln_tau_gp
+        ln_ampin = getattr(self, 'ln_ampin_gp')
+        ln_ampout = getattr(self, 'ln_ampout_gp')
+        ln_tau = getattr(self, 'ln_tau_gp')
 
         ln_ampin_gp = np.exp(ln_ampin.currVal)
         ln_ampout_gp = np.exp(ln_ampout.currVal)
