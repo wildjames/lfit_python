@@ -32,11 +32,20 @@ class Lightcurve:
 
         data = np.loadtxt(fname, delimiter=' ', comments='#')
         phase, flux, error = data.T
+
+        # Filter out nans.
+        mask = np.where(np.isnan(flux) == 0)
+
+        phase = phase[mask]
+        flux = flux[mask]
+        error = error[mask]
+
         width = np.mean(np.diff(phase))*np.ones_like(phase)/2.
 
         # Set the name of this eclipse as the filename of the data file.
         if name is None:
             _, name = os.path.split(fname)
+
         return cls(name, phase, flux, error, width, fname=fname)
 
     def trim(self, lo, hi):
@@ -44,6 +53,7 @@ class Lightcurve:
         xt = self.x
 
         mask = (xt > lo) & (xt < hi)
+
         self.x = self.x[mask]
         self.y = self.y[mask]
         self.ye = self.ye[mask]
@@ -786,11 +796,22 @@ class Eclipse(Model):
         # Get the model CV lightcurve across our data.
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
 
+
         return flx
 
     def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''
         flx = self.calcFlux()
+
+        # If the model gets any nans, return -inf
+        if np.any(np.isnan(flx)):
+            if self.DEBUG:
+                print("Model returned some ({}/{} data) nans.".format(
+                    np.sum(np.isnan(flx)),
+                    flx.shape[0]
+                ))
+
+            return -np.inf
 
         # Calculate the chisq of this model.
         chisq = ((self.lc.y - flx) / self.lc.ye)**2
