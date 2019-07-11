@@ -803,7 +803,7 @@ class Eclipse(Model):
         '''Return the chisq of this eclipse, given current params.'''
         flx = self.calcFlux()
 
-        # If the model gets any nans, return -inf
+        # If the model gets any nans, return inf
         if np.any(np.isnan(flx)):
             if self.DEBUG:
                 print("Model returned some ({}/{} data) nans.".format(
@@ -811,7 +811,7 @@ class Eclipse(Model):
                     flx.shape[0]
                 ))
 
-            return -np.inf
+            return np.inf
 
         # Calculate the chisq of this model.
         chisq = ((self.lc.y - flx) / self.lc.ye)**2
