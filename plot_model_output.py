@@ -8,13 +8,45 @@ from mcmcfit import construct_model, extract_par_and_key
 import argparse
 
 
-argparse.ArgumentParser(description="Takes a chain file and the input file that created it, and summarises the results. Plots the before and after lightcurves, and the corner plot of each eclipse. Plots the likelihood evolution.")
+parser = argparse.ArgumentParser(
+    description='''Takes a chain file and the input file that created it, and
+    summarises the results.
+    Plots the before and after lightcurves, and the corner plot of each eclipse.
+    Plots the likelihood evolution.'''
+)
 
-chain_fname = 'chain_prod.txt'
-input_fname = 'mcmc_input.dat'
+parser.add_argument(
+    "chain_fname",
+    help="The filename for the MCMC chain",
+    type=str,
+)
+parser.add_argument(
+    "input_fname",
+    help="The input command file for the MCMC chain",
+    type=str,
+)
+parser.add_argument(
+    "--nskip",
+    help="How many steps to cut off the front of the MCMC chain",
+    type=int,
+    default=0,
+)
+parser.add_argument(
+    '--thin',
+    help='I will only take every Nth step of the chain',
+    type=int,
+    default=1,
+)
 
-nskip = 0
-thin = 1
+
+args = parser.parse_args()
+
+chain_fname = args.chain_fname
+input_fname = args.input_fname
+
+nskip = args.nskip
+thin = args.thin
+
 
 input_dict = configobj.ConfigObj(input_fname)
 nsteps = int(input_dict['nprod'])
@@ -36,10 +68,13 @@ with open(chain_fname, 'r') as chain_file:
 data = np.array(data)
 
 print("Done!\nData shape: {}".format(data.shape))
+data = data[nskip::thin, :, :]
 nwalkers, nsteps, npars = data.shape
+print("After thinning and skipping: {}".format(data.shape))
+
 
 # Create the flattened version of the chain
-chain = data[nskip::thin, :, :].reshape((-1, npars))
+chain = data.reshape((-1, npars))
 print("The flattened chain has the shape: {}".format(chain.shape))
 
 # Analyse the chain. Take the mean as the result, and 2 sigma as the error
@@ -114,7 +149,7 @@ plt.show()
 
 # Plot the mean likelihood evolution
 likes = np.mean(likes, axis=0)
-steps = np.arange(0, len(likes))
+steps = np.arange(nskip, nskip+len(likes))
 std = np.std(likes)
 
 # Make the likelihood plot
@@ -154,5 +189,8 @@ for eclipse in eclipses:
     print("chain_slice has the shape:", chain_slice.shape)
 
     fig = u.thumbPlot(chain_slice, par_labels)
-    plt.savefig("Final_figs/"+eclipse.name+'_corners.png')
+
+    oname = "Final_figs/" + eclipse.name + '_corners.png'
+    print("Saving to {}...".format(oname))
+    plt.savefig(oname)
     plt.close()

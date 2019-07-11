@@ -288,23 +288,6 @@ if __name__ in '__main__':
 
 
     if not to_fit:
-        # with open('model_parameters.txt', 'w') as file_obj:
-        #     # Evaluate the final model.
-        #     file_obj.write("  Chisq             = {:.3f}\n".format(
-        #         model.chisq()))
-
-        #     file_obj.write("  ln prior          = {:.3f}\n".format(
-        #         model.ln_prior()))
-
-        #     file_obj.write("  ln like           = {:.3f}\n".format(
-        #         model.ln_like()))
-
-        #     file_obj.write("  ln prob           = {:.3f}\n".format(
-        #         model.ln_prob()))
-
-        # Plot the data and the final fit.
-        # model.plot_data(save=True)
-
         exit()
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -368,6 +351,7 @@ if __name__ in '__main__':
         # Create another array for second burn-in
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
 
+
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
     if use_pt:
@@ -384,6 +368,7 @@ if __name__ in '__main__':
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
                                         ln_prob, threads=nthreads)
+
 
     # Run the burnin phase
     print("\n\nExecuting the burn-in phase...")
@@ -402,6 +387,7 @@ if __name__ in '__main__':
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
+
 
     # Now, reset the sampler. We'll use the result of the burn-in phase to
     # re-initialise it.
@@ -431,8 +417,10 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
+
     # Save flattened chain
     np.savetxt('chain_flat.txt', chain, delimiter=' ')
+
 
     print("Model parameters:")
     with open('model_parameters.txt', 'w') as file_obj:
