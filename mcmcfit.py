@@ -184,8 +184,8 @@ if __name__ in '__main__':
     # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
     # in order to pickle them :(
     def ln_prior(param_vector):
-        model.dynasty_par_vals = param_vector
-        try:
+            try:
+            model.dynasty_par_vals = param_vector
             val = func_timeout(
                 60,
                 model.ln_prior
@@ -198,8 +198,8 @@ if __name__ in '__main__':
         return val
 
     def ln_prob(param_vector):
-        model.dynasty_par_vals = param_vector
         try:
+            model.dynasty_par_vals = param_vector
             val = func_timeout(
                 60,
                 model.ln_prob
@@ -212,8 +212,8 @@ if __name__ in '__main__':
         return val
 
     def ln_like(param_vector):
-        model.dynasty_par_vals = param_vector
         try:
+            model.dynasty_par_vals = param_vector
             val = func_timeout(
                 60,
                 model.ln_like
