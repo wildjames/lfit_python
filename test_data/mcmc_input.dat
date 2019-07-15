@@ -1,15 +1,24 @@
 # MCMC run parameters
+fit            = 1      # actually fit (1), or just plot model as specified (0)
 nburn          = 10000  # number of steps to use in burn-in phase
 nprod          = 10000  # number of steps to use in production phase
-nwalkers       = 200    # number of walkers per chain, must be even multiple of npars (npars = (3 or 6) + (11 or 15)*necl)
+nwalkers       =  36    # number of walkers per chain, must be even multiple of npars
+
+nthread        = 8     # number of CPU threads to use
+
+usePT          = 0      # use parallel tempering (1), or standard fitting (0)
 ntemps         = 3      # number of chains of different temperatures for Parallel Tempering fitting
-nthread        = 7     # number of CPU threads to use
-first_scatter  = 0.05   # fractional scatter to add to starting ball of parameters in first burnin
+
+
+first_scatter  = 0.10   # fractional scatter to add to starting ball of parameters in first burnin
+double_burnin  = 0      # run two burnin phases (1), or just the one (0)
 second_scatter = 0.05   # fractional scatter to add to starting ball of parameters in second burnin
 comp_scat      = 1      # vary scatter for different params (1), or add uniform scatter (0)
-fit            = 1      # actually fit (1), or just plot model as specified (0)
-usePT          = 1      # use parallel tempering (1), or standard fitting (0)
-double_burnin  = 0      # run two burnin phases (1), or just the one (0)
+
+
+gelman_rubin_burn   = 1       # Run a Gelman-Rubin test at each step of the burn-in, and move to the sampling phase when it passes.
+gelman_rubin_thresh = 1.1     # The threshold for R to terminate the G-R phase
+
 
 # all model parameters have both a starting value and a prior
 # priors are specified by type, val1, val2
@@ -17,7 +26,7 @@ double_burnin  = 0      # run two burnin phases (1), or just the one (0)
 # if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
 # if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
 
-#neclipses = 6
+neclipses = 1
 
 # what phases to plot/fit
 phi_start = -0.2
@@ -34,9 +43,9 @@ useGP = 0
 
 
 # eclipse independent parameters, is parameter to be fit (1) or not (0)?
-  ampin_gp =    -9.5118        uniform        -20.0         -2.0            1
- ampout_gp =    -9.0953        uniform        -20.0         -2.0            1
-    tau_gp =    -2.2131        uniform         -6.9         -2.0            1
+  ln_ampin_gp =    -9.5118        uniform        -20.0         -2.0            1
+ ln_ampout_gp =    -9.0953        uniform        -20.0         -2.0            1
+    ln_tau_gp =    -2.2131        uniform         -6.9         -2.0            1
 
 
          q =       0.1037      uniform       0.0300       0.5000            1
@@ -59,27 +68,27 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
 # the following lines should have an entry for each individual eclipse
 
 ### g Data
-    file_0 = lightcurves/test_data_0.calib 
+    file_0 = lightcurves/test_data_0.calib
     plot_0 = test_data_0
     band_0 = g
 
-   dFlux_0 =       0.0607      uniform       0.0010       0.2000            1
-   sFlux_0 =       0.0813      uniform       0.0010       0.2000            1
+   dFlux_0 =       0.0707      uniform       0.0010       0.2000            1
+   sFlux_0 =       0.0613      uniform       0.0010       0.2000            1
    ulimb_0 =       0.2840        gauss       0.2840       0.0010            1
-   rdisc_0 =       0.4953      uniform       0.2000       0.7000            1
-   scale_0 =       0.0330  log_uniform       0.0010       0.2000            1
+   rdisc_0 =       0.2953      uniform       0.2000       0.7000            1
+   scale_0 =       0.0430  log_uniform       0.0010       0.2000            1
       az_0 =     127.2343      uniform      50.0000     175.0000            1
      fis_0 =       0.0480      uniform       0.0010       1.0000            1
-    dexp_0 =       1.9000  log_uniform       0.0010       2.0000            1
-    phi0_0 =      -0.0003      uniform      -0.2000       0.2000            1
-    exp1_0 =       1.6090      uniform       0.0010       5.0000            1
-    exp2_0 =       0.9879      uniform       0.5000       5.0000            1
-     yaw_0 =      -0.0464      uniform     -90.0000      90.0000            1
-    tilt_0 =      48.5079      uniform       0.0010     180.0000            1
+    dexp_0 =       0.5000  log_uniform       0.0010       2.0000            1
+    phi0_0 =      -0.023      uniform      -0.2000       0.2000            1
+    exp1_0 =       1.1342      uniform       0.0010       5.0000            1
+    exp2_0 =       4.5971      uniform       0.5000       5.0000            1
+     yaw_0 =      -64.040      uniform     -90.0000      90.0000            1
+    tilt_0 =       8.5079      uniform       0.0010     180.0000            1
 
 
-    file_1 = lightcurves/test_data_1.calib  
-    plot_1 = test_data_1 
+    file_1 = lightcurves/test_data_1.calib
+    plot_1 = test_data_1
     band_1 = g
 
    dFlux_1 =       0.1238      uniform       0.0010       0.2000            1
@@ -100,7 +109,7 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
 
 ### KG5 Data
     file_2 =   lightcurves/test_data_2.calib
-    plot_2 =  test_data_2 
+    plot_2 =  test_data_2
     band_2 = KG5
 
    dFlux_2 =       0.0496      uniform       0.0010       0.2000            1
@@ -118,8 +127,8 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
     tilt_2 =      49.0896      uniform       0.0010     180.0000            1
 
 
-    file_3 =   lightcurves/test_data_3.calib 
-    plot_3 =  test_data_3 
+    file_3 =   lightcurves/test_data_3.calib
+    plot_3 =  test_data_3
     band_3 = KG5
 
    dFlux_3 =       0.0938      uniform       0.0010       0.2000            1
@@ -139,7 +148,7 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
 
 ### r Data
     file_4 =  lightcurves/test_data_4.calib
-    plot_4 =  test_data_4 
+    plot_4 =  test_data_4
     band_4 = r
 
    dFlux_4 =       0.1267      uniform       0.0010       0.2000            1
@@ -157,8 +166,8 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
     tilt_4 =     138.7462      uniform       0.0010     180.0000            1
 
 
-    file_5 = lightcurves/test_data_5.calib 
-    plot_5 = test_data_5 
+    file_5 = lightcurves/test_data_5.calib
+    plot_5 = test_data_5
     band_5 = r
 
    dFlux_5 =       0.0845      uniform       0.0010       0.2000            1
