@@ -184,7 +184,7 @@ if __name__ in '__main__':
     # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
     # in order to pickle them :(
     def ln_prior(param_vector):
-            try:
+        try:
             model.dynasty_par_vals = param_vector
             val = func_timeout(
                 60,
