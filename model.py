@@ -273,36 +273,29 @@ class Model:
         self.children.extend(children)
 
     # Tree evaluation methods
-    def evaluate_model(self, *args, **kwargs):
-        '''Overwrite this method for the nodes capable of evaluating the model.
-        Called by ln_like. Example would be having this call a chisq function
-        and return the output.'''
-
-        if self.is_leaf:
-            msg = "Leaf {} of the model do not have an evaluation function!"
-            msg.format(self.name)
-            raise NotImplementedError(msg)
-        else:
-            raise NotImplementedError
-
     def ln_like(self, *args, **kwargs):
         '''Calculate the log likelihood, via chi squared.
         Extra arguments can be supplied to the model evaluation
-        via args and kwargs.'''
+        via args and kwargs.
+
+        Overwrite this method for leaf nodes.
+        If I'm a leaf without having had this function overwritten,
+        returns 0.0.
+
+        Example would be having this call a chisq function
+        and return the output.
+        '''
         ln_like = 0.0
 
-        try:
-            #Execute the model evaluation with a deadline.
-            ln_like += self.evaluate_model(*args, **kwargs)
+        # Get the likelihood of all my children.
+        # If one returns inf, terminate immediately.
+        # If I'm a leaf without having had this function overwritten,
+        # returns 0.0.
+        for child in self.children:
+            ln_like += child.ln_like(*args, **kwargs)
 
-        except NotImplementedError:
-            for child in self.children:
-                ln_like += child.ln_like(*args, **kwargs)
-
-                if np.isinf(ln_like):
-                    return -np.inf
-        except:
-            return -np.inf
+            if np.isinf(ln_like):
+                return -np.inf
 
         return ln_like
 
@@ -729,16 +722,15 @@ class Model:
 
 
 # Subclasses.
-class Eclipse(Model):
-    '''Subclass of Model, specifically for storing a single eclipse. Lightcurve
-    data is stored on this level.
+class SimpleEclipse(Model):
+    '''Subclass of Model, specifically for storing a single eclipse.
+    Uses the simple BS model.
+    Lightcurve data is stored on this level.
 
     Inputs:
     -------
       lightcurve; Lightcurve:
         A Lightcurve object, containing data
-      iscomplex; bool:
-        Do we use the complex model?
       label; str:
         A label to apply to the node. Mostly used when searching trees.
       parameter_objects; list(Param), or Param:
@@ -756,15 +748,7 @@ class Eclipse(Model):
         'scale', 'az', 'fis', 'dexp', 'phi0'
     )
 
-    def __init__(self, lightcurve, iscomplex, *args, **kwargs):
-        # If we're a complex eclipse, add the complex parameter names
-        if iscomplex:
-            self.node_par_names = (
-                'dFlux', 'sFlux', 'ulimb', 'rdisc',
-                'scale', 'az', 'fis', 'dexp', 'phi0',
-                'exp1', 'exp2', 'yaw', 'tilt'
-            )
-
+    def __init__(self, lightcurve, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # If the lightcurve is a Lightcurve object, save it. Otherwise,
@@ -819,7 +803,7 @@ class Eclipse(Model):
 
         return chisq
 
-    def evaluate_model(self, plot=False):
+    def ln_like(self, plot=False):
         '''Calculate the chisq of this eclipse, against the data stored in its
         lightcurve object.
 
@@ -950,13 +934,6 @@ class Eclipse(Model):
         infer one from the data filename
         '''
 
-        cv_par_name_list = [
-            'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
-            'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
-        ]
-        if self.iscomplex:
-            cv_par_name_list.extend(['exp1', 'exp2', 'yaw', 'tilt'])
-
         # Re-init my CV object with the current params.
         self.initCV()
 
@@ -1033,30 +1010,60 @@ class Eclipse(Model):
         return fig, axs
 
     @property
+    def cv_parnames(self):
+        names = [
+            'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
+            'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
+        ]
+
+        return names
+
+    @property
     def cv_parlist(self):
         '''Construct the parameter list needed by the CV'''
 
-        if self.iscomplex:
-            par_name_list = (
-                'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
-                'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0',
-                'exp1', 'exp2', 'tilt', 'yaw'
-            )
-        else:
-            par_name_list = (
-                'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
-                'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0'
-            )
+        par_name_list = self.cv_parnames
 
         param_dict = self.ancestor_param_dict
         parlist = [param_dict[key].currVal for key in par_name_list]
 
         return parlist
 
+
+class ComplexEclipse(SimpleEclipse):
+    '''Subclass of Model, specifically for storing a single eclipse.
+    Uses the complex BS model.
+    Lightcurve data is stored on this level.
+
+    Inputs:
+    -------
+      lightcurve; Lightcurve:
+        A Lightcurve object, containing data
+      label; str:
+        A label to apply to the node. Mostly used when searching trees.
+      parameter_objects; list(Param), or Param:
+        The parameter objects that correspond to this node. Single Param is
+        also accepted.
+      parent; Model, optional:
+        The parent of this node.
+      children; list(Model), or Model:
+        The children of this node. Single Model is also accepted
+    '''
+    node_par_names = (
+                'dFlux', 'sFlux', 'ulimb', 'rdisc',
+                'scale', 'az', 'fis', 'dexp', 'phi0',
+                'exp1', 'exp2', 'yaw', 'tilt'
+            )
+
     @property
-    def iscomplex(self):
-        '''True if the eclipse uses the complex model. False otherwise'''
-        return len(self.node_par_names) == 13
+    def cv_parnames(self):
+        names = [
+            'wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'q', 'dphi',
+            'rdisc', 'ulimb', 'rwd', 'scale', 'az', 'fis', 'dexp', 'phi0',
+            'exp1', 'exp2', 'tilt', 'yaw'
+        ]
+
+        return names
 
 
 class Band(Model):
@@ -1102,7 +1109,8 @@ class LCModel(Model):
         '''Calculate the sum chisq of all my eclispses.'''
         chisq = 0.0
 
-        eclipses = self.search_node_type('Eclipse')
+        eclipses = self.search_node_type('SimpleEclipse')
+        eclipses = eclipses.union(self.search_node_type("ComplexEclipse"))
         for eclipse in eclipses:
             chisq += eclipse.chisq()
 
@@ -1160,7 +1168,8 @@ class LCModel(Model):
         Figsize is passed to matplotlib.
         '''
 
-        eclipses = self.search_node_type('Eclipse')
+        eclipses = self.search_node_type('SimpleEclipse')
+        eclipses = eclipses.union(self.search_node_type("ComplexEclipse"))
         for eclipse in eclipses:
             fig, ax = eclipse.plot_data(save, *args, **kwargs)
             if not save:
