@@ -54,22 +54,45 @@ nwalkers = int(input_dict['nwalkers'])
 
 # Grab the column names from the top.
 print("Reading in the file...")
+# with open(chain_fname, 'r') as chain_file:
+#     colKeys = chain_file.readline().strip().split(',')
+
+#     data = []
+#     for i in range(nsteps):
+#         step = []
+#         for j in range(nwalkers):
+#             line = chain_file.readline()
+#             if line == '':
+#                 break
+#             line = line.strip().split(' ')
+
+#             line = [float(val) for val in line]
+#             step.append(line[1:])
+#         if line == '':
+#             break
+#         data.append(list(step))
+# data = np.array(data)
+
+
 with open(chain_fname, 'r') as chain_file:
     colKeys = chain_file.readline().strip().split(',')
 
-    data = []
-    for i in range(nsteps):
-        step = []
-        for j in range(nwalkers):
-            line = chain_file.readline().strip().split(' ')
-            line = [float(val) for val in line]
-            step.append(line[1:])
-        data.append(list(step))
-data = np.array(data)
+data = np.loadtxt(chain_fname, delimiter=' ', skiprows=1)
+nwalkers = np.amax(data[:, 0]) + 1
+data.reshape()
 
 print("Done!\nData shape: {}".format(data.shape))
+
+if nskip == 0:
+    nskip = input("You opted not to skip any data, are you still sure?\n-> nskip: ")
+    nskip = int(nskip)
+if thin == 1:
+    thin = input("You opted not to thin the data, are you sure?\n-> thin: ")
+    thin = int(thin)
+
 data = data[nskip::thin, :, :]
 nwalkers, nsteps, npars = data.shape
+
 print("After thinning and skipping: {}".format(data.shape))
 
 
@@ -155,7 +178,7 @@ std = np.std(likes)
 # Make the likelihood plot
 fig, ax = plt.subplots(figsize=(11, 8))
 ax.fill_between(steps, likes-std, likes+std, color='red', alpha=0.4)
-ax.plot(likes, color="green")
+ax.plot(steps, likes, color="green")
 
 ax.set_title('SDSS J0748 g_binned only')
 ax.set_xlabel("Step")
@@ -194,3 +217,9 @@ for eclipse in eclipses:
     print("Saving to {}...".format(oname))
     plt.savefig(oname)
     plt.close()
+
+    del chain_slice
+    try:
+        del fig
+    except:
+        pass
