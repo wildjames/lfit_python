@@ -18,6 +18,7 @@ from tqdm import tqdm
 import scipy.integrate as intg
 import warnings
 from matplotlib import pyplot as plt
+import time
 
 TINY = -np.inf
 
@@ -312,27 +313,48 @@ def flatchain(chain, npars=None, nskip=0, thin=1):
 
 
 def readchain(file, **kwargs):
-    # TODO: Both this function and the dask version are bugged, and return a
-    # mangled form of the desired output.
+    '''Reads in the chain file in a single thread.
+    Returns the chain in the shape (nwalkers, nprod, npars)
+    '''
     data = pd.read_csv(file, header=None, compression=None,
                        delim_whitespace=True, **kwargs)
     data = np.array(data)
-    nwalkers = int(data[:, 0].max()+1)
-    nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID
-    chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
+
+    # Figure out what shape the result should have.
+    nwalkers = int(np.amax(data[:, 0])+1)
+    nprod = int(data.shape[0] / nwalkers)
+    npars = int(data.shape[1] - 1)
+
+    # empty array to fill. Make it nans to be safe?
+    chain = np.zeros((nwalkers, nprod, npars))
+    chain[:, :, :] = np.nan
+
+    for i in range(nwalkers):
+        chain[i] = data[i::nwalkers, 1:]
+
     return chain
 
 
 def readchain_dask(file, **kwargs):
-    data = dd.io.read_csv(file, engine='c', header=None, compression=None,
+    '''Reads in the chain file using threading.
+    Returns the chain in the shape (nwalkers, nprod, npars).'''
+    data = dd.io.read_csv(file, engine='c', header=1, compression=None,
                           na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
     data = np.array(data)
-    nwalkers = int(data[:, 0].max()+1)
-    nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID
-    chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
+
+    # Figure out what shape the result should have.
+    nwalkers = int(np.amax(data[:, 0])+1)
+    nprod = int(data.shape[0] / nwalkers)
+    npars = int(data.shape[1] - 1)
+
+    # empty array to fill. Make it nans to be safe?
+    chain = np.zeros((nwalkers, nprod, npars))
+    chain[:, :, :] = np.nan
+
+    for i in range(nwalkers):
+        chain[i] = data[i::nwalkers, 1:]
+
     return chain
 
 
