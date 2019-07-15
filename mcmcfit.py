@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 import emcee
 
-from model import Lightcurve, Eclipse, Band, LCModel, GPLCModel
+from model import *
 from mcmc_utils import Param
 import mcmc_utils as utils
 
@@ -88,9 +88,10 @@ def construct_model(input_file):
     band_par_names = Band.node_par_names
 
     # Use the Eclipse class to find the parameters we're interested in
-    ecl_pars = Eclipse.node_par_names
     if is_complex:
-        ecl_pars += ('exp1', 'exp2', 'yaw', 'tilt')
+        ecl_pars = ComplexEclipse.node_par_names
+    else:
+        ecl_pars = SimpleEclipse.node_par_names
 
     # I care about the order in which eclipses and bands are defined.
     # Collect that order here.
@@ -158,7 +159,10 @@ def construct_model(input_file):
         my_band = input_dict['band_{}'.format(label)]
         my_band = model.search_Node('Band', my_band)
 
-        Eclipse(lc, is_complex, label, params, parent=my_band)
+        if is_complex:
+            ComplexEclipse(lc, label, params, parent=my_band)
+        else:
+            SimpleEclipse(lc, label, params, parent=my_band)
 
     # Make sure that all the model's Band have eclipses. Otherwise, prune them
     model.children = [band for band in model.children if len(band.children)]
@@ -252,18 +256,24 @@ if __name__ in '__main__':
         neclipses = int(input_dict['neclipses'])
     except KeyError:
         neclipses = 0
-        while model.search_Node('Eclipse', str(neclipses)) is not None:
+        while model.search_Node('SimpleEclipse', str(neclipses)) is not None:
+            neclipses += 1
+        while model.search_Node('ComplexEclipse', str(neclipses)) is not None:
             neclipses += 1
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
-    eclipses = model.search_node_type('Eclipse')
+    # Collect the eclipses.
+    eclipses = model.search_node_type('SimpleEclipse')
+    eclipses = eclipses.union(model.search_node_type('ComplexEclipse'))
+
     # How many data points do we have?
-    dof = np.sum([ecl.lc.x.size for ecl in eclipses])
+    dof = np.sum([ecl.lc.n_data for ecl in eclipses])
     # Subtract a DoF for each variable
     dof -= len(model.dynasty_par_names)
     # Subtract one DoF for the fit
     dof -= 1
+    dof = int(dof)
 
     print("\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).".format(model.chisq(), dof))
     print("\nFrom the wrapper functions, we get;")

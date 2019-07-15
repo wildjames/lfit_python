@@ -53,35 +53,13 @@ nsteps = int(input_dict['nprod'])
 nwalkers = int(input_dict['nwalkers'])
 
 # Grab the column names from the top.
-print("Reading in the file...")
-# with open(chain_fname, 'r') as chain_file:
-#     colKeys = chain_file.readline().strip().split(',')
-
-#     data = []
-#     for i in range(nsteps):
-#         step = []
-#         for j in range(nwalkers):
-#             line = chain_file.readline()
-#             if line == '':
-#                 break
-#             line = line.strip().split(' ')
-
-#             line = [float(val) for val in line]
-#             step.append(line[1:])
-#         if line == '':
-#             break
-#         data.append(list(step))
-# data = np.array(data)
-
-
 with open(chain_fname, 'r') as chain_file:
     colKeys = chain_file.readline().strip().split(',')
-
-data = np.loadtxt(chain_fname, delimiter=' ', skiprows=1)
-nwalkers = np.amax(data[:, 0]) + 1
-data.reshape()
+print("Reading in the file...")
+data = u.readchain_dask(chain_fname)
 
 print("Done!\nData shape: {}".format(data.shape))
+print("Expected a shape (nwalkers, nprod, npars): ({}, {}, {})".format(nwalkers, nsteps, len(colKeys)))
 
 if nskip == 0:
     nskip = input("You opted not to skip any data, are you still sure?\n-> nskip: ")

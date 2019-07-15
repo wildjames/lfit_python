@@ -22,6 +22,10 @@ class Lightcurve:
         self.ye = ye
         self.w = w
 
+    @property
+    def n_data(self):
+        return self.x.shape[0]
+
     @classmethod
     def from_calib(cls, fname, name=None):
         '''Read in a calib file, of the format;
@@ -258,7 +262,7 @@ class Model:
 
         for child in self.children:
             child_nodes = child.search_node_type(class_type, nodes)
-            nodes.union(child_nodes)
+            nodes = nodes.union(child_nodes)
 
         if str(self.__class__.__name__) == class_type:
             nodes.add(self)
@@ -1210,7 +1214,12 @@ class GPLCModel(LCModel):
 
     # Add the GP params
     node_par_names = LCModel.node_par_names
-    node_par_names += ('ln_ampin_gp', 'ln_ampout_gp', 'ln_tau_gp')
+    node_par_names + ('ln_ampin_gp', 'ln_ampout_gp', 'ln_tau_gp')
+
+
+
+class SimpleGPEclipse(SimpleEclipse):
+    #TODO: Impoliment this properly.
 
     def calcChangepoints(self, eclipse):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
@@ -1317,9 +1326,9 @@ class GPLCModel(LCModel):
 
         return georgeGP
 
-    def evaluate_model(self):
+    def ln_like(self):
         '''The GP sits at the top of the tree. It replaces the LCModel
-        class. When the evaluate_model function is called, this class should
+        class. When the evaluate function is called, this class should
         hijack it, calculate the residuals of all the eclipses in the tree,
         and find the likelihood of each of those residuals given the current GP
         hyper-parameters.
@@ -1338,7 +1347,8 @@ class GPLCModel(LCModel):
         '''
 
         # Get a list of all my eclipse children
-        eclipses = self.search_node_type('Eclipse')
+        eclipses = self.search_node_type('SimpleEclipse')
+        eclipses = eclipses.union(self.search_node_type("ComplexEclipse"))
 
         # For each eclipse, I want to know the log likelihood of its residuals
         gp_ln_like = 0.0
@@ -1368,7 +1378,10 @@ class GPLCModel(LCModel):
         Figsize is passed to matplotlib.
         '''
 
-        eclipses = self.search_node_type('Eclipse')
+        # Collect the eclipses
+        eclipses = self.search_node_type('SimpleEclipse')
+        eclipses = eclipses.union(self.search_node_type("ComplexEclipse"))
+
         for eclipse in eclipses:
             # Get the figure and axes from the eclipse
             fig, ax = eclipse.plot_data(save, figsize)
