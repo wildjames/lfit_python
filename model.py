@@ -277,6 +277,19 @@ class Model:
         self.children.extend(children)
 
     # Tree evaluation methods
+    def chisq(self, *args, **kwargs):
+        '''Returns the sum of my children's  chisqs. Must be overwritten on
+        leaf nodes, or nodes capable of evaluating a model.'''
+
+        chisq = 0.0
+
+        for child in self.children:
+            chisq += child.chisq(*args, **kwargs)
+            if np.isinf(chisq):
+                return np.inf
+
+        return chisq
+
     def ln_like(self, *args, **kwargs):
         '''Calculate the log likelihood, via chi squared.
         Extra arguments can be supplied to the model evaluation
@@ -948,7 +961,7 @@ class SimpleEclipse(Model):
         BS_flx = self.cv.ys
         disc_flx = self.cv.yd
 
-        # print("This model has a chisq of {:.3f}".format(self.calc()))
+        # print("This model has a chisq of {:.3f}".format(self.chisq()))
 
         # Start the plotting area
         fig, axs = plt.subplots(2, sharex=True, figsize=figsize)
@@ -1108,17 +1121,6 @@ class LCModel(Model):
 
     # Set the parameter names for this layer
     node_par_names = ('q', 'dphi', 'rwd')
-
-    def chisq(self, verbose=False):
-        '''Calculate the sum chisq of all my eclispses.'''
-        chisq = 0.0
-
-        eclipses = self.search_node_type('SimpleEclipse')
-        eclipses = eclipses.union(self.search_node_type("ComplexEclipse"))
-        for eclipse in eclipses:
-            chisq += eclipse.chisq()
-
-        return chisq
 
     def ln_prior(self, verbose=False):
         '''Before we calculate the ln_prior of myself or my children, I check
