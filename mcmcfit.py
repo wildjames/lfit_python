@@ -241,8 +241,8 @@ if __name__ in '__main__':
     scatter_2 = float(input_dict['second_scatter'])
     to_fit = int(input_dict['fit'])
     use_pt = bool(int(input_dict['usePT']))
-    use_gr = bool(int(input_dict['gelman_rubin_burn']))
-    gr_thresh = float(input_dict['gelman_rubin_thresh'])
+    # use_gr = bool(int(input_dict['gelman_rubin_burn']))
+    # gr_thresh = float(input_dict['gelman_rubin_thresh'])
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
