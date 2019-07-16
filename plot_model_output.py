@@ -54,7 +54,7 @@ nwalkers = int(input_dict['nwalkers'])
 
 # Grab the column names from the top.
 with open(chain_fname, 'r') as chain_file:
-    colKeys = chain_file.readline().strip().split(',')
+    colKeys = chain_file.readline().strip().split(' ')[1:]
 print("Reading in the file...")
 data = u.readchain_dask(chain_fname)
 
@@ -62,11 +62,17 @@ print("Done!\nData shape: {}".format(data.shape))
 print("Expected a shape (nwalkers, nprod, npars): ({}, {}, {})".format(nwalkers, nsteps, len(colKeys)))
 
 if nskip == 0:
-    nskip = input("You opted not to skip any data, are you still sure?\n-> nskip: ")
-    nskip = int(nskip)
+    nskip = input("You opted not to skip any data, are you still sure? (default 0)\n-> nskip: ")
+    try:
+        nskip = int(nskip)
+    except:
+        nskip = 0
 if thin == 1:
-    thin = input("You opted not to thin the data, are you sure?\n-> thin: ")
-    thin = int(thin)
+    thin = input("You opted not to thin the data, are you sure? (default 1)\n-> thin: ")
+    try:
+        thin = int(thin)
+    except:
+        thin = 1
 
 data = data[nskip::thin, :, :]
 nwalkers, nsteps, npars = data.shape
@@ -100,7 +106,8 @@ model = construct_model(input_fname)
 
 # We want to know where we started, so we can evaluate improvements.
 # Wok out how many degrees of freedom we have in the model
-eclipses = model.search_node_type('Eclipse')
+eclipses = model.search_node_type('SimpleEclipse')
+eclipses = eclipses.union(model.search_node_type('ComplexEclipse'))
 # How many data points do we have?
 dof = np.sum([ecl.lc.x.size for ecl in eclipses])
 # Subtract a DoF for each variable
@@ -142,7 +149,7 @@ model.plot_data(save=True, figsize=(11, 8), save_dir='./Final_figs/')
 # Plot an image of the walker likelihoods over time.
 # data is shape (nwalkers, nsteps, ndim+1)
 print("Reading in the chain file for likelihoods...")
-likes = data[:, :, -1].T
+likes = data[:, :, -1]
 
 ax = plt.imshow(likes)
 plt.show()
@@ -167,7 +174,8 @@ plt.savefig('Final_figs/likelihood.pdf')
 plt.show()
 
 # Corner plots. Collect the eclipses.
-eclipses = model.search_node_type("Eclipse")
+eclipses = model.search_node_type("SimpleEclipse")
+eclipses = eclipses.union(model.search_node_type("ComplexEclipse"))
 for eclipse in eclipses:
     # Get the par names from the eclipse
     par_labels = eclipse.node_par_names
