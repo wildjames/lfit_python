@@ -276,45 +276,41 @@ class Model:
 
         self.children.extend(children)
 
-    # Tree evaluation methods
+
+    # # # # # # # # # # # # # #
+    # Tree evaluation methods #
+    # # # # # # # # # # # # # #
+
+    def __call_recursive_func__(self, name, *args, **kwargs):
+        '''
+        Descend the model heirarchy, calling a function at each leaf.
+
+        This is used, for example, to evaluate chisq or ln_like for a given model,
+        where we want to sum this quantity for all fully defined models.
+
+        The recursive function
+        '''
+        val = 0.0
+        if self.is_leaf:
+            raise NotImplementedError('must overwrite {} on leaf nodes of model'.format(
+                name
+            ))
+        for child in self.children:
+            func = getattr(child, name)
+            val += func(*args, **kwargs)
+            if np.isinf(val):
+                # we've got an invalid model, no need to evaluate other leaves
+                return val
+        return val
+
     def chisq(self, *args, **kwargs):
         '''Returns the sum of my children's  chisqs. Must be overwritten on
         leaf nodes, or nodes capable of evaluating a model.'''
-
-        chisq = 0.0
-
-        for child in self.children:
-            chisq += child.chisq(*args, **kwargs)
-            if np.isinf(chisq):
-                return np.inf
-
-        return chisq
+        return self.__call_recursive_func__('chisq', *args, **kwargs)
 
     def ln_like(self, *args, **kwargs):
-        '''Calculate the log likelihood, via chi squared.
-        Extra arguments can be supplied to the model evaluation
-        via args and kwargs.
-
-        Overwrite this method for leaf nodes.
-        If I'm a leaf without having had this function overwritten,
-        returns 0.0.
-
-        Example would be having this call a chisq function
-        and return the output.
-        '''
-        ln_like = 0.0
-
-        # Get the likelihood of all my children.
-        # If one returns inf, terminate immediately.
-        # If I'm a leaf without having had this function overwritten,
-        # returns 0.0.
-        for child in self.children:
-            ln_like += child.ln_like(*args, **kwargs)
-
-            if np.isinf(ln_like):
-                return -np.inf
-
-        return ln_like
+        '''Calculate the log likelihood'''
+        return self.__call_recursive_func__('ln_like', *args, **kwargs)
 
     def ln_prior(self, verbose=False):
         """Return the natural log of the prior probability of the Param objects
