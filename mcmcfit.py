@@ -13,7 +13,9 @@ import matplotlib.pyplot as plt
 
 import emcee
 
-from model import *
+from CVModel import Lightcurve, SimpleEclipse, ComplexEclipse, SimpleGPEclipse
+from CVModel import ComplexGPEclipse, Band, LCModel, GPLCModel
+
 from mcmc_utils import Param
 import mcmc_utils as utils
 
@@ -159,10 +161,16 @@ def construct_model(input_file):
         my_band = input_dict['band_{}'.format(label)]
         my_band = model.search_Node('Band', my_band)
 
-        if is_complex:
-            ComplexEclipse(lc, label, params, parent=my_band)
+        if use_gp:
+            if is_complex:
+                ComplexGPEclipse(lc, label, params, parent=my_band)
+            else:
+                SimpleGPEclipse(lc, label, params, parent=my_band)
         else:
-            SimpleEclipse(lc, label, params, parent=my_band)
+            if is_complex:
+                ComplexEclipse(lc, label, params, parent=my_band)
+            else:
+                SimpleEclipse(lc, label, params, parent=my_band)
 
     # Make sure that all the model's Band have eclipses. Otherwise, prune them
     model.children = [band for band in model.children if len(band.children)]
