@@ -1,4 +1,13 @@
-from model import *
+import os
+
+import george
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+from lfit import CV
+from trm import roche
+
+from model import Model
 
 
 class Lightcurve:
@@ -154,7 +163,7 @@ class SimpleEclipse(Model):
 
         # If the lightcurve is a Lightcurve object, save it. Otherwise,
         # read it in from the file.
-        if "Lightcurve" in str(lightcurve.__class__):
+        if isinstance(lightcurve, Lightcurve):
             self.lc = lightcurve
         elif isinstance(lightcurve, str):
             self.lc = Lightcurve.from_calib(lightcurve)
