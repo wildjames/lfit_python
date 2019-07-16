@@ -316,7 +316,7 @@ def readchain(file, **kwargs):
     '''Reads in the chain file in a single thread.
     Returns the chain in the shape (nwalkers, nprod, npars)
     '''
-    data = pd.read_csv(file, header=None, compression=None,
+    data = pd.read_csv(file, header=0, compression=None,
                        delim_whitespace=True, **kwargs)
     data = np.array(data)
 
@@ -330,7 +330,8 @@ def readchain(file, **kwargs):
     chain[:, :, :] = np.nan
 
     for i in range(nwalkers):
-        chain[i] = data[i::nwalkers, 1:]
+        index = np.where(data[:, 0] == float(i))
+        chain[i] = data[index, 1:]
 
     return chain
 
@@ -338,7 +339,7 @@ def readchain(file, **kwargs):
 def readchain_dask(file, **kwargs):
     '''Reads in the chain file using threading.
     Returns the chain in the shape (nwalkers, nprod, npars).'''
-    data = dd.io.read_csv(file, engine='c', header=1, compression=None,
+    data = dd.io.read_csv(file, engine='c', header=0, compression=None,
                           na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
     data = np.array(data)
@@ -353,7 +354,8 @@ def readchain_dask(file, **kwargs):
     chain[:, :, :] = np.nan
 
     for i in range(nwalkers):
-        chain[i] = data[i::nwalkers, 1:]
+        index = np.where(data[:, 0] == float(i))
+        chain[i] = data[index, 1:]
 
     return chain
 
