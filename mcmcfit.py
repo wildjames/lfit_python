@@ -408,7 +408,7 @@ if __name__ in '__main__':
     print("Starting the main MCMC chain. Probably going to take a while!")
 
     # Get the column keys. Otherwise, we can't parse the results!
-    col_names = ','.join(model.dynasty_par_names) + ',ln_prob'
+    col_names = "walker_no " + ' '.join(model.dynasty_par_names) + ' ln_prob'
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
