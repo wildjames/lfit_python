@@ -145,6 +145,7 @@ print("a ln_like of {:.3f}".format(model.ln_like()))
 print("a ln_prob of {:.3f}".format(model.ln_prob()))
 print()
 model.plot_data(save=True, figsize=(11, 8), save_dir='./Final_figs/')
+model.plot_data(save=False)
 
 # Plot an image of the walker likelihoods over time.
 # data is shape (nwalkers, nsteps, ndim+1)
