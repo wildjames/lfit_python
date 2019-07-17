@@ -5,21 +5,22 @@ Supplied at the command line, via:
     python3 mcmcfit.py mcmc_input.dat
 '''
 
-from pprint import pprint
+import argparse
 import sys
-import numpy as np
+from pprint import pprint
+
 import configobj
-import matplotlib.pyplot as plt
-
 import emcee
+import matplotlib.pyplot as plt
+import numpy as np
+from func_timeout import FunctionTimedOut, func_timeout
 
-from CVModel import Lightcurve, SimpleEclipse, ComplexEclipse, SimpleGPEclipse
-from CVModel import ComplexGPEclipse, Band, LCModel, GPLCModel
-
-from mcmc_utils import Param
 import mcmc_utils as utils
+from CVModel import (Band, ComplexEclipse, ComplexGPEclipse, GPLCModel,
+                     LCModel, Lightcurve, SimpleEclipse, SimpleGPEclipse)
+from mcmc_utils import Param
+import plot_model_output as summariser
 
-from func_timeout import func_timeout, FunctionTimedOut
 
 def extract_par_and_key(key):
     '''As stated. For example,
@@ -60,7 +61,7 @@ def construct_model(input_file):
         neclipses = int(input_dict['neclipses'])
     except KeyError:
         # Read in all the available eclipses
-        neclipses = 9e99
+        neclipses = 9999
 
     # # # # # # # # # # # # # # # # #
     # Get the initial model setup # #
@@ -180,12 +181,27 @@ def construct_model(input_file):
 
 if __name__ in '__main__':
 
-    try:
-        input_fname = sys.argv[1]
-    except:
-        print("No input file supplied!!")
-        exit()
+    parser = argparse.ArgumentParser(
+        description='''Execute an MCMC fit to a dataset.'''
+    )
 
+    parser.add_argument(
+        "input",
+        help="The filename for the MCMC parameters' input file.",
+        type=str,
+    )
+    parser.add_argument(
+        '--notify',
+        help="The script will email a summary results of the MCMC to this address",
+        type=str,
+        default=''
+    )
+
+    args = parser.parse_args()
+    input_fname = args.input
+    dest = args.notify
+
+    # Build the model from the input file
     model = construct_model(input_fname)
 
     print("\nStructure:")
@@ -263,17 +279,12 @@ if __name__ in '__main__':
     try:
         neclipses = int(input_dict['neclipses'])
     except KeyError:
-        neclipses = 0
-        while model.search_Node('SimpleEclipse', str(neclipses)) is not None:
-            neclipses += 1
-        while model.search_Node('ComplexEclipse', str(neclipses)) is not None:
-            neclipses += 1
+        neclipses = len(model.search_node_type("Eclipses"))
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
     # Collect the eclipses.
-    eclipses = model.search_node_type('SimpleEclipse')
-    eclipses = eclipses.union(model.search_node_type('ComplexEclipse'))
+    eclipses = model.search_node_type('Eclipse')
 
     # How many data points do we have?
     dof = np.sum([ecl.lc.n_data for ecl in eclipses])
@@ -439,49 +450,4 @@ if __name__ in '__main__':
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
 
-    # Save flattened chain
-    np.savetxt('chain_flat.txt', chain, delimiter=' ')
-
-
-    print("Model parameters:")
-    with open('model_parameters.txt', 'w') as file_obj:
-        file_obj.write('parName,mean,84th percentile,16th percentile\n')
-
-        # Save the results for later
-        chain_results = []
-        for i, name in enumerate(model.dynasty_par_names):
-            # Get the results of each parameter
-            par = chain[:, i]
-            lolim, best, uplim = np.percentile(par, [16, 50, 84])
-
-            # Save the middle value, for later setting to the model
-            chain_results.append(best)
-
-            # Report
-            print("{:>15s}: {:>7.3f} +{:<7.3f} -{:<7.3f}".format(
-                name, best, uplim, lolim))
-            file_obj.write("{},{},{},{}\n".format(name, best, uplim, lolim))
-
-        # Set the model parameters to the results of the chain.
-        model.dynasty_par_vals = chain_results
-
-        # Evaluate the final model. Save to file.
-        print("\n\nFor this model;\n")
-        print("  Chisq             = {:.3f}".format(model.chisq()))
-        file_obj.write("\n\n  Chisq             = {:.3f}\n".format(
-            model.chisq()))
-
-        print("  ln prior          = {:.3f}".format(model.ln_prior()))
-        file_obj.write("  ln prior          = {:.3f}\n".format(
-            model.ln_prior()))
-
-        print("  ln like           = {:.3f}".format(model.ln_like()))
-        file_obj.write("  ln like           = {:.3f}\n".format(
-            model.ln_like()))
-
-        print("  ln prob           = {:.3f}".format(model.ln_prob()))
-        file_obj.write("  ln prob           = {:.3f}\n".format(
-            model.ln_prob()))
-
-    # Plot the data and the final fit.
-    model.plot_data(save=True)
+    summariser.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)
