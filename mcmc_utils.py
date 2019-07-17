@@ -229,7 +229,6 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
                   progress=True, **kwargs):
     '''runs an MCMC chain with emcee, and saves steps to a file'''
     # open chain save file
-    print("col_names: {}".format(col_names))
     if file:
         with open(file, "w") as f:
             f.write(col_names)
@@ -265,7 +264,6 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
 def run_ptmcmc_save(sampler, startPos, nSteps, file,
                     progress=True, col_names='', **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
-    print("col_names: {}".format(col_names))
     if file:
         with open(file, "w") as f:
             f.write(col_names)

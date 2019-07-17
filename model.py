@@ -143,7 +143,7 @@ class Model:
             child_nodes = child.search_node_type(class_type, nodes)
             nodes = nodes.union(child_nodes)
 
-        if str(self.__class__.__name__) == class_type:
+        if class_type in str(self.__class__.__name__):
             nodes.add(self)
 
         return nodes
@@ -182,18 +182,22 @@ class Model:
                 return val
         return val
 
-    def plot_data(self, *args, **kwargs):
+    def plot_data(self, show=True, *args, **kwargs):
         '''Calls each of my children's plotter functions. '''
 
         # Check that this node has a plotter function.
         # if hasattr(self, 'plotter'):
         plotter = getattr(self, 'plotter')
         fig, ax = plotter(*args, **kwargs)
-        plt.show()
+        if fig is None and ax is None:
+            del fig
+            del ax
+        else:
+            plt.close()
 
         # Repeat for my children.
         for child in self.children:
-            child.plot_data(*args, **kwargs)
+            child.plot_data(show, *args, **kwargs)
 
     def plotter(self, *args, **kwargs):
         '''Blank template of the plotter function.

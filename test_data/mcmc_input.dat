@@ -1,8 +1,8 @@
 # MCMC run parameters
 fit            = 1      # actually fit (1), or just plot model as specified (0)
-nburn          = 10000  # number of steps to use in burn-in phase
-nprod          = 10000  # number of steps to use in production phase
-nwalkers       =  36    # number of walkers per chain, must be even multiple of npars
+nburn          = 100    # number of steps to use in burn-in phase
+nprod          = 100    # number of steps to use in production phase
+nwalkers       = 36      # number of walkers per chain, must be even multiple of npars
 
 nthread        = 8     # number of CPU threads to use
 
@@ -15,9 +15,6 @@ double_burnin  = 0      # run two burnin phases (1), or just the one (0)
 second_scatter = 0.05   # fractional scatter to add to starting ball of parameters in second burnin
 comp_scat      = 1      # vary scatter for different params (1), or add uniform scatter (0)
 
-
-gelman_rubin_burn   = 1       # Run a Gelman-Rubin test at each step of the burn-in, and move to the sampling phase when it passes.
-gelman_rubin_thresh = 1.1     # The threshold for R to terminate the G-R phase
 
 
 # all model parameters have both a starting value and a prior
