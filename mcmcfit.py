@@ -7,6 +7,7 @@ Supplied at the command line, via:
 
 import argparse
 import sys
+import os
 from pprint import pprint
 
 import configobj
@@ -201,6 +202,29 @@ if __name__ in '__main__':
     input_fname = args.input
     dest = args.notify
 
+
+    # I want to pre-check that the details have been supplied.
+    if dest is not '':
+        location = __file__.split('/')[:-1] + ["email_details.json"]
+        details_loc = '/'.join(location)
+        if not os.path.isfile(details_loc):
+            print("Couldn't find the file {}! Creating it now.")
+            with open(details_loc, 'w') as f:
+                s = '{\n  "user": "Bot email address",\n  "pass": "Bot email password"\n}'
+                f.write(s)
+
+        # Check that the details file has been filled in.
+        # If it hasn't, ask the user to get it done.
+        with open(details_loc, 'r') as f:
+            details = f.read()
+        if "Bot email address" in details:
+            print("The model will continue for now, but there are no")
+            print("email credentials supplied and the code will fail")
+            print("when it tries to send it.")
+            print("Don't panic, just complete the JSON file here:")
+            print("{}".format(details_loc))
+
+
     # Build the model from the input file
     model = construct_model(input_fname)
 
@@ -269,8 +293,6 @@ if __name__ in '__main__':
     scatter_2 = float(input_dict['second_scatter'])
     to_fit = int(input_dict['fit'])
     use_pt = bool(int(input_dict['usePT']))
-    # use_gr = bool(int(input_dict['gelman_rubin_burn']))
-    # gr_thresh = float(input_dict['gelman_rubin_thresh'])
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
@@ -316,7 +338,7 @@ if __name__ in '__main__':
         # Calculate ln_prior verbosely, for the user's benefit
         model.ln_prior(verbose=True)
         exit()
-    model.plot_data()
+    model.plot_data(save=False)
 
 
     if not to_fit:

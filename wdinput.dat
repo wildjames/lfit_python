@@ -9,6 +9,7 @@ nthread  = 6      # number of CPU threads to use
 
 scatter  = 0.10   # fractional scatter to add to starting ball of parameters
 
+flat     = 0      # Is the chain file flattened, or 3D?
 thin     = 1      # amount to thin MCMC chain by before calculating best fit
 
 
@@ -41,14 +42,6 @@ plax  =  2.4041     gauss     2.4041     0.1564
 syserr = 0.03 # systematic error to add to all fluxes (in %)
 
 
-# Number of eclipses
-neclipses = 9
-
-# Complex bright spot used, yes (1) or no (0)?
-complex = 0
-
-# Gaussian processes used, yes (1) or no (0)?
-useGP = 1
 
 # Name of chain file
 chain = ../hierarchical_FinalFit/chain_prod.txt

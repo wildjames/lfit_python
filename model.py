@@ -122,7 +122,7 @@ class Model:
     def search_Node(self, class_type, label):
         '''Search for a node below me of class_type, with the label requested.
         '''
-        if self.name == "{}_{}".format(class_type, label):
+        if self.name == "{}:{}".format(class_type, label):
             return self
         else:
             for child in self.children:
@@ -394,7 +394,7 @@ class Model:
     @property
     def name(self):
         '''The name of this object, of the form <class name>_<label>'''
-        return "{}_{}".format(self.__class__.__name__, self.label)
+        return "{}:{}".format(self.__class__.__name__, self.label)
 
     @property
     def parent(self):

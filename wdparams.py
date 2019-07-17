@@ -347,7 +347,7 @@ if __name__ == "__main__":
 
     syserr = float( input_dict['syserr'] )
 
-    flat      = int( input_dict['flat'] )
+    flat = int( input_dict['flat'] )
 
 
     # # # # # # # # # # # #
@@ -365,9 +365,8 @@ if __name__ == "__main__":
         with open(chain_file, 'r') as f:
             colKeys = f.readline().strip().split()[1:]
         chain = readchain_dask(chain_file)
-        nwalkers, nsteps, npars = chain.shape
         print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
-        fchain = flatchain(chain,npars,thin=thin)
+        fchain = flatchain(chain, thin=thin)
     print("Done!")
 
     # Get the filters used from the column headers
@@ -388,7 +387,7 @@ if __name__ == "__main__":
     # In some circumstances, the uband eclipse has to be fit separately
     # e.g. when it is of poor quality
     # For this reason, a uband wd flux and error can be input manually
-    if uband_used == False:
+    if "wdFlux_u" not in colKeys:
         while True:
             mode = input('Add seperate u band wd flux and error? (Y/N): ')
             if mode.upper() == 'Y' or mode.upper() == 'N':
@@ -406,6 +405,7 @@ if __name__ == "__main__":
             umag = Flux(uflux,uflux_err,'u')
             mags[0] = umag
             print((uflux,uflux_err))
+            uband_used = True
 
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
     if 'wdFlux_u' in colKeys:
@@ -422,6 +422,9 @@ if __name__ == "__main__":
         umag = Flux(uflux,uflux_err,'u')
         mags[0] = umag
 
+        uband_used = True
+    else: uband_used = False
+
     if 'wdFlux_g' in colKeys:
         index = colKeys.index('wdFlux_g')
         gband = fchain[:,index]
@@ -433,6 +436,9 @@ if __name__ == "__main__":
 
         gmag = Flux(gflux,gflux_err,'g')
         mags[1] = gmag
+
+        gband_used = True
+    else: gband_used = False
 
     if 'wdFlux_r' in colKeys:
         index = colKeys.index('wdFlux_r')
@@ -447,6 +453,9 @@ if __name__ == "__main__":
         rmag = Flux(rflux,rflux_err,'r')
         mags[2] = rmag
 
+        rband_used = True
+    else: rband_used = False
+
     if 'wdFlux_i' in colKeys:
         index = colKeys.index('wdFlux_i')
         iband = fchain[:,index]
@@ -459,6 +468,9 @@ if __name__ == "__main__":
 
         imag = Flux(iflux,iflux_err,'i')
         mags[3] = imag
+
+        iband_used = True
+    else: iband_used = False
 
     if 'wdFlux_z' in colKeys:
         index = colKeys.index('wdFlux_z')
@@ -473,6 +485,9 @@ if __name__ == "__main__":
         zmag = Flux(zflux,zflux_err,'z')
         mags[4] = zmag
 
+        zband_used = True
+    else: zband_used = False
+
     if 'wdFlux_kg5' in colKeys:
         index = colKeys.index('wdFlux_kg5')
         kg5band = fchain[:,index]
@@ -486,6 +501,9 @@ if __name__ == "__main__":
         kg5mag = Flux(kg5flux,kg5flux_err,'kg5')
         mags[5] = kg5mag
 
+        kg5band_used = True
+    else: kg5band_used = False
+
     # Arrays containing all fluxes and errors
     fluxes = np.array(fluxes)
     fluxes_err = np.array(fluxes_err)
@@ -495,6 +513,7 @@ if __name__ == "__main__":
 
     # Create mask to discard any filters that are not used
     if 'uflux' in locals(): uband_used = True
+
     mask = np.array([uband_used,gband_used,rband_used,iband_used,zband_used,kg5band_used])
 
 
