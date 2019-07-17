@@ -335,7 +335,7 @@ class SimpleEclipse(Model):
 
         return lnp
 
-    def plotter(self, save=False, figsize=(11., 8.), fname=None, save_dir='.'):
+    def plotter(self, save=False, figsize=(11., 8.), fname=None, save_dir='.', ext='.png'):
         '''Create a plot of the eclipse's data.
 
         If save is True, a copy of the figure is saved.
@@ -405,7 +405,7 @@ class SimpleEclipse(Model):
 
             # If we didnt get told to use a certain fname, use this node's name
             if fname is None:
-                fname = self.lc.name.replace('.calib', '.png')
+                fname = self.lc.name.replace('.calib', ext)
 
             # Make the filename
             fname = '/'.join([save_dir, fname])
