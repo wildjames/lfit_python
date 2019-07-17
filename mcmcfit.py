@@ -61,7 +61,7 @@ def construct_model(input_file):
         neclipses = int(input_dict['neclipses'])
     except KeyError:
         # Read in all the available eclipses
-        neclipses = 9e99
+        neclipses = 9999
 
     # # # # # # # # # # # # # # # # #
     # Get the initial model setup # #
@@ -279,17 +279,12 @@ if __name__ in '__main__':
     try:
         neclipses = int(input_dict['neclipses'])
     except KeyError:
-        neclipses = 0
-        while model.search_Node('SimpleEclipse', str(neclipses)) is not None:
-            neclipses += 1
-        while model.search_Node('ComplexEclipse', str(neclipses)) is not None:
-            neclipses += 1
+        neclipses = len(model.search_node_type("Eclipses"))
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
     # Collect the eclipses.
-    eclipses = model.search_node_type('SimpleEclipse')
-    eclipses = eclipses.union(model.search_node_type('ComplexEclipse'))
+    eclipses = model.search_node_type('Eclipse')
 
     # How many data points do we have?
     dof = np.sum([ecl.lc.n_data for ecl in eclipses])

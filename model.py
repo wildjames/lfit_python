@@ -185,15 +185,15 @@ class Model:
     def plot_data(self, show=True, *args, **kwargs):
         '''Calls each of my children's plotter functions. '''
 
-        # Check that this node has a plotter function.
-        # if hasattr(self, 'plotter'):
-        plotter = getattr(self, 'plotter')
-        fig, ax = plotter(*args, **kwargs)
+        fig, ax = self.plotter(*args, **kwargs)
         if fig is None and ax is None:
             del fig
             del ax
         else:
-            plt.close()
+            if show:
+                plt.show()
+            else:
+                plt.close()
 
         # Repeat for my children.
         for child in self.children:
