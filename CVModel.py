@@ -188,8 +188,10 @@ class SimpleEclipse(Model):
             self.initCV()
 
         # Get the model CV lightcurve across our data.
-        flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
-
+        try:
+            flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+        except:
+            flx = np.nan
 
         return flx
 
