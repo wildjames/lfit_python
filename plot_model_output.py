@@ -23,6 +23,12 @@ def notipy(send_to, fnames, body):
     # Also contains email bot login
     location = __file__.split('/')[:-1] + ["email_details.json"]
     details_loc = '/'.join(location)
+    if not os.path.isfile(details_loc):
+        print("Couldn't find the file {}! Creating it now.")
+        with open(details_loc, 'w') as f:
+            s = '{\n  "user": "Bot email address",\n  "pass": "Bot email password"\n}'
+            f.write(s)
+
     with open(details_loc, 'r') as f:
         details = json.load(f)
 

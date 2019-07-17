@@ -28,6 +28,7 @@ pickle.dump
 python_out.txt
 testBug.py
 
+email_details.json
 chain_prod.txt
 model_parameters.txt
 modparams.txt
