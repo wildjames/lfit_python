@@ -10,7 +10,7 @@ import numpy as np
 import yagmail as yag
 
 import mcmc_utils as u
-from mcmcfit import construct_model, extract_par_and_key
+from CVModel import construct_model, extract_par_and_key
 
 
 def notipy(send_to, fnames, body):
