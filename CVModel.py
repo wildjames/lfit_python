@@ -441,9 +441,10 @@ class SimpleEclipse(Model):
 
         param_dict = self.ancestor_param_dict
 
-        print(par_name_list)
-        print(param_dict)
-        self.report()
+        if self.DEBUG:
+            print(par_name_list)
+            print(param_dict)
+            self.report()
 
         parlist = [param_dict[key].currVal for key in par_name_list]
 
