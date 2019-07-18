@@ -145,7 +145,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # report. While we're doing that, make a dict of the values we want to assign
     # to the new version of the model.
     resultDict = {}
-    print("Result of the chain:")
+    print("\nResult of the chain:")
     for n, r, lo, up in zip(colKeys, result, lolim, uplim):
         print("{:>20s} = {:.3f}   +{:.3f}   -{:.3f}".format(n, r, r-lo, up-r))
         resultDict[n] = r
@@ -220,7 +220,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
         # This parameter it typically only important if something goes badly
         # wrong anyway, so if it gets stuck here, just filter it out.
         dirac_delta_par0 = False
-        if eclipse.phi0 == 0.0:
+        if eclipse.phi0.currVal == 0.0:
             dirac_delta_par0 = True
 
         if dirac_delta_par0:
