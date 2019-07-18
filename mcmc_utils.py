@@ -1,9 +1,17 @@
-import numpy as np
-import scipy.stats as stats
-import pandas as pd
-import emcee
+import time
+import warnings
+
 import dask.dataframe as dd
+import emcee
+import numpy as np
+import pandas as pd
+import scipy.integrate as intg
+import scipy.stats as stats
 import seaborn
+from matplotlib import pyplot as plt
+# lightweight progress bar
+from tqdm import tqdm
+
 try:
     import triangle
     # This triangle should have a method corner
@@ -13,12 +21,6 @@ except (AttributeError, ImportError):
     # We want the other package
     import corner as triangle
 
-# lightweight progress bar
-from tqdm import tqdm
-import scipy.integrate as intg
-import warnings
-from matplotlib import pyplot as plt
-import time
 
 TINY = -np.inf
 

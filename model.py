@@ -62,12 +62,34 @@ class Model:
     branches or leaves without them sharing any parameters.
     '''
 
-    # Init the node_par_names to be empty and a tuple
+    # Init the node_par_names to be empty and a tuple.
+    # Change this when you subclass Model!
     node_par_names = ()
 
-    def __init__(self, label, parameter_objects, parent=None, children=None, DEBUG=False):
-        '''Store parameter values to the parameter names, and track the parent
-        and children, if necessary.'''
+    def __init__(self, label, parameter_objects, parent=None, children=None,
+                 DEBUG=False):
+        '''Initialse the node. Does the following:
+
+        - Store parameter values to attributes named after the parameter names
+        - Store the object defined as my parent
+        - Store a list of objects defined as my children
+        - Checks that my Param objects were stored correctly.
+
+        Inputs:
+        -------
+          label: str
+            A label for this node. The name attribute will be the node class
+            name joined with this label.
+          parameter_objects: list of Param
+            The parameters to be stored on this node.
+          parent: Model object, Optional
+            The node that this node is a child of.
+          children: Model, list of Model, Optional
+            The children of this node.
+          DEBUG: bool
+            A useful debugging flag for you to use.
+        '''
+        self.DEBUG = DEBUG
 
         # I expect my parameter values to be fed in as a list. If they're not
         # a list, assume I have a single Param object, and wrap it in a list.
@@ -76,11 +98,6 @@ class Model:
         # Make sure our label is valid
         assert isinstance(label, str), "Label must be a string!"
         self.label = label
-
-        self.DEBUG = bool(DEBUG)
-        if DEBUG:
-            print("Creating a new {}, labelled {}".format(
-                self.__class__.__name__, self.label))
 
         # Check that the user defined their parameter names!
         if len(self.node_par_names) != len(parameter_objects):
@@ -106,8 +123,22 @@ class Model:
 
     # Tree handling methods
     def search_par(self, label, name):
-        '''Check if I have <name> in my attributes. If I don't, check my children.
-        If they don't, return None'''
+        '''Search the tree recursively downwards, and return the Param.
+        Returns None if the Param is not found.
+
+        Inputs:
+        -------
+          label: str
+            The Param I'm searching for will be associated with a node
+            having this label.
+          name: str
+            The name of the Param object. I'm looking for
+
+        Returns:
+        --------
+          Param, None if the search fails
+            The Param object to be searched.
+        '''
         # If I'm the desired node, get my parameter
         if self.label == label:
             return getattr(self, name)
@@ -121,6 +152,19 @@ class Model:
 
     def search_Node(self, class_type, label):
         '''Search for a node below me of class_type, with the label requested.
+        Returns None if this is not found.
+
+        Inputs:
+        -------
+          class_type: str
+            The nodes will be checked that their class name is this string
+          label: str
+            The nodes will be checked that their label is this string
+
+        Outputs:
+        --------
+          Model, None is the search fails
+            The node that was requested.
         '''
         if self.name == "{}:{}".format(class_type, label):
             return self
@@ -134,7 +178,20 @@ class Model:
             return None
 
     def search_node_type(self, class_type, nodes=None):
-        '''Construct a set of all the nodes of a given type below me'''
+        '''Construct a set of all the nodes of a given type below me
+
+        Inputs:
+        -------
+          class_type: str
+            If the node class contains this string, it will be added.
+          nodes: set of Model, Optional
+            The existing list of nodes that will be extended with my result.
+
+        Outputs:
+        --------
+          nodes: set of Model
+            The search result.
+        '''
 
         if nodes is None:
             nodes = set()
@@ -149,10 +206,18 @@ class Model:
         return nodes
 
     def add_child(self, children):
-        # This check allows XXX.add_child(Param) to be valid
+        '''Add children to my list of children
+
+        Inputs:
+        -------
+          children: Model, or list of Model
+            Add this to my list of children. They will be altered to
+            have this node as a parent.
+        '''
         if not isinstance(children, list):
             children = [children]
 
+        # Set the children.
         self.children.extend(children)
 
 
@@ -167,7 +232,17 @@ class Model:
         This is used, for example, to evaluate chisq or ln_like for a given model,
         where we want to sum this quantity for all fully defined models.
 
-        The recursive function
+        Inputs:
+        -------
+          name: str
+            The name of the function to be called
+          *args, **kwargs
+            Arguments to be passed to the function.
+
+        Outputs:
+        --------
+          float:
+            The sum of the function called at each relevant node.
         '''
         val = 0.0
         if self.is_leaf:
@@ -305,7 +380,9 @@ class Model:
         '''Query all my parents for their parameter vectors. When they've all
         given me them, return the full list.
 
-        Parameter vectors are the
+        Outputs:
+        --------
+          list of Param objects
         '''
 
         # This is where I'll build my list of parameters
@@ -321,7 +398,16 @@ class Model:
         return vector
 
     def __get_descendant_params__(self):
-        '''Get all the Param objects at or below this node'''
+        '''Get all the Param objects at or below this node
+
+        Outputs:
+        --------
+          list of Params,
+            All the Param objects of the nodes descended from this node.
+          list of node labels,
+            The node label corresponding to the Param at the corresponding
+            index. Has the same shape as the list of Params.
+        '''
         params = []
         node_names = []
 
@@ -417,6 +503,14 @@ class Model:
 
     @children.setter
     def children(self, children):
+        '''Set the children list to children.
+
+        If the child already has a parent, remove the child from the
+        ex-parent's children list.
+
+        Set the childs parent to this node.
+        '''
+
         # I need to preserve the order of the children, so keep as a list.
         if not isinstance(children, list):
             children = list(children)

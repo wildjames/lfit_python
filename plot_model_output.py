@@ -14,6 +14,18 @@ from CVModel import construct_model, extract_par_and_key
 
 
 def notipy(send_to, fnames, body):
+    '''Handle the actual sending an email. A pre-defined bot (login details
+    in email_details.json) will send an email.
+
+    Inputs:
+    -------
+      send_to: str, list of str
+        The email (or list of emails) to send to
+      fnames: list of str
+        The paths of the files to attach
+      body: str
+        The main text of the email
+    '''
     print("fnames: ")
     for name in fnames:
         print("-> '{}'".format(name))
@@ -54,6 +66,27 @@ def notipy(send_to, fnames, body):
 
 
 def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', automated=False):
+    '''Takes the chain file made by mcmcfit.py and summarises the initial
+    and final conditions. Uses the input filename normally supplied to
+    mcmcfit.py to accurately reconstruct the model.
+
+    Inputs:
+    -------
+      chain_fname: str
+        The chain file to be read in. This must be the chain_prod.txt version,
+        i.e. the one that tracks which walker is doing what.
+      input_fname: str
+        The input file normally supplied to mcmcfit.py.
+      nskip: int
+        This many steps will be stripped from the front of the chain
+      thin: int
+        Only every 'thin'-th step will be used.
+      destination: str
+        The summary will also be emailed off to this address.
+      automated: bool
+        If this is True, no figures will actually show, and will only be
+        saved to file.
+    '''
 
     # Retrieve some info from the input dict.
     input_dict = configobj.ConfigObj(input_fname)
@@ -145,7 +178,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # report. While we're doing that, make a dict of the values we want to assign
     # to the new version of the model.
     resultDict = {}
-    print("\nResult of the chain:")
+    print("Result of the chain:")
     for n, r, lo, up in zip(colKeys, result, lolim, uplim):
         print("{:>20s} = {:.3f}   +{:.3f}   -{:.3f}".format(n, r, r-lo, up-r))
         resultDict[n] = r
@@ -220,7 +253,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
         # This parameter it typically only important if something goes badly
         # wrong anyway, so if it gets stuck here, just filter it out.
         dirac_delta_par0 = False
-        if eclipse.phi0.currVal == 0.0:
+        if eclipse.phi0 == 0.0:
             dirac_delta_par0 = True
 
         if dirac_delta_par0:

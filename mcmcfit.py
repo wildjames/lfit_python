@@ -6,25 +6,26 @@ Supplied at the command line, via:
 '''
 
 import argparse
-import sys
 import os
+import sys
 from pprint import pprint
 
 import configobj
 import emcee
 import matplotlib.pyplot as plt
 import numpy as np
+from func_timeout import FunctionTimedOut, func_timeout
 
 import mcmc_utils as utils
 import plot_model_output as summariser
 from CVModel import (Band, ComplexEclipse, ComplexGPEclipse, GPLCModel,
                      LCModel, Lightcurve, SimpleEclipse, SimpleGPEclipse,
                      construct_model, extract_par_and_key)
-from func_timeout import FunctionTimedOut, func_timeout
 from mcmc_utils import Param
 
 if __name__ in '__main__':
 
+    # Set up the parser.
     parser = argparse.ArgumentParser(
         description='''Execute an MCMC fit to a dataset.'''
     )

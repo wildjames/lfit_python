@@ -1,8 +1,11 @@
 from __future__ import print_function
-from builtins import input
-from builtins import zip
+
+from builtins import input, zip
+
 import numpy as np
-from scipy.interpolate import interp2d, SmoothBivariateSpline, RectBivariateSpline
+from scipy.interpolate import (RectBivariateSpline, SmoothBivariateSpline,
+                               interp2d)
+
 
 def ld (band,logg,teff,law='linear'):
     assert band in ['u','g','r','i','z']
@@ -15,13 +18,13 @@ def ld (band,logg,teff,law='linear'):
     g1 = np.unique(x) # unique loggs
     nt = len(t1)
     ng = len(g1)
-    
+
     z0=data[:,2] #linear ld coefficient
     z1=data[:,3] # first quad term
     z2=data[:,4] # 2nd quad term
     z3=data[:,5] # first square-root term
     z4=data[:,6] # second square-root term
-    
+
     #func = SmoothBivariateSpline(x,y,z)
     #return func(logg,teff)[0]
     if law == 'linear':
@@ -34,8 +37,8 @@ def ld (band,logg,teff,law='linear'):
     elif law == 'sqr':
         funca = RectBivariateSpline(g1,t1,z3.reshape((ng,nt)),kx=3,ky=3)
         funcb = RectBivariateSpline(g1,t1,z4.reshape((ng,nt)),kx=3,ky=3)
-        return (funca(logg,teff)[0,0],funcb(logg,teff)[0,0])        
-        
+        return (funca(logg,teff)[0,0],funcb(logg,teff)[0,0])
+
 def main():
     logg, gerr = input('> Give log g and error: ').split()
     teff, terr = input('> Give eff. temp. and error: ').split()

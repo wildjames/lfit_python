@@ -1,19 +1,21 @@
-from __future__ import division
-from __future__ import print_function
-from builtins import input
-from builtins import range
-from builtins import object
-from past.utils import old_div
-import numpy
-import emcee
-from mcmc_utils import *
-import scipy.interpolate as interp
-import matplotlib.pyplot as plt
-from collections import MutableSequence
-import warnings
+from __future__ import division, print_function
+
+import os
 import sys
-import seaborn
+import warnings
+from builtins import input, object, range
+from collections import MutableSequence
 from os.path import realpath
+
+import emcee
+import matplotlib.pyplot as plt
+import numpy
+import scipy.interpolate as interp
+import seaborn
+from past.utils import old_div
+
+from mcmc_utils import *
+
 
 class wdModel(MutableSequence):
     '''wd model
@@ -73,10 +75,8 @@ def model(thisModel,mask):
     d = thisModel.dist
 
     # load bergeron models
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
+    root, fn = os.path.split(__file__)
+    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -167,10 +167,8 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
     d = 1000. / plax
 
     # load bergeron models
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = numpy.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
+    root, fn = os.path.split(__file__)
+    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -221,10 +219,8 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
 def plotColors(mags):
 
     # load bergeron models
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
+    root, fn = os.path.split(__file__)
+    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
 
     # bergeron model magnitudes
     umags = data[:,4]
@@ -573,6 +569,3 @@ if __name__ == "__main__":
 
     # Plot measured and model fluxes
     plotFluxes(fluxes,fluxes_err,mask,bestPars)
-
-
-

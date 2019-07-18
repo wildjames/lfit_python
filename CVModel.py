@@ -339,7 +339,8 @@ class SimpleEclipse(Model):
 
         return lnp
 
-    def plotter(self, save=False, figsize=(11., 8.), fname=None, save_dir='.', ext='.png'):
+    def plotter(self, save=False, figsize=(11., 8.), fname=None, save_dir='.',
+                ext='.png'):
         '''Create a plot of the eclipse's data.
 
         If save is True, a copy of the figure is saved.
@@ -439,6 +440,11 @@ class SimpleEclipse(Model):
         par_name_list = self.cv_parnames
 
         param_dict = self.ancestor_param_dict
+
+        print(par_name_list)
+        print(param_dict)
+        self.report()
+
         parlist = [param_dict[key].currVal for key in par_name_list]
 
         return parlist
@@ -747,7 +753,7 @@ class SimpleGPEclipse(SimpleEclipse):
         return gp_ln_like
 
     def plotter(self, save=False, *args, **kwargs):
-        '''For each eclipse descended from me, plot their data.
+        '''Plot my data. Returns fig, ax
 
         If save is True, save the figures.
         Figsize is passed to matplotlib.
@@ -821,7 +827,16 @@ def extract_par_and_key(key):
 
 def construct_model(input_file):
     '''Takes an input filename, and parses it into a model tree.
-    Returns that model tree. '''
+
+    Inputs:
+    -------
+      input_file: str,
+        The input.dat file to be parsed
+
+    Output:
+    -------
+      model root node
+    '''
 
     input_dict = configobj.ConfigObj(input_file)
 
