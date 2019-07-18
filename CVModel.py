@@ -1,5 +1,6 @@
 import os
 
+import configobj
 import george
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -7,6 +8,7 @@ import numpy as np
 from lfit import CV
 from trm import roche
 
+from mcmc_utils import Param
 from model import Model
 
 

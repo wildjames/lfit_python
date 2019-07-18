@@ -107,7 +107,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     if automated:
         plt.close()
     else:
-        plt.show()
+        plt.show(block=False)
 
     # Check that the user is sure about not thinning or skipping, in light of the chain size.
     if not automated:
@@ -124,7 +124,9 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
             except:
                 thin = 1
 
-    data = data[nskip::thin, :, :]
+        plt.close()
+
+    data = data[:, nskip::thin, :]
     nwalkers, nsteps, npars = data.shape
 
     print("After thinning and skipping: {}".format(data.shape))
@@ -164,14 +166,17 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # Subtract one DoF for the fit
     dof -= 1
 
-    model_report = ''
+    model_report = 'The following is the result of the MCMC fit running in:\n'
+    model_report += "  Machine name: {}\n  Directory: {}\n".format(os.uname().nodename, os.path.curdir)
     model_report += "\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
     model_report += "\nEvaluating the model, we get;\n"
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
 
-    model.plot_data(show=automated, save=True, figsize=(11, 8), save_dir='Initial_figs')
+    if not automated:
+        print("Initial conditions being plotted now...")
+    model.plot_data(show=(not automated), save=True, figsize=(11, 8), save_dir='Initial_figs')
 
     # Set the parameters of the model to the results of the chain
     for key, value in resultDict.items():
@@ -188,13 +193,13 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # The model is now fully built. #
     # # # # # # # # # # # # # # # # #
 
+    print(model_report)
     model_report += "\n\nMCMC result has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
     model_report += "\nEvaluating the model, we get;\n"
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
-    print(model_report)
-    model.plot_data(show=automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
+    model.plot_data(show=(not automated), save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
         # Gather the files
@@ -209,8 +214,20 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     eclipses = model.search_node_type("SimpleEclipse")
     eclipses = eclipses.union(model.search_node_type("ComplexEclipse"))
     for eclipse in eclipses:
-        # Get the par names from the eclipse
-        par_labels = eclipse.node_par_names
+        # Get the par names from the eclipse.
+        # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
+        # the thumbplot gets confused and dies, since there's no range.
+        # This parameter it typically only important if something goes badly
+        # wrong anyway, so if it gets stuck here, just filter it out.
+        dirac_delta_par0 = False
+        if eclipse.phi0 == 0.0:
+            dirac_delta_par0 = True
+
+        if dirac_delta_par0:
+            par_labels = [par for par in eclipse.node_par_names if 'phi0' not in par]
+        else:
+            par_labels = eclipse.node_par_names
+
         par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
 
         # Get the par names from the band
@@ -280,7 +297,12 @@ if __name__ == "__main__":
         type=str,
         default='',
     )
-
+    parser.add_argument(
+        '--quiet',
+        help="1/0, if I'm being quiet, no figure will be shown, only saved to file.",
+        type=int,
+        default=1
+    )
 
     args = parser.parse_args()
 
@@ -291,6 +313,7 @@ if __name__ == "__main__":
     thin = args.thin
 
     destination = args.notify
+    automated=bool(args.quiet)
 
 
-    fit_summary(chain_fname, input_fname, nskip, thin, destination)
+    fit_summary(chain_fname, input_fname, nskip, thin, destination, automated=automated)
