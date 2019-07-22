@@ -136,7 +136,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     ax.set_ylabel("-ln_like")
 
     plt.tight_layout()
-    plt.savefig('Final_figs/likelihood.pdf')
+
+    oname = 'Final_figs/likelihood.pdf'
+
+    plt.savefig(oname)
+    print("Saved to {}".format(oname))
     if automated:
         plt.close()
     else:
@@ -157,7 +161,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
             except:
                 thin = 1
 
-        plt.close()
+    # Close any open figures
+    plt.close()
 
     data = data[:, nskip::thin, :]
     nwalkers, nsteps, npars = data.shape
@@ -199,13 +204,14 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # Subtract one DoF for the fit
     dof -= 1
 
-    model_report = 'The following is the result of the MCMC fit running in:\n'
-    model_report += "  Machine name: {}\n  Directory: {}\n".format(os.uname().nodename, os.path.curdir)
-    model_report += "\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
-    model_report += "\nEvaluating the model, we get;\n"
-    model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
-    model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
-    model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+    model_preport = 'The following is the result of the MCMC fit running in:\n'
+    model_preport += "  Machine name: {}\n  Directory: {}\n".format(os.uname().nodename, os.path.curdir)
+    model_preport += "\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
+    model_preport += "\nEvaluating the model, we get;\n"
+    model_preport += "a ln_prior of {:.3f}\n".format(model.ln_prior())
+    model_preport += "a ln_like of {:.3f}\n".format(model.ln_like())
+    model_preport += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+    print(model_preport)
 
     if not automated:
         print("Initial conditions being plotted now...")
@@ -226,12 +232,15 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
     # The model is now fully built. #
     # # # # # # # # # # # # # # # # #
 
-    print(model_report)
+    model_report = ''
     model_report += "\n\nMCMC result has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
     model_report += "\nEvaluating the model, we get;\n"
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+
+    if not automated:
+        print("Final conditions being plotted now...")
     model.plot_data(show=(not automated), save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
@@ -240,7 +249,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
         fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
-        notipy(destination, fnames, model_report)
+        notipy(destination, fnames, model_preport+model_report)
 
 
     # Corner plots. Collect the eclipses.
@@ -332,9 +341,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--quiet',
-        help="1/0, if I'm being quiet, no figure will be shown, only saved to file.",
-        type=int,
-        default=1
+        dest='quiet',
+        action='store_true',
+        help="If I'm being quiet, no figure will be shown, only saved to file.",
     )
 
     args = parser.parse_args()
@@ -347,6 +356,5 @@ if __name__ == "__main__":
 
     destination = args.notify
     automated=bool(args.quiet)
-
 
     fit_summary(chain_fname, input_fname, nskip, thin, destination, automated=automated)
