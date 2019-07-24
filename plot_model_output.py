@@ -65,7 +65,8 @@ def notipy(send_to, fnames, body):
     return
 
 
-def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', automated=False):
+def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
+                automated=False):
     '''Takes the chain file made by mcmcfit.py and summarises the initial
     and final conditions. Uses the input filename normally supplied to
     mcmcfit.py to accurately reconstruct the model.
