@@ -1,5 +1,4 @@
 import argparse
-import getpass
 import glob
 import json
 import os
@@ -11,6 +10,7 @@ import yagmail as yag
 
 import mcmc_utils as u
 from CVModel import construct_model, extract_par_and_key
+import plotCV
 
 
 def notipy(send_to, fnames, body):
@@ -215,7 +215,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
 
     if not automated:
         print("Initial conditions being plotted now...")
-    model.plot_data(show=(not automated), save=True, figsize=(11, 8), save_dir='Initial_figs')
+
+    plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Initial_figs')
 
     # Set the parameters of the model to the results of the chain
     for key, value in resultDict.items():
@@ -241,7 +242,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='', autom
 
     if not automated:
         print("Final conditions being plotted now...")
-    model.plot_data(show=(not automated), save=True, figsize=(11, 8), save_dir='Final_figs/')
+
+    plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
         # Gather the files

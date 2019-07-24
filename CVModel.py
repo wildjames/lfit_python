@@ -2,8 +2,6 @@ import os
 
 import configobj
 import george
-import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 from lfit import CV
 from trm import roche
@@ -66,71 +64,6 @@ class Lightcurve:
         self.y = self.y[mask]
         self.ye = self.ye[mask]
         self.w = self.w[mask]
-
-    def plot(self, flx=None, save=False, show=True):
-        '''Plot the data for this data. If we're also passed a model flx, plot
-        that and its residuals.'''
-
-        if flx is None:
-            fig, ax = plt.subplots()
-
-            # Plot the data
-            ax.errorbar(
-                self.x, self.y,
-                yerr=self.ye,
-                linestyle='none', ecolor='grey', zorder=1
-                )
-            ax.step(self.x, self.y, where='mid', color='black')
-
-            # Labels. Phase is unitless
-            ax.set_title(self.name)
-            ax.set_xlabel('Phase')
-            ax.set_ylabel('Flux, mJy')
-
-        else:
-            fig, axs = plt.subplots(2, sharex=True)
-
-            # Plot the data first. Also do errors
-            axs[0].errorbar(
-                self.x, self.y,
-                yerr=self.ye,
-                linestyle='none', ecolor='grey', zorder=1
-                )
-            axs[0].step(self.x, self.y, where='mid', color='black')
-
-            # Plot the model over the data
-            axs[0].plot(self.x, flx, color='red')
-
-            # Plot the errorbars
-            axs[1].errorbar(
-                self.x, self.y-flx,
-                yerr=self.ye,
-                linestyle='none', ecolor='grey', zorder=1
-                )
-            axs[1].step(self.x, self.y-flx, where='mid', color='darkred')
-
-            # 0 residuals line, to guide the eye
-            axs[1].axhline(0.0, linestyle='--', color='black', alpha=0.7,
-                           zorder=0)
-
-            # Labelling. Top one gets title, bottom one gets x label
-            axs[0].set_title(self.name)
-            axs[0].set_ylabel('Flux, mJy')
-
-            axs[1].set_xlabel('Phase')
-            axs[1].set_ylabel('Residual Flux, mJy')
-
-        # Arrange the figure on the page
-        plt.tight_layout()
-        fig.subplots_adjust(wspace=0, hspace=0)
-
-        # Do we want to save the figure?
-        if save:
-            plt.savefig(self.fname.replace('.calib', '')+'.png')
-
-        if show:
-            plt.show()
-            return
 
 
 # Subclasses.
@@ -217,14 +150,11 @@ class SimpleEclipse(Model):
 
         return chisq
 
-    def ln_like(self, plot=False):
+    def ln_like(self):
         '''Calculate the chisq of this eclipse, against the data stored in its
         lightcurve object.
 
         If plot is True, also plot the data in a figure.'''
-
-        if plot:
-            self.plotter()
 
         chisq = self.chisq()
 
@@ -338,91 +268,6 @@ class SimpleEclipse(Model):
         lnp = super().ln_prior(verbose=verbose, *args, **kwargs)
 
         return lnp
-
-    def plotter(self, save=False, figsize=(11., 8.), fname=None, save_dir='.',
-                ext='.png'):
-        '''Create a plot of the eclipse's data.
-
-        If save is True, a copy of the figure is saved.
-
-        If fname is defined, save the figure with that filename. Otherwise,
-        infer one from the data filename
-        '''
-
-        # Re-init my CV object with the current params.
-        self.initCV()
-
-        # Generate the lightcurve of the total, and the components.
-        flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
-        wd_flx = self.cv.ywd
-        sec_flx = self.cv.yrs
-        BS_flx = self.cv.ys
-        disc_flx = self.cv.yd
-
-        # print("This model has a chisq of {:.3f}".format(self.chisq()))
-
-        # Start the plotting area
-        fig, axs = plt.subplots(2, sharex=True, figsize=figsize)
-
-        # Plot the data first. Also do errors
-        axs[0].errorbar(
-            self.lc.x, self.lc.y,
-            yerr=self.lc.ye,
-            linestyle='none', ecolor='grey', zorder=1
-            )
-        axs[0].step(self.lc.x, self.lc.y, where='mid', color='black')
-
-        # Plot the model over the data
-        axs[0].plot(self.lc.x, wd_flx, color='lightblue', label='WD')
-        axs[0].plot(self.lc.x, sec_flx, color='magenta', label='Sec')
-        axs[0].plot(self.lc.x, BS_flx, color='darkblue', label='BS')
-        axs[0].plot(self.lc.x, disc_flx, color='brown', label='Disc')
-        axs[0].plot(self.lc.x, flx, color='red')
-        axs[0].legend()
-
-        # Plot the errorbars
-        axs[1].errorbar(
-            self.lc.x, self.lc.y-flx,
-            yerr=self.lc.ye,
-            linestyle='none', ecolor='grey', zorder=1
-            )
-        axs[1].step(self.lc.x, self.lc.y-flx, where='mid', color='black')
-
-        # 0 residuals line, to guide the eye
-        axs[1].axhline(0.0, linestyle='--', color='black', alpha=0.7,
-                       zorder=0)
-
-        # Labelling. Top one gets title, bottom one gets x label
-        axs[0].set_title(self.lc.name)
-        axs[0].set_ylabel('Flux, mJy')
-
-        axs[1].set_xlabel('Phase')
-        axs[1].set_ylabel('Residual Flux, mJy')
-
-        # Arrange the figure on the page, and show it
-        plt.tight_layout()
-        fig.subplots_adjust(wspace=0, hspace=0)
-
-        if save:
-            # Check that save_dir exists
-            if not os.path.isdir(save_dir):
-                os.mkdir(save_dir)
-
-            # If we didnt get told to use a certain fname, use this node's name
-            if fname is None:
-                fname = self.lc.name.replace('.calib', ext)
-
-            # Make the filename
-            fname = '/'.join([save_dir, fname])
-
-            # If the user specified a path like './figs/', then the above could
-            # return './figs//Eclipse_N.pdf'; I want to be robust against that.
-            while '//' in fname:
-                fname = fname.replace('//', '/')
-
-            plt.savefig(fname)
-
-        return fig, axs
 
     @property
     def cv_parnames(self):
@@ -606,7 +451,6 @@ class SimpleGPEclipse(SimpleEclipse):
 
     # _dist_cp is initially set to whatever, it will be overwritten anyway.
     _dist_cp = 9e99
-    #TODO: Impliment this properly.
 
     def calcChangepoints(self):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
@@ -752,45 +596,6 @@ class SimpleGPEclipse(SimpleEclipse):
         gp_ln_like += gp_lnl
 
         return gp_ln_like
-
-    def plotter(self, save=False, *args, **kwargs):
-        '''Plot my data. Returns fig, ax
-
-        If save is True, save the figures.
-        Figsize is passed to matplotlib.
-        '''
-
-        # Get the figure and axes from the eclipse
-        fig, ax = super().plotter(save=False, *args, **kwargs)
-
-        # Get the residuals of the model
-        residuals = self.lc.y - self.calcFlux()
-        # Did the model turn out ok?
-        if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
-            return -np.inf
-
-        # Create the GP of this eclipse
-        gp = self.create_GP()
-        # Compute the GP
-        gp.compute(self.lc.x, self.lc.ye)
-
-        # Draw samples from the GP
-        samples = gp.sample_conditional(residuals, self.lc.x, size=300)
-
-        # Get the mean, mu, standard deviation, and
-        mu = np.mean(samples, axis=0)
-        std = np.std(samples, axis=0)
-
-        ax[1].fill_between(
-            self.lc.x,
-            mu + (1.0*std),
-            mu - (1.0*std),
-            color='r',
-            alpha=0.4,
-            zorder=20
-        )
-
-        return fig, ax
 
 
 class ComplexGPEclipse(SimpleGPEclipse):

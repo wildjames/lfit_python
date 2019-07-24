@@ -7,21 +7,16 @@ Supplied at the command line, via:
 
 import argparse
 import os
-import sys
 from pprint import pprint
+from sys import exit
 
 import configobj
 import emcee
-import matplotlib.pyplot as plt
 import numpy as np
-from func_timeout import FunctionTimedOut, func_timeout
 
 import mcmc_utils as utils
-import plot_model_output as summariser
-from CVModel import (Band, ComplexEclipse, ComplexGPEclipse, GPLCModel,
-                     LCModel, Lightcurve, SimpleEclipse, SimpleGPEclipse,
-                     construct_model, extract_par_and_key)
-from mcmc_utils import Param
+from CVModel import construct_model, extract_par_and_key
+
 
 if __name__ in '__main__':
 
@@ -74,71 +69,38 @@ if __name__ in '__main__':
 
     print("\nStructure:")
     pprint(model.structure)
-    # Get the model's graph
-    model.draw()
 
     # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
     # in order to pickle them :(
     def ln_prior(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_prior
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prior()
         return val
 
     def ln_prob(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_prob
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prob()
         return val
 
     def ln_like(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_like
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
+        model.dynasty_par_vals = param_vector
+        val = model.ln_like()
         return val
 
     input_dict = configobj.ConfigObj(input_fname)
 
-    for key, item in input_dict.items():
-        if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
-            input_dict['ln_'+key] = item
-
     # Read in information about mcmc
-    nburn = int(input_dict['nburn'])
-    nprod = int(input_dict['nprod'])
-    nthreads = int(input_dict['nthread'])
-    nwalkers = int(input_dict['nwalkers'])
-    ntemps = int(input_dict['ntemps'])
-    scatter_1 = float(input_dict['first_scatter'])
-    scatter_2 = float(input_dict['second_scatter'])
-    to_fit = int(input_dict['fit'])
-    use_pt = bool(int(input_dict['usePT']))
-    double_burnin = bool(int(input_dict['double_burnin']))
-    comp_scat = bool(int(input_dict['comp_scat']))
+    nburn          = int(input_dict['nburn'])
+    nprod          = int(input_dict['nprod'])
+    nthreads       = int(input_dict['nthread'])
+    nwalkers       = int(input_dict['nwalkers'])
+    ntemps         = int(input_dict['ntemps'])
+    scatter_1      = float(input_dict['first_scatter'])
+    scatter_2      = float(input_dict['second_scatter'])
+    to_fit         = int(input_dict['fit'])
+    use_pt         = bool(int(input_dict['usePT']))
+    double_burnin  = bool(int(input_dict['double_burnin']))
+    comp_scat      = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
@@ -182,10 +144,20 @@ if __name__ in '__main__':
         # Calculate ln_prior verbosely, for the user's benefit
         model.ln_prior(verbose=True)
         exit()
-    model.plot_data(save=False)
+
+    # model.plot_data(save=False)
+    # plt.close()
 
 
     if not to_fit:
+        import plotCV
+        from matplotlib.pyplot import show
+
+        ax = plotCV.nxdraw(model)
+        show()
+
+        plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
+
         exit()
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -316,4 +288,6 @@ if __name__ in '__main__':
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
 
-    summariser.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)
+    from plot_model_output import fit_summary
+    fit_summary('chain_prod.txt', input_fname, destination=dest,
+                automated=True)
