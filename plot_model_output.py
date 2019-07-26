@@ -256,8 +256,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
 
     # Corner plots. Collect the eclipses.
-    eclipses = model.search_node_type("SimpleEclipse")
-    eclipses = eclipses.union(model.search_node_type("ComplexEclipse"))
+    eclipses = model.search_node_type("Eclipse")
     for eclipse in eclipses:
         # Get the par names from the eclipse.
         # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
