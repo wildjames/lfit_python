@@ -18,7 +18,26 @@ import numpy as np
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
 
+# I need to wrap the model's ln_like, ln_prior, and ln_prob functions
+# in order to pickle them :(
+def ln_prior(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_prior()
+    return val
+
+def ln_prob(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_prob()
+    return val
+
+def ln_like(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_like()
+    return val
+
 if __name__ in '__main__':
+
+    np.random.seed = 432
 
     # Set up the parser.
     parser = argparse.ArgumentParser(
@@ -70,22 +89,6 @@ if __name__ in '__main__':
     print("\nStructure:")
     pprint(model.structure)
 
-    # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
-    # in order to pickle them :(
-    def ln_prior(param_vector):
-        model.dynasty_par_vals = param_vector
-        val = model.ln_prior()
-        return val
-
-    def ln_prob(param_vector):
-        model.dynasty_par_vals = param_vector
-        val = model.ln_prob()
-        return val
-
-    def ln_like(param_vector):
-        model.dynasty_par_vals = param_vector
-        val = model.ln_like()
-        return val
 
     input_dict = configobj.ConfigObj(input_fname)
 
@@ -111,11 +114,8 @@ if __name__ in '__main__':
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
-    # Collect the eclipses.
-    eclipses = model.search_node_type('Eclipse')
-
     # How many data points do we have?
-    dof = np.sum([ecl.lc.n_data for ecl in eclipses])
+    dof = np.sum([ecl.lc.n_data for ecl in model.search_node_type('Eclipse')])
     # Subtract a DoF for each variable
     dof -= len(model.dynasty_par_names)
     # Subtract one DoF for the fit
@@ -123,11 +123,11 @@ if __name__ in '__main__':
     dof = int(dof)
 
     print("\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).".format(model.chisq(), dof))
-    print("\nFrom the wrapper functions, we get;")
+    print("\nFrom the wrapper functions with the above parameters, we get;")
     pars = model.dynasty_par_vals
-    print("a ln_prior of {:.3f}".format(ln_prior(pars)))
-    print("a ln_like of {:.3f}".format(ln_like(pars)))
-    print("a ln_prob of {:.3f}".format(ln_prob(pars)))
+    print("a ln_prior of {:.3f}".format(ln_prior(pars, model)))
+    print("a ln_like of {:.3f}".format(ln_like(pars, model)))
+    print("a ln_prob of {:.3f}".format(ln_prob(pars, model)))
     print()
     if np.isinf(model.ln_prior()):
         print("ERROR: Starting position violates priors!")
@@ -145,10 +145,7 @@ if __name__ in '__main__':
         model.ln_prior(verbose=True)
         exit()
 
-    # model.plot_data(save=False)
-    # plt.close()
-
-
+    # If we're not running the fit, plot our stuff.
     if not to_fit:
         import plotCV
         from matplotlib.pyplot import show
@@ -230,19 +227,22 @@ if __name__ in '__main__':
     if use_pt:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
-                                          nwalkers, ntemps, ln_prior)
+                                          nwalkers, ntemps, ln_prior, model)
         # Create the sampler
         sampler = emcee.PTSampler(ntemps, nwalkers, npars,
                                   ln_like, ln_prior,
+                                  loglargs=(model,),
+                                  logpargs=(model,),
                                   pool=pool)
                                 #   threads=nthreads)
     else:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
-                                       ln_prior)
+                                       ln_prior, model)
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
                                         ln_prob,
+                                        args=(model,),
                                         pool=pool)
                                         # threads=nthreads)
 
@@ -260,7 +260,8 @@ if __name__ in '__main__':
         # Get the Get the most likely step of the first burn-in
         p_0 = pos[np.argmax(prob)]
         # And scatter the walker ball about that position
-        p_0 = utils.initialise_walkers(p_0, p0_scatter_2, nwalkers, ln_prior)
+        p_0 = utils.initialise_walkers(p_0, p0_scatter_2, nwalkers,
+                                       ln_prior, model)
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
