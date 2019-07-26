@@ -23,7 +23,7 @@ def nxdraw(model):
         pos=pos, with_labels=True,
         node_color='grey', font_weight='heavy')
 
-    return ax
+    plt.show()
 
 def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                  save_dir='.', ext='.png'):

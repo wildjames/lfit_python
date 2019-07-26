@@ -148,10 +148,8 @@ if __name__ in '__main__':
     # If we're not running the fit, plot our stuff.
     if not to_fit:
         import plotCV
-        from matplotlib.pyplot import show
 
         ax = plotCV.nxdraw(model)
-        show()
 
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
 
