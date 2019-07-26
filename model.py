@@ -1,11 +1,8 @@
 import os
 
 import george
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from lfit import CV
-from trm import roche
 
 
 class Model:
@@ -256,34 +253,6 @@ class Model:
                 # we've got an invalid model, no need to evaluate other leaves
                 return val
         return val
-
-    def plot_data(self, show=True, *args, **kwargs):
-        '''Calls each of my children's plotter functions. '''
-
-        fig, ax = self.plotter(*args, **kwargs)
-        if fig is None and ax is None:
-            del fig
-            del ax
-        else:
-            if show:
-                plt.show()
-            else:
-                plt.close()
-
-        # Repeat for my children.
-        for child in self.children:
-            child.plot_data(show, *args, **kwargs)
-
-    def plotter(self, *args, **kwargs):
-        '''Blank template of the plotter function.
-
-        Should return:
-            fig, ax
-        '''
-        if self.is_leaf:
-            print("No plotter function implimented on this node, {}".format(self.name))
-
-        return None, None
 
     def chisq(self, *args, **kwargs):
         '''Returns the sum of my children's  chisqs. Must be overwritten on
@@ -645,7 +614,7 @@ class Model:
             figsize = (2*float(G.number_of_nodes()), 8.0)
             print("Figure will be {}".format(figsize))
 
-        fig, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots(figsize=figsize)
 
         nx.draw(
             G,
@@ -653,8 +622,7 @@ class Model:
             pos=pos, with_labels=True,
             node_color='grey', font_weight='heavy')
 
-        plt.tight_layout()
-        plt.show()
+        return ax
 
     def hierarchy_pos(self, G,
                       root=None, width=1.,

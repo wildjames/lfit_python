@@ -6,24 +6,38 @@ Supplied at the command line, via:
 '''
 
 import argparse
+import multiprocessing as mp
 import os
-import sys
 from pprint import pprint
+from sys import exit
 
 import configobj
 import emcee
-import matplotlib.pyplot as plt
 import numpy as np
-from func_timeout import FunctionTimedOut, func_timeout
 
 import mcmc_utils as utils
-import plot_model_output as summariser
-from CVModel import (Band, ComplexEclipse, ComplexGPEclipse, GPLCModel,
-                     LCModel, Lightcurve, SimpleEclipse, SimpleGPEclipse,
-                     construct_model, extract_par_and_key)
-from mcmc_utils import Param
+from CVModel import construct_model, extract_par_and_key
+
+# I need to wrap the model's ln_like, ln_prior, and ln_prob functions
+# in order to pickle them :(
+def ln_prior(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_prior()
+    return val
+
+def ln_prob(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_prob()
+    return val
+
+def ln_like(param_vector, model):
+    model.dynasty_par_vals = param_vector
+    val = model.ln_like()
+    return val
 
 if __name__ in '__main__':
+
+    np.random.seed = 432
 
     # Set up the parser.
     parser = argparse.ArgumentParser(
@@ -74,71 +88,22 @@ if __name__ in '__main__':
 
     print("\nStructure:")
     pprint(model.structure)
-    # Get the model's graph
-    model.draw()
 
-    # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
-    # in order to pickle them :(
-    def ln_prior(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_prior
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
-        return val
-
-    def ln_prob(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_prob
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
-        return val
-
-    def ln_like(param_vector):
-        try:
-            model.dynasty_par_vals = param_vector
-            val = func_timeout(
-                60,
-                model.ln_like
-            )
-        except FunctionTimedOut as e:
-            print("Model Parameters:")
-            model.report()
-            val = -np.inf
-            print(e)
-        return val
 
     input_dict = configobj.ConfigObj(input_fname)
 
-    for key, item in input_dict.items():
-        if key in ['ampin_gp', 'ampout_gp', 'tau_gp']:
-            input_dict['ln_'+key] = item
-
     # Read in information about mcmc
-    nburn = int(input_dict['nburn'])
-    nprod = int(input_dict['nprod'])
-    nthreads = int(input_dict['nthread'])
-    nwalkers = int(input_dict['nwalkers'])
-    ntemps = int(input_dict['ntemps'])
-    scatter_1 = float(input_dict['first_scatter'])
-    scatter_2 = float(input_dict['second_scatter'])
-    to_fit = int(input_dict['fit'])
-    use_pt = bool(int(input_dict['usePT']))
-    double_burnin = bool(int(input_dict['double_burnin']))
-    comp_scat = bool(int(input_dict['comp_scat']))
+    nburn          = int(input_dict['nburn'])
+    nprod          = int(input_dict['nprod'])
+    nthreads       = int(input_dict['nthread'])
+    nwalkers       = int(input_dict['nwalkers'])
+    ntemps         = int(input_dict['ntemps'])
+    scatter_1      = float(input_dict['first_scatter'])
+    scatter_2      = float(input_dict['second_scatter'])
+    to_fit         = int(input_dict['fit'])
+    use_pt         = bool(int(input_dict['usePT']))
+    double_burnin  = bool(int(input_dict['double_burnin']))
+    comp_scat      = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
@@ -149,11 +114,8 @@ if __name__ in '__main__':
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
-    # Collect the eclipses.
-    eclipses = model.search_node_type('Eclipse')
-
     # How many data points do we have?
-    dof = np.sum([ecl.lc.n_data for ecl in eclipses])
+    dof = np.sum([ecl.lc.n_data for ecl in model.search_node_type('Eclipse')])
     # Subtract a DoF for each variable
     dof -= len(model.dynasty_par_names)
     # Subtract one DoF for the fit
@@ -161,11 +123,11 @@ if __name__ in '__main__':
     dof = int(dof)
 
     print("\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).".format(model.chisq(), dof))
-    print("\nFrom the wrapper functions, we get;")
+    print("\nFrom the wrapper functions with the above parameters, we get;")
     pars = model.dynasty_par_vals
-    print("a ln_prior of {:.3f}".format(ln_prior(pars)))
-    print("a ln_like of {:.3f}".format(ln_like(pars)))
-    print("a ln_prob of {:.3f}".format(ln_prob(pars)))
+    print("a ln_prior of {:.3f}".format(ln_prior(pars, model)))
+    print("a ln_like of {:.3f}".format(ln_like(pars, model)))
+    print("a ln_prob of {:.3f}".format(ln_prob(pars, model)))
     print()
     if np.isinf(model.ln_prior()):
         print("ERROR: Starting position violates priors!")
@@ -182,10 +144,15 @@ if __name__ in '__main__':
         # Calculate ln_prior verbosely, for the user's benefit
         model.ln_prior(verbose=True)
         exit()
-    model.plot_data(save=False)
 
-
+    # If we're not running the fit, plot our stuff.
     if not to_fit:
+        import plotCV
+
+        plotCV.nxdraw(model)
+
+        plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
+
         exit()
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -252,20 +219,30 @@ if __name__ in '__main__':
 
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
+    mp.set_start_method("forkserver")
+    pool = mp.Pool(nthreads)
+
     if use_pt:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
-                                          nwalkers, ntemps, ln_prior)
+                                          nwalkers, ntemps, ln_prior, model)
         # Create the sampler
         sampler = emcee.PTSampler(ntemps, nwalkers, npars,
-                                  ln_like, ln_prior, threads=nthreads)
+                                  ln_like, ln_prior,
+                                  loglargs=(model,),
+                                  logpargs=(model,),
+                                  pool=pool)
+                                #   threads=nthreads)
     else:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
-                                       ln_prior)
+                                       ln_prior, model)
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
-                                        ln_prob, threads=nthreads)
+                                        ln_prob,
+                                        args=(model,),
+                                        pool=pool)
+                                        # threads=nthreads)
 
 
     # Run the burnin phase
@@ -281,7 +258,8 @@ if __name__ in '__main__':
         # Get the Get the most likely step of the first burn-in
         p_0 = pos[np.argmax(prob)]
         # And scatter the walker ball about that position
-        p_0 = utils.initialise_walkers(p_0, p0_scatter_2, nwalkers, ln_prior)
+        p_0 = utils.initialise_walkers(p_0, p0_scatter_2, nwalkers,
+                                       ln_prior, model)
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
@@ -316,4 +294,6 @@ if __name__ in '__main__':
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
 
-    summariser.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)
+    from plotCV import fit_summary
+    fit_summary('chain_prod.txt', input_fname, destination=dest,
+                automated=True)

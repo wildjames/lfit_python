@@ -149,7 +149,7 @@ def scatterWalkers(pos0, percentScatter):
     return pos0 + percentScatter*pos0*scatter/100.0
 
 
-def initialise_walkers(p, scatter, nwalkers, ln_prior):
+def initialise_walkers(p, scatter, nwalkers, ln_prior, model):
     # Create starting ball of walkers with a certain amount of scatter
     p0 = emcee.utils.sample_ball(p, scatter*p, size=nwalkers)
     # Make initial number of invalid walkers equal to total number of walkers
@@ -159,7 +159,7 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior):
     # All invalid params need to be resampled
     while numInvalid > 0:
         # Create a mask of invalid params
-        isValid = np.array([np.isfinite(ln_prior(p)) for p in p0])
+        isValid = np.array([np.isfinite(ln_prior(p, model)) for p in p0])
         bad = p0[~isValid]
         # Determine the number of good and bad walkers
         nbad = len(bad)
@@ -178,7 +178,7 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior):
     return p0
 
 
-def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
+def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior, model):
     # Create starting ball of walkers with a certain amount of scatter
     p0 = np.array([emcee.utils.sample_ball(p, scatter*p, size=nwalkers) for
                    i in range(ntemps)])
@@ -192,7 +192,7 @@ def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
     # All invalid params need to be resampled
     while numInvalid > 0:
         # Create a mask of invalid params
-        isValid = np.array([np.isfinite(ln_prior(p)) for p in p0])
+        isValid = np.array([np.isfinite(ln_prior(p, model)) for p in p0])
         bad = p0[~isValid]
         # Determine the number of good and bad walkers
         nbad = len(bad)
