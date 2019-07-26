@@ -149,7 +149,7 @@ if __name__ in '__main__':
     if not to_fit:
         import plotCV
 
-        ax = plotCV.nxdraw(model)
+        plotCV.nxdraw(model)
 
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
 
