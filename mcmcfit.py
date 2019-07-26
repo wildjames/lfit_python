@@ -6,6 +6,7 @@ Supplied at the command line, via:
 '''
 
 import argparse
+import multiprocessing as mp
 import os
 from pprint import pprint
 from sys import exit
@@ -16,7 +17,6 @@ import numpy as np
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
-
 
 if __name__ in '__main__':
 
@@ -224,20 +224,27 @@ if __name__ in '__main__':
 
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
+    mp.set_start_method("forkserver")
+    pool = mp.Pool(nthreads)
+
     if use_pt:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
                                           nwalkers, ntemps, ln_prior)
         # Create the sampler
         sampler = emcee.PTSampler(ntemps, nwalkers, npars,
-                                  ln_like, ln_prior, threads=nthreads)
+                                  ln_like, ln_prior,
+                                  pool=pool)
+                                #   threads=nthreads)
     else:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
                                        ln_prior)
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
-                                        ln_prob, threads=nthreads)
+                                        ln_prob,
+                                        pool=pool)
+                                        # threads=nthreads)
 
 
     # Run the burnin phase
