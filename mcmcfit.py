@@ -294,6 +294,6 @@ if __name__ in '__main__':
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
 
-    from plot_model_output import fit_summary
+    from plotCV import fit_summary
     fit_summary('chain_prod.txt', input_fname, destination=dest,
                 automated=True)
