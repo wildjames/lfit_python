@@ -6,8 +6,7 @@ import numpy as np
 from lfit import CV
 from trm import roche
 
-from mcmc_utils import Param
-from model import Model
+from model import Model, Param
 
 
 class Lightcurve:

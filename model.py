@@ -1,8 +1,118 @@
 import os
+import warnings
 
 import george
 import networkx as nx
 import numpy as np
+import scipy.integrate as intg
+import scipy.stats as stats
+from matplotlib import pyplot as plt
+
+TINY = -np.inf
+
+
+class Prior(object):
+    '''a class to represent a prior on a parameter, which makes calculating
+    prior log-probability easier.
+
+    Priors can be of five types:
+        gauss, gaussPos, uniform, log_uniform and mod_jeff
+
+    gauss is a Gaussian distribution, and is useful for parameters with
+    existing constraints in the literature
+    gaussPos is like gauss but enforces positivity
+    Gaussian priors are initialised as Prior('gauss',mean,stdDev)
+
+    uniform is a uniform prior, initialised like:
+        Prior('uniform',low_limit,high_limit)
+    uniform priors are useful because they are 'uninformative'
+
+    log_uniform priors have constant probability in log-space. They are the
+    uninformative prior for 'scale-factors', such as error bars (look up
+    Jeffreys prior for more info)
+
+    mod_jeff is a modified jeffries prior - see Gregory et al 2007
+    they are useful when you have a large uncertainty in the parameter value,
+    so a jeffreys prior is appropriate, but the range of allowed values
+    starts at 0
+
+    they have two parameters, p0 and pmax.
+    they act as a jeffrey's prior about p0, and uniform below p0. typically
+    set p0=noise level
+    '''
+    def __init__(self, type, p1, p2):
+        assert type in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']
+        self.type = type
+        self.p1 = p1
+        self.p2 = p2
+        if type == 'log_uniform' and self.p1 < 1.0e-30:
+            warnings.warn('lower limit on log_uniform prior rescaled from %f to 1.0e-30' % self.p1)
+            self.p1 = 1.0e-30
+        if type == 'log_uniform':
+            self.normalise = 1.0
+            self.normalise = np.fabs(intg.quad(self.ln_prob, self.p1, self.p2)[0])
+        if type == 'mod_jeff':
+            self.normalise = np.log((self.p1+self.p2)/self.p1)
+
+    def ln_prob(self, val):
+        if self.type == 'gauss':
+            prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
+            if prob > 0:
+                return np.log(prob)
+            else:
+                return TINY
+        elif self.type == 'gaussPos':
+            if val <= 0.0:
+                return TINY
+            else:
+                prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
+                if prob > 0:
+                    return np.log(prob)
+                else:
+                    return TINY
+        elif self.type == 'uniform':
+            if (val > self.p1) and (val < self.p2):
+                return np.log(1.0/np.abs(self.p1-self.p2))
+            else:
+                return TINY
+        elif self.type == 'log_uniform':
+            if (val > self.p1) and (val < self.p2):
+                return np.log(1.0 / self.normalise / val)
+            else:
+                return TINY
+        elif self.type == 'mod_jeff':
+            if (val > 0) and (val < self.p2):
+                return np.log(1.0 / self.normalise / (val+self.p1))
+            else:
+                return TINY
+
+
+class Param(object):
+    '''A Param needs a starting value, a current value, and a prior
+    and a flag to state whether is should vary'''
+    def __init__(self, name, startVal, prior, isVar=True):
+        self.name = name
+        self.startVal = startVal
+        self.prior = prior
+        self.currVal = startVal
+        self.isVar = isVar
+
+    @classmethod
+    def fromString(cls, name, parString):
+        fields = parString.split()
+        val = float(fields[0])
+        priorType = fields[1].strip()
+        priorP1 = float(fields[2])
+        priorP2 = float(fields[3])
+        if len(fields) == 5:
+            isVar = bool(int(fields[4]))
+        else:
+            isVar = True
+        return cls(name, val, Prior(priorType, priorP1, priorP2), isVar)
+
+    @property
+    def isValid(self):
+        return np.isfinite(self.prior.ln_prob(self.currVal))
 
 
 class Model:
