@@ -33,8 +33,8 @@ When a leaf wants to evaluate its model, it will need to retrieve its parameters
 
 ## LFIT - A brief user's guide
 
-[LFIT](https://github.com/StuartLittlefair/lfit) is most useful in providing a CV class object. This object has a method, `calcFLux`, that takes a list of (14 or 18) CV parameters, a phase array, and some optional paramters on the resolution of the donor star and disc. The function then returns the CV flux along that phase array. Components can also be individually retrieved, if necessary, though the sum is more often the important part. 
+[LFIT](https://github.com/StuartLittlefair/lfit) is most useful in providing a CV class object. This object has a method, `calcFLux`, that takes a list of (14 or 18) CV parameters, a phase array, and some optional paramters on the resolution of the donor star and disc. The function then returns the CV flux along that phase array. Components can also be individually retrieved if necessary, though the sum is more often the important part. The model holds best to Cataclysmic Variables with a roughtly homogenous disc, and a bright spot that is not excessively extended.
 
 ## Model Fitting
 
-The model 
+The model is fit with an affine-invariant MCMC method, implimented by emcee. 
