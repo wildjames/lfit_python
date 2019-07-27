@@ -713,7 +713,7 @@ class Node:
     def DEBUG(self, flag):
         self.__DEBUG = flag
 
-    def log(self, message='\n'):
+    def log(self, message='\n', log_stack=False):
         '''
         Logging function. Writes the node name, and the current function stack
         so the dev can trace what functions are calling what. Writes a message
@@ -722,10 +722,14 @@ class Node:
         if not self.DEBUG:
             return
 
-        stack = ["File {}, line {}, function {}".format(x.filename, x.lineno, x.function) for x in inspect.stack()][::-1]
-        stack = "\n     ".join(stack)
+        if log_stack:
+            stack = ["File {}, line {}, function {}".format(x.filename, x.lineno, x.function) for x in inspect.stack()][::-1]
+            stack = "\n     ".join(stack)
+
+        # What function called the logger
         called_by = inspect.stack()[1][3]
 
+        # Construct an output filename
         my_fname = "{}.txt".format(os.getpid())
         oname = os.path.join('DEBUGGING', my_fname)
 
@@ -738,7 +742,8 @@ class Node:
         with open(oname, 'a+') as f:
             f.write('*'*150 + "\n")
             f.write("--> Logger called by function {} in node {}\n".format(called_by, self.name))
-            f.write("--> The function stack is \n     {}\n".format(stack))
+            if log_stack:
+                f.write("--> The function stack is \n     {}\n".format(stack))
             f.write(message)
             f.write('~'*150 + "\n\n\n")
 
