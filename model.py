@@ -1,3 +1,9 @@
+'''
+Base classes for the MCMC fitting routine. Allows the creation of a
+hierarchical model structure, that can also track the prior knowledge of the
+parameters of that model.
+'''
+
 import os
 import warnings
 

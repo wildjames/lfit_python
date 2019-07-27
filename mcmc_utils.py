@@ -1,3 +1,8 @@
+'''
+Helper functions to aid the MCMC nuts and bolts.
+'''
+
+
 import time
 import warnings
 

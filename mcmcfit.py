@@ -1,8 +1,11 @@
-'''This script will run the actual fitting procedure.
+'''
+This script will run the actual fitting procedure.
 Requires the input file, and data files defined in that.
 Supplied at the command line, via:
 
     python3 mcmcfit.py mcmc_input.dat
+
+Can also notify the user of a completed chain with the --notify flag.
 '''
 
 import argparse

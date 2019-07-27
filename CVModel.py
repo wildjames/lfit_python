@@ -1,3 +1,10 @@
+'''Subclasses from the `model` module, that actually comprise the tree
+structure of the model fed to emcee. The `trunk` is an LCModel or GPLCModel
+node, with child Bands, that have XEclipse leaves to evaluate the CV lightcurve
+fit to the data. Data is stored in the Lightcurve class.
+'''
+
+
 import os
 
 import configobj

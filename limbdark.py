@@ -1,3 +1,11 @@
+'''Uses the output fluxes of a White Dwarf from an MCMC chain, and uses them
+to calculate the limb darkening coefficient that should be used when fitting
+that body. Data is typically not sensitive enough to this to fit it
+independantly, so a few iterations through this script should aid in the
+science.
+'''
+
+
 from __future__ import print_function
 
 from builtins import input, zip

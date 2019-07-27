@@ -1,3 +1,7 @@
+'''
+Plotting routines to accompany mcmcfit.py
+'''
+
 import argparse
 import glob
 import json
