@@ -14,6 +14,8 @@ import scipy.integrate as intg
 import scipy.stats as stats
 from matplotlib import pyplot as plt
 
+import inspect
+
 TINY = -np.inf
 
 
@@ -121,7 +123,7 @@ class Param(object):
         return np.isfinite(self.prior.ln_prob(self.currVal))
 
 
-class Model:
+class Node:
     r'''
     Inputs:
     -------
@@ -130,10 +132,10 @@ class Model:
       parameter_objects; list(Param), or Param:
         The parameter objects that correspond to this node. Single Param is
         also accepted.
-      parent; Model, optional:
+      parent; Node, optional:
         The parent of this node.
-      children; list(Model), or Model:
-        The children of this node. Single Model is also accepted
+      children; list(Node), or Node:
+        The children of this node. Single Node is also accepted
 
     Description:
     ------------
@@ -176,11 +178,11 @@ class Model:
     '''
 
     # Init the node_par_names to be empty and a tuple.
-    # Change this when you subclass Model!
+    # Change this when you subclass Node!
     node_par_names = ()
 
     def __init__(self, label, parameter_objects, parent=None, children=None,
-                 DEBUG=False):
+                 DEBUG=None):
         '''Initialse the node. Does the following:
 
         - Store parameter values to attributes named after the parameter names
@@ -195,14 +197,28 @@ class Model:
             name joined with this label.
           parameter_objects: list of Param
             The parameters to be stored on this node.
-          parent: Model object, Optional
+          parent: Node object, Optional
             The node that this node is a child of.
-          children: Model, list of Model, Optional
+          children: Node, list of Node, Optional
             The children of this node.
           DEBUG: bool
             A useful debugging flag for you to use.
         '''
-        self.DEBUG = DEBUG
+        # Handle the family
+        if children is None:
+            children = []
+        self.children = children
+        self.parent = parent
+
+        # If the user tells us a debugging flag, use it.
+        if isinstance(DEBUG, bool):
+            self.DEBUG = DEBUG
+        # Otherwise, inherit my parent's debugging flag
+        elif self.parent is not None:
+            self.DEBUG = self.parent.DEBUG
+        # unless I don't have one. Then default to False
+        else:
+            self.DEBUG = False
 
         # I expect my parameter values to be fed in as a list. If they're not
         # a list, assume I have a single Param object, and wrap it in a list.
@@ -225,14 +241,7 @@ class Model:
         for par in parameter_objects:
             setattr(self, par.name, par)
 
-        # Handle the family
-        if children is None:
-            children = []
-        self.children = children
-        self.parent = parent
-
-        # Verify my parameters get put in the right places
-        self.__check_par_assignments__()
+        self.log("Successfully did the base Node init")
 
     # Tree handling methods
     def search_par(self, label, name):
@@ -252,15 +261,21 @@ class Model:
           Param, None if the search fails
             The Param object to be searched.
         '''
+
+        self.log("Searching for a Param called {}, on a Node labelled {}".format(name, label))
+
         # If I'm the desired node, get my parameter
         if self.label == label:
+            self.log("I am that Node!")
             return getattr(self, name)
         # Otherwise, check my children.
         else:
+            self.log("Searching my children for that Node.")
             for child in self.children:
                 val = child.search_par(label, name)
                 if val is not None:
                     return val
+            self.log("Could not find that node.")
             return None
 
     def search_Node(self, class_type, label):
@@ -276,18 +291,22 @@ class Model:
 
         Outputs:
         --------
-          Model, None is the search fails
+          Node, None is the search fails
             The node that was requested.
         '''
+        self.log("Searching for a Node of class type {}, with a label {}".format(class_type, label))
         if self.name == "{}:{}".format(class_type, label):
+            self.log("I am that node. Returning self")
             return self
         else:
+            self.log("Checking my children")
             for child in self.children:
                 val = child.search_Node(class_type, label)
                 if val is not None:
                     return val
                 else:
                     pass
+            self.log("Could not find that node.")
             return None
 
     def search_node_type(self, class_type, nodes=None):
@@ -297,14 +316,15 @@ class Model:
         -------
           class_type: str
             If the node class contains this string, it will be added.
-          nodes: set of Model, Optional
+          nodes: set of Node, Optional
             The existing list of nodes that will be extended with my result.
 
         Outputs:
         --------
-          nodes: set of Model
+          nodes: set of Node
             The search result.
         '''
+        self.log("Constructing a set of Nodes of type {}".format(class_type))
 
         if nodes is None:
             nodes = set()
@@ -316,6 +336,7 @@ class Model:
         if class_type in str(self.__class__.__name__):
             nodes.add(self)
 
+        self.log("Returning: \n{}".format(nodes))
         return nodes
 
     def add_child(self, children):
@@ -323,10 +344,11 @@ class Model:
 
         Inputs:
         -------
-          children: Model, or list of Model
+          children: Node, or list of Node
             Add this to my list of children. They will be altered to
             have this node as a parent.
         '''
+        self.log("Adding: \n{}\nto my existing list of children, which was \n{}".format(children, self.children))
         if not isinstance(children, list):
             children = [children]
 
@@ -357,16 +379,19 @@ class Model:
           float:
             The sum of the function called at each relevant node.
         '''
+        # self.log("Calling the function {} recursively, passing it the args:\n{}\nkwargs:\n{}".format(name, args, kwargs))
         val = 0.0
         if self.is_leaf:
+            self.log("Reached the bottom of the Tree with no function by that name.")
             raise NotImplementedError('must overwrite {} on leaf nodes of model'.format(
                 name
             ))
         for child in self.children:
             func = getattr(child, name)
             val += func(*args, **kwargs)
-            if np.isinf(val):
+            if np.any(np.isinf(val)):
                 # we've got an invalid model, no need to evaluate other leaves
+                self.log("The function {} called on {}, but returned an inf.".format(name, child.name))
                 return val
         return val
 
@@ -386,6 +411,7 @@ class Model:
         If model has more prior information not captured in the priors of the
         parameters, the details of such additional prior information must be
         codified in subclass methods!."""
+        self.log("Summing the ln_prior of all my Params ({} Params)".format(len(self.node_par_names)))
 
         # Start at a log prior probablity of 0. We'll add to this for each node
         lnp = 0.0
@@ -399,6 +425,8 @@ class Model:
                 if verbose:
                     print("Param {} in {} is invalid!".format(
                         param.name, self.name))
+                self.log("Param {} in {} is invalid!".format(
+                        param.name, self.name))
                 return -np.inf
 
         # Reporting, if necessary
@@ -411,15 +439,19 @@ class Model:
             print("The sum of parameter ln_priors of {} is {:.3f}\n".format(
                 self.name, lnp))
 
+        # self.log("My ln_prior is {}. Gathering my descendant ln_priors".format(lnp))
+
         # Then recursively fetch my decendants
         for child in self.children:
             lnp += child.ln_prior(verbose=verbose)
 
             # If my child returns negative infinite prob, terminate here.
             if np.isinf(lnp):
+                self.log("My child, {}, yielded an inf ln_prior".format(child.name))
                 return lnp
 
         # Pass it up the chain, or back to the main program
+        self.log("I computed a total ln_prior at and below me of {}".format(lnp))
         return lnp
 
     def ln_prob(self, verbose=False):
@@ -432,14 +464,18 @@ class Model:
         # Then add ln_prior to ln_like
         if np.isfinite(lnp):
             try:
-                return lnp + self.ln_like()
+                lnp = lnp + self.ln_like()
+                self.log("Calculated ln_prob = ln_prior + ln_like = {}".format(lnp))
+                return lnp
             except:
                 if verbose:
                     print("Failed to evaluate ln_like at {}".format(self.name))
+                self.log("Failed to evaluate ln_prob!")
                 return -np.inf
         else:
             if verbose:
                 print("{} ln_prior returned infinite!".format(self.name))
+            self.log("{} ln_prior returned infinite!".format(self.name))
             return lnp
 
     # Dunder methods that are generally hidden from the user.
@@ -669,6 +705,44 @@ class Model:
 
         return nx.readwrite.tree_data(self.nx_graph, self.name)
 
+    @property
+    def DEBUG(self):
+        return self.__DEBUG
+
+    @DEBUG.setter
+    def DEBUG(self, flag):
+        self.__DEBUG = flag
+
+    def log(self, message='\n'):
+        '''
+        Logging function. Writes the node name, and the current function stack
+        so the dev can trace what functions are calling what. Writes a message
+        if the user asks it to.
+        '''
+        if not self.DEBUG:
+            return
+
+        stack = ["File {}, line {}, function {}".format(x.filename, x.lineno, x.function) for x in inspect.stack()][::-1]
+        stack = "\n     ".join(stack)
+        called_by = inspect.stack()[1][3]
+
+        my_fname = "{}.txt".format(os.getpid())
+        oname = os.path.join('DEBUGGING', my_fname)
+
+        if not os.path.isdir("DEBUGGING"):
+            os.mkdir("DEBUGGING")
+
+        if not message.endswith('\n'):
+            message += "\n"
+
+        with open(oname, 'a+') as f:
+            f.write('*'*150 + "\n")
+            f.write("--> Logger called by function {} in node {}\n".format(called_by, self.name))
+            f.write("--> The function stack is \n     {}\n".format(stack))
+            f.write(message)
+            f.write('~'*150 + "\n\n\n")
+
+
     def report_relatives(self):
         '''This is a pretty crappy, inflexible way of doing this. Can I
         come up with a nicer, perhaps recursive way of it?'''
@@ -719,101 +793,101 @@ class Model:
         self.nx_graph = G
         return G
 
-    def draw(self, figsize=None):
-        '''Draw a hierarchical node map of the model.'''
+    # def draw(self, figsize=None):
+    #     '''Draw a hierarchical node map of the model.'''
 
-        G = self.create_tree()
-        pos = self.hierarchy_pos(G)
+    #     G = self.create_tree()
+    #     pos = self.hierarchy_pos(G)
 
-        if figsize is None:
-            # Figure has two inches of width per node
-            figsize = (2*float(G.number_of_nodes()), 8.0)
-            print("Figure will be {}".format(figsize))
+    #     if figsize is None:
+    #         # Figure has two inches of width per node
+    #         figsize = (2*float(G.number_of_nodes()), 8.0)
+    #         print("Figure will be {}".format(figsize))
 
-        _, ax = plt.subplots(figsize=figsize)
+    #     _, ax = plt.subplots(figsize=figsize)
 
-        nx.draw(
-            G,
-            ax=ax,
-            pos=pos, with_labels=True,
-            node_color='grey', font_weight='heavy')
+    #     nx.draw(
+    #         G,
+    #         ax=ax,
+    #         pos=pos, with_labels=True,
+    #         node_color='grey', font_weight='heavy')
 
-        return ax
+    #     return ax
 
-    def hierarchy_pos(self, G,
-                      root=None, width=1.,
-                      vert_gap=0.2, vert_loc=0, xcenter=0.5):
-        '''
-        From Joel's answer at https://stackoverflow.com/a/29597209/2966723.
-        Licensed under Creative Commons Attribution-Share Alike
+    # def hierarchy_pos(self, G,
+    #                   root=None, width=1.,
+    #                   vert_gap=0.2, vert_loc=0, xcenter=0.5):
+    #     '''
+    #     From Joel's answer at https://stackoverflow.com/a/29597209/2966723.
+    #     Licensed under Creative Commons Attribution-Share Alike
 
-        If the graph is a tree this will return the positions to plot this in a
-        hierarchical layout.
+    #     If the graph is a tree this will return the positions to plot this in a
+    #     hierarchical layout.
 
-        G: the graph (must be a tree)
+    #     G: the graph (must be a tree)
 
-        root: the root node of current branch
-        - if the tree is directed and this is not given,
-        the root will be found and used
-        - if the tree is directed and this is given, then
-        the positions will be just for the descendants of this node.
-        - if the tree is undirected and not given,
-        then a random choice will be used.
+    #     root: the root node of current branch
+    #     - if the tree is directed and this is not given,
+    #     the root will be found and used
+    #     - if the tree is directed and this is given, then
+    #     the positions will be just for the descendants of this node.
+    #     - if the tree is undirected and not given,
+    #     then a random choice will be used.
 
-        width: horizontal space allocated for this branch - avoids overlap with
-        other branches
+    #     width: horizontal space allocated for this branch - avoids overlap with
+    #     other branches
 
-        vert_gap: gap between levels of hierarchy
+    #     vert_gap: gap between levels of hierarchy
 
-        vert_loc: vertical location of root
+    #     vert_loc: vertical location of root
 
-        xcenter: horizontal location of root
-        '''
-        if not nx.is_tree(G):
-            fail_msg = 'cannot use hierarchy_pos on a graph that is not a tree'
-            raise TypeError(fail_msg)
+    #     xcenter: horizontal location of root
+    #     '''
+    #     if not nx.is_tree(G):
+    #         fail_msg = 'cannot use hierarchy_pos on a graph that is not a tree'
+    #         raise TypeError(fail_msg)
 
-        if root is None:
-            if isinstance(G, nx.DiGraph):
-                # Allows back compatibility with nx version 1.11
-                root = next(iter(nx.topological_sort(G)))
-            else:
-                import random
-                root = random.choice(list(G.nodes))
+    #     if root is None:
+    #         if isinstance(G, nx.DiGraph):
+    #             # Allows back compatibility with nx version 1.11
+    #             root = next(iter(nx.topological_sort(G)))
+    #         else:
+    #             import random
+    #             root = random.choice(list(G.nodes))
 
-        return self._hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
+    #     return self._hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
 
-    def _hierarchy_pos(self, G, root,
-                       width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5,
-                       pos=None, parent=None):
-        '''
-        see hierarchy_pos docstring for most arguments
+    # def _hierarchy_pos(self, G, root,
+    #                    width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5,
+    #                    pos=None, parent=None):
+    #     '''
+    #     see hierarchy_pos docstring for most arguments
 
-        pos: a dict saying where all nodes go if they have been assigned
-        parent: parent of this branch. - only affects it if non-directed
+    #     pos: a dict saying where all nodes go if they have been assigned
+    #     parent: parent of this branch. - only affects it if non-directed
 
-        '''
+    #     '''
 
-        if pos is None:
-            pos = {root: (xcenter, vert_loc)}
-        else:
-            pos[root] = (xcenter, vert_loc)
+    #     if pos is None:
+    #         pos = {root: (xcenter, vert_loc)}
+    #     else:
+    #         pos[root] = (xcenter, vert_loc)
 
-        children = list(G.neighbors(root))
+    #     children = list(G.neighbors(root))
 
-        if not isinstance(G, nx.DiGraph) and parent is not None:
-            children.remove(parent)
+    #     if not isinstance(G, nx.DiGraph) and parent is not None:
+    #         children.remove(parent)
 
-        if len(children) != 0:
-            dx = width/len(children)
-            nextx = xcenter - width/2 - dx/2
-            for child in children:
-                nextx += dx
-                pos = self._hierarchy_pos(
-                    G, child,
-                    width=dx, vert_gap=vert_gap,
-                    vert_loc=vert_loc-vert_gap, xcenter=nextx,
-                    pos=pos, parent=root
-                )
+    #     if len(children) != 0:
+    #         dx = width/len(children)
+    #         nextx = xcenter - width/2 - dx/2
+    #         for child in children:
+    #             nextx += dx
+    #             pos = self._hierarchy_pos(
+    #                 G, child,
+    #                 width=dx, vert_gap=vert_gap,
+    #                 vert_loc=vert_loc-vert_gap, xcenter=nextx,
+    #                 pos=pos, parent=root
+    #             )
 
-        return pos
+    #     return pos

@@ -12,6 +12,7 @@ import argparse
 import multiprocessing as mp
 import os
 from pprint import pprint
+from shutil import rmtree
 from sys import exit
 
 import configobj
@@ -20,6 +21,7 @@ import numpy as np
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
+
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -58,11 +60,20 @@ if __name__ in '__main__':
         type=str,
         default=''
     )
+    parser.add_argument(
+        '--debug',
+        help='Enable the debugging flag in the model',
+        action='store_true'
+    )
 
     args = parser.parse_args()
     input_fname = args.input
     dest = args.notify
+    debug = args.debug
 
+    if debug:
+        if os.path.isdir("DEBUGGING"):
+            rmtree("DEBUGGING")
 
     # I want to pre-check that the details have been supplied.
     if dest is not '':
@@ -87,7 +98,7 @@ if __name__ in '__main__':
 
 
     # Build the model from the input file
-    model = construct_model(input_fname)
+    model = construct_model(input_fname, debug)
 
     print("\nStructure:")
     pprint(model.structure)

@@ -23,7 +23,7 @@ def nxdraw(model):
 
     # Build the network
     G = model.create_tree()
-    pos = model.hierarchy_pos(G)
+    pos = hierarchy_pos(G)
 
     # Figure has two inches of width per node
     figsize = (2*float(G.number_of_nodes()), 8.0)
@@ -38,6 +38,84 @@ def nxdraw(model):
 
     plt.show()
 
+def hierarchy_pos(G,
+                  root=None, width=1.,
+                  vert_gap=0.2, vert_loc=0, xcenter=0.5):
+    '''
+    From Joel's answer at https://stackoverflow.com/a/29597209/2966723.
+    Licensed under Creative Commons Attribution-Share Alike
+
+    If the graph is a tree this will return the positions to plot this in a
+    hierarchical layout.
+
+    G: the graph (must be a tree)
+
+    root: the root node of current branch
+    - if the tree is directed and this is not given,
+    the root will be found and used
+    - if the tree is directed and this is given, then
+    the positions will be just for the descendants of this node.
+    - if the tree is undirected and not given,
+    then a random choice will be used.
+
+    width: horizontal space allocated for this branch - avoids overlap with
+    other branches
+
+    vert_gap: gap between levels of hierarchy
+
+    vert_loc: vertical location of root
+
+    xcenter: horizontal location of root
+    '''
+    if not nx.is_tree(G):
+        fail_msg = 'cannot use hierarchy_pos on a graph that is not a tree'
+        raise TypeError(fail_msg)
+
+    if root is None:
+        if isinstance(G, nx.DiGraph):
+            # Allows back compatibility with nx version 1.11
+            root = next(iter(nx.topological_sort(G)))
+        else:
+            import random
+            root = random.choice(list(G.nodes))
+
+    return _hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
+
+def _hierarchy_pos(G, root,
+                   width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5,
+                   pos=None, parent=None):
+    '''
+    see hierarchy_pos docstring for most arguments
+
+    pos: a dict saying where all nodes go if they have been assigned
+    parent: parent of this branch. - only affects it if non-directed
+
+    '''
+
+    if pos is None:
+        pos = {root: (xcenter, vert_loc)}
+    else:
+        pos[root] = (xcenter, vert_loc)
+
+    children = list(G.neighbors(root))
+
+    if not isinstance(G, nx.DiGraph) and parent is not None:
+        children.remove(parent)
+
+    if len(children) != 0:
+        dx = width/len(children)
+        nextx = xcenter - width/2 - dx/2
+        for child in children:
+            nextx += dx
+            pos = _hierarchy_pos(
+                G, child,
+                width=dx, vert_gap=vert_gap,
+                vert_loc=vert_loc-vert_gap, xcenter=nextx,
+                pos=pos, parent=root
+            )
+
+    return pos
+
 def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                  save_dir='.', ext='.png'):
     '''Create a plot of the eclipse's data.
@@ -47,10 +125,6 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
     If fname is defined, save the figure with that filename. Otherwise,
     infer one from the data filename
     '''
-
-    # Re-init my CV object with the current params.
-    ecl_node.initCV()
-
     # Generate the lightcurve of the total, and the components.
     flx = ecl_node.cv.calcFlux(ecl_node.cv_parlist, ecl_node.lc.x, ecl_node.lc.w)
     wd_flx = ecl_node.cv.ywd
