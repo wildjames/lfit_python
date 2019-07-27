@@ -11,8 +11,8 @@ import os
 import configobj
 import george
 import numpy as np
-from lfit import CV
-from trm import roche
+import lfit
+import trm import roche
 
 from model import Node, Param
 
@@ -115,7 +115,7 @@ class SimpleEclipse(Node):
             raise TypeError(msg)
 
         # Create the CV object
-        self.cv = CV(self.cv_parlist)
+        self.cv = lfit.CV(self.cv_parlist)
 
         self.log('SimpleEclipse.__init__', "Successfully ran the SimpleEclipse initialiser.")
 
@@ -250,7 +250,7 @@ class SimpleEclipse(Node):
             az = ancestor_param_dict['az'].currVal
 
             # If the stream does not intersect the disc, this throws an error
-            x, y, vx, vy = roche.bspot(q, rdisc_a)
+            x, y, _, _ = roche.bspot(q, rdisc_a)
 
             # Find the tangent to the disc
             alpha = np.degrees(np.arctan2(y, x))

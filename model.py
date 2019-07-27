@@ -234,7 +234,7 @@ class Node:
             fail_msg = 'I recieved the wrong number of parameters!'
             fail_msg += ' Expect: \n{}\nGot:\n{}'.format(
                 self.node_par_names,
-                [obj.name for obj in parameter_objects]
+                [param.name for param in parameter_objects]
             )
             raise TypeError(fail_msg)
 
