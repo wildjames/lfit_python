@@ -4,6 +4,7 @@ hierarchical model structure, that can also track the prior knowledge of the
 parameters of that model.
 '''
 
+import sys
 import os
 import warnings
 
@@ -241,7 +242,7 @@ class Node:
         for par in parameter_objects:
             setattr(self, par.name, par)
 
-        self.log("Successfully did the base Node init")
+        self.log('base.__init__', "Successfully did the base Node init")
 
     # Tree handling methods
     def search_par(self, label, name):
@@ -262,20 +263,20 @@ class Node:
             The Param object to be searched.
         '''
 
-        self.log("Searching for a Param called {}, on a Node labelled {}".format(name, label))
+        self.log('base.search_par', "Searching for a Param called {}, on a Node labelled {}".format(name, label))
 
         # If I'm the desired node, get my parameter
         if self.label == label:
-            self.log("I am that Node!")
+            self.log('base.search_par', "I am that Node!")
             return getattr(self, name)
         # Otherwise, check my children.
         else:
-            self.log("Searching my children for that Node.")
+            self.log('base.search_par', "Searching my children for that Node.")
             for child in self.children:
                 val = child.search_par(label, name)
                 if val is not None:
                     return val
-            self.log("Could not find that node.")
+            self.log('base.search_par', "Could not find that node.")
             return None
 
     def search_Node(self, class_type, label):
@@ -294,19 +295,19 @@ class Node:
           Node, None is the search fails
             The node that was requested.
         '''
-        self.log("Searching for a Node of class type {}, with a label {}".format(class_type, label))
+        self.log('base.search_Node', "Searching for a Node of class type {}, with a label {}".format(class_type, label))
         if self.name == "{}:{}".format(class_type, label):
-            self.log("I am that node. Returning self")
+            self.log('base.search_Node', "I am that node. Returning self")
             return self
         else:
-            self.log("Checking my children")
+            self.log('base.search_Node', "Checking my children")
             for child in self.children:
                 val = child.search_Node(class_type, label)
                 if val is not None:
                     return val
                 else:
                     pass
-            self.log("Could not find that node.")
+            self.log('base.search_Node', "Could not find that node.")
             return None
 
     def search_node_type(self, class_type, nodes=None):
@@ -324,7 +325,7 @@ class Node:
           nodes: set of Node
             The search result.
         '''
-        self.log("Constructing a set of Nodes of type {}".format(class_type))
+        self.log('base.search_node_type', "Constructing a set of Nodes of type {}".format(class_type))
 
         if nodes is None:
             nodes = set()
@@ -336,7 +337,7 @@ class Node:
         if class_type in str(self.__class__.__name__):
             nodes.add(self)
 
-        self.log("Returning: \n{}".format(nodes))
+        self.log('base.search_node_type', "Returning: \n{}".format(nodes))
         return nodes
 
     def add_child(self, children):
@@ -348,7 +349,7 @@ class Node:
             Add this to my list of children. They will be altered to
             have this node as a parent.
         '''
-        self.log("Adding: \n{}\nto my existing list of children, which was \n{}".format(children, self.children))
+        self.log('base.add_child', "Adding: \n{}\nto my existing list of children, which was \n{}".format(children, self.children))
         if not isinstance(children, list):
             children = [children]
 
@@ -379,10 +380,10 @@ class Node:
           float:
             The sum of the function called at each relevant node.
         '''
-        # self.log("Calling the function {} recursively, passing it the args:\n{}\nkwargs:\n{}".format(name, args, kwargs))
+        # self.log("base.__call_recursive_func", "Calling the function {} recursively, passing it the args:\n{}\nkwargs:\n{}".format(name, args, kwargs))
         val = 0.0
         if self.is_leaf:
-            self.log("Reached the bottom of the Tree with no function by that name.")
+            self.log("base.__call_recursive_func", "Reached the bottom of the Tree with no function by that name.")
             raise NotImplementedError('must overwrite {} on leaf nodes of model'.format(
                 name
             ))
@@ -391,7 +392,7 @@ class Node:
             val += func(*args, **kwargs)
             if np.any(np.isinf(val)):
                 # we've got an invalid model, no need to evaluate other leaves
-                self.log("The function {} called on {}, but returned an inf.".format(name, child.name))
+                self.log("base.__call_recursive_func", "The function {} called on {}, but returned an inf.".format(name, child.name))
                 return val
         return val
 
@@ -411,7 +412,7 @@ class Node:
         If model has more prior information not captured in the priors of the
         parameters, the details of such additional prior information must be
         codified in subclass methods!."""
-        self.log("Summing the ln_prior of all my Params ({} Params)".format(len(self.node_par_names)))
+        self.log('base.ln_prior', "Summing the ln_prior of all my Params ({} Params)".format(len(self.node_par_names)))
 
         # Start at a log prior probablity of 0. We'll add to this for each node
         lnp = 0.0
@@ -425,7 +426,7 @@ class Node:
                 if verbose:
                     print("Param {} in {} is invalid!".format(
                         param.name, self.name))
-                self.log("Param {} in {} is invalid!".format(
+                self.log('base.ln_prior', "Param {} in {} is invalid!".format(
                         param.name, self.name))
                 return -np.inf
 
@@ -439,7 +440,7 @@ class Node:
             print("The sum of parameter ln_priors of {} is {:.3f}\n".format(
                 self.name, lnp))
 
-        # self.log("My ln_prior is {}. Gathering my descendant ln_priors".format(lnp))
+        # self.log('base.ln_prior', "My ln_prior is {}. Gathering my descendant ln_priors".format(lnp))
 
         # Then recursively fetch my decendants
         for child in self.children:
@@ -447,11 +448,11 @@ class Node:
 
             # If my child returns negative infinite prob, terminate here.
             if np.isinf(lnp):
-                self.log("My child, {}, yielded an inf ln_prior".format(child.name))
+                self.log('base.ln_prior', "My child, {}, yielded an inf ln_prior".format(child.name))
                 return lnp
 
         # Pass it up the chain, or back to the main program
-        self.log("I computed a total ln_prior at and below me of {}".format(lnp))
+        self.log('base.ln_prior', "I computed a total ln_prior at and below me of {}".format(lnp))
         return lnp
 
     def ln_prob(self, verbose=False):
@@ -465,17 +466,17 @@ class Node:
         if np.isfinite(lnp):
             try:
                 lnp = lnp + self.ln_like()
-                self.log("Calculated ln_prob = ln_prior + ln_like = {}".format(lnp))
+                self.log('base.ln_prob', "Calculated ln_prob = ln_prior + ln_like = {}".format(lnp))
                 return lnp
             except:
                 if verbose:
                     print("Failed to evaluate ln_like at {}".format(self.name))
-                self.log("Failed to evaluate ln_prob!")
+                self.log('base.ln_prob', "Failed to evaluate ln_prob!")
                 return -np.inf
         else:
             if verbose:
                 print("{} ln_prior returned infinite!".format(self.name))
-            self.log("{} ln_prior returned infinite!".format(self.name))
+            self.log('base.ln_prob', "{} ln_prior returned infinite!".format(self.name))
             return lnp
 
     # Dunder methods that are generally hidden from the user.
@@ -713,7 +714,7 @@ class Node:
     def DEBUG(self, flag):
         self.__DEBUG = flag
 
-    def log(self, message='\n', log_stack=False):
+    def log(self, called_by, message='\n', log_stack=False):
         '''
         Logging function. Writes the node name, and the current function stack
         so the dev can trace what functions are calling what. Writes a message
@@ -722,12 +723,10 @@ class Node:
         if not self.DEBUG:
             return
 
+        # the call to inspect.stack() takes a looooong time (~ms)
         if log_stack:
             stack = ["File {}, line {}, function {}".format(x.filename, x.lineno, x.function) for x in inspect.stack()][::-1]
             stack = "\n     ".join(stack)
-
-        # What function called the logger
-        called_by = inspect.stack()[1][3]
 
         # Construct an output filename
         my_fname = "{}.txt".format(os.getpid())

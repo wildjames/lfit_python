@@ -117,10 +117,11 @@ class SimpleEclipse(Node):
         # Create the CV object
         self.cv = CV(self.cv_parlist)
 
-        self.log("Successfully ran the SimpleEclipse initialiser.")
+        self.log('SimpleEclipse.__init__', "Successfully ran the SimpleEclipse initialiser.")
 
     def calcFlux(self):
         '''Fetch the CV parameter vector, and generate it's model lightcurve'''
+        self.log('SimpleEclipse.calcFlux', "Doing calcFlux")
 
         # Get the model CV lightcurve across our data.
         try:
@@ -128,11 +129,12 @@ class SimpleEclipse(Node):
         except:
             flx = np.nan
 
-        self.log("Computed a lightcurve flux: \n{}\n\n\n".format(flx))
+        self.log('SimpleEclipse.calcFlux', "Computed a lightcurve flux: \n{}\n\n\n".format(flx))
         return flx
 
     def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''
+        self.log('SimpleEclipse.chisq', "Doing chisq")
         flx = self.calcFlux()
 
         # If the model gets any nans, return inf
@@ -143,14 +145,14 @@ class SimpleEclipse(Node):
                     flx.shape[0]
                 ))
 
-            self.log("I computed a flux that contains nans. Returning an inf chisq.")
+            self.log('SimpleEclipse.chisq', "I computed a flux that contains nans. Returning an inf chisq.")
             return np.inf
 
         # Calculate the chisq of this model.
         chisq = ((self.lc.y - flx) / self.lc.ye)**2
         chisq = np.sum(chisq)
 
-        self.log("Computed a chisq of {}".format(chisq))
+        self.log('SimpleEclipse.chisq', "Computed a chisq of {}".format(chisq))
         return chisq
 
     def ln_like(self):
@@ -158,11 +160,12 @@ class SimpleEclipse(Node):
         lightcurve object.
 
         If plot is True, also plot the data in a figure.'''
-        self.log("Returning an ln_like that is (-0.5 * chisq)")
+
+        self.log("SimpleEclipse.ln_like", "Returning an ln_like that is (-0.5 * chisq)")
 
         chisq = self.chisq()
 
-        self.log("Returning a ln_like of {}".format(-0.5*chisq))
+        self.log("SimpleEclipse.ln_like", "Returning a ln_like of {}".format(-0.5*chisq))
         return -0.5 * chisq
 
     def ln_prior(self, verbose, *args, **kwargs):
@@ -177,7 +180,7 @@ class SimpleEclipse(Node):
         If other constraints on the level of the individual eclipse are
         necessary, they should go in here.
         '''
-        self.log("Checking that the values construct a valid CV!")
+        self.log("SimpleEclipse.ln_prior", "Checking that the values construct a valid CV!")
 
         # Before we start, I'm going to collect the necessary parameters. By
         # only calling this once, we save a little effort.
@@ -203,7 +206,7 @@ class SimpleEclipse(Node):
             if verbose:
                 msg = "The disc radius of {} is large enough to precess! Value: {:.3f}".format(self.name, rdisc)
                 print(msg)
-            self.log("The disc radius is too large. Returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior", "The disc radius is too large. Returning ln_prior = -np.inf")
             return -np.inf
 
         ##############################################
@@ -234,7 +237,7 @@ class SimpleEclipse(Node):
                 print("Scale: {:.3f}".format(scale))
                 print("Range: {:.3f} - {:.3f}".format(rmin, rmax))
 
-            self.log("The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior", "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
             return -np.inf
 
         ##############################################
@@ -265,21 +268,21 @@ class SimpleEclipse(Node):
             maxaz = min(178, tangent+slope)
 
             if az < minaz or az > maxaz:
-                self.log("Azimuth is out of range. Returning ln_prior = -np.inf")
+                self.log("SimpleEclipse.ln_prior", "Azimuth is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
         except:
             if verbose:
                 print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
-            self.log("The mass stream does not intersect the disc, returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior", "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
             return -np.inf
 
-        self.log("Passed validity checks at {}.".format(self.name))
+        self.log("SimpleEclipse.ln_prior", "Passed validity checks at {}.".format(self.name))
 
         # If we pass all that, then calculate the ln_prior normally
         lnp = super().ln_prior(verbose=verbose, *args, **kwargs)
 
-        self.log("Computed a ln_prior of {}".format(lnp))
+        self.log("SimpleEclipse.ln_prior", "Computed a ln_prior of {}".format(lnp))
         return lnp
 
     @property
@@ -301,7 +304,7 @@ class SimpleEclipse(Node):
 
         parlist = [param_dict[key].currVal for key in par_name_list]
 
-        self.log("Constructed a cv_parlist of:\n{}".format(parlist))
+        self.log("SimpleEclipse.cv_parlist", "Constructed a cv_parlist of:\n{}".format(parlist))
 
         return parlist
 
@@ -389,7 +392,7 @@ class LCModel(Node):
         If other constraints on the core parameters become necessary, they
         should go here. If these tests fail, -np.inf is immediately returned.
         '''
-        self.log("Checking global parameters for validity.")
+        self.log('LCModel.ln_prior', "Checking global parameters for validity.")
         lnp = 0.0
 
         # Check that dphi is within limits
@@ -413,7 +416,7 @@ class LCModel(Node):
                     msg.format(self.name, q, dphi, maxphi, tol)
 
                     print(msg)
-                self.log("dphi is out of range. Returning ln_prior = -np.inf")
+                self.log('LCModel.ln_prior', "dphi is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
         except:
@@ -422,15 +425,15 @@ class LCModel(Node):
             if verbose:
                 msg = "Failed to calculate a value of dphi at node {}"
                 print(msg.format(self.name))
-            self.log("Failed to calculate a value of dphi. Returning ln_prior = -np.inf")
+            self.log('LCModel.ln_prior', "Failed to calculate a value of dphi. Returning ln_prior = -np.inf")
             return -np.inf
 
-        self.log("Passed parameter value validity checks.")
+        self.log('LCModel.ln_prior', "Passed parameter value validity checks.")
 
         # Then, if we pass this, move on to the 'normal' ln_prior calculation.
         lnp += super().ln_prior(verbose=verbose)
 
-        self.log("Returning a ln_prior of {}".format(lnp))
+        self.log('LCModel.ln_prior', "Returning a ln_prior of {}".format(lnp))
         return lnp
 
 
@@ -477,7 +480,7 @@ class SimpleGPEclipse(SimpleEclipse):
         range.
         '''
 
-        self.log("Calculating GP changepoints")
+        self.log('SimpleGPEclipse.calcChangepoints', "Calculating GP changepoints")
 
         # Also get object for dphi, q and rwd as this is required to determine
         # changepoints
@@ -497,7 +500,7 @@ class SimpleGPEclipse(SimpleEclipse):
         # Check to see if our model parameters have changed enough to
         # significantly change the location of the changepoints.
         if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
-            self.log("The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
+            self.log('SimpleGPEclipse.calcChangepoints', "The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
 
             # Calculate inclination
             inc = roche.findi(q.currVal, dphi.currVal)
@@ -517,7 +520,7 @@ class SimpleGPEclipse(SimpleEclipse):
             self._olddphi = dphi.currVal
             self._oldrwd = rwd.currVal
         else:
-            self.log("Using old values of dist_cp")
+            self.log('SimpleGPEclipse.calcChangepoints', "Using old values of dist_cp")
             # Use the old values
             dist_cp = self._dist_cp
 
@@ -539,7 +542,7 @@ class SimpleGPEclipse(SimpleEclipse):
             ingress = e - dist_cp + phi0.currVal
             changepoints.append([egress, ingress])
 
-        self.log("Computed GP changepoints as:\n{}".format(changepoints))
+        self.log('SimpleGPEclipse.calcChangepoints', "Computed GP changepoints as:\n{}".format(changepoints))
         return changepoints
 
     def create_GP(self):
@@ -551,7 +554,7 @@ class SimpleGPEclipse(SimpleEclipse):
 
         Requires an Eclipse object to create the GP for. """
 
-        self.log("Creating a new GP")
+        self.log('SimpleGPEclipse.create_GP', "Creating a new GP")
 
         # Get objects for ln_ampin_gp, ln_ampout_gp, ln_tau_gp and find the exponential
         # of their current values
@@ -574,7 +577,7 @@ class SimpleGPEclipse(SimpleEclipse):
 
         # We need to make a fairly complex kernel.
         # Global flicker
-        self.log("Constructing a new kernel")
+        self.log('SimpleGPEclipse.create_GP', "Constructing a new kernel")
         kernel = ampin_gp * george.kernels.Matern32Kernel(tau_gp)
         # inter-eclipse flicker
         for gap in changepoints:
@@ -586,7 +589,7 @@ class SimpleGPEclipse(SimpleEclipse):
         # Use that kernel to make a GP object
         georgeGP = george.GP(kernel, solver=george.HODLRSolver)
 
-        self.log("Successfully created a new GP!")
+        self.log('SimpleGPEclipse.create_GP', "Successfully created a new GP!")
         return georgeGP
 
     def ln_like(self):
@@ -608,8 +611,8 @@ class SimpleGPEclipse(SimpleEclipse):
         children; list(Node), or Node:
             The children of this node. Single Node is also accepted
         '''
-        if self.DEBUG:
-            self.log("Computing ln_like for a GP")
+
+        self.log('SimpleGPEclipse.ln_like', "Computing ln_like for a GP")
 
         # For each eclipse, I want to know the log likelihood of its residuals
         gp_ln_like = 0.0
@@ -619,7 +622,7 @@ class SimpleGPEclipse(SimpleEclipse):
         # Did the model turn out ok?
         if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
             if self.DEBUG:
-                self.log("GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood.")
+                self.log('SimpleGPEclipse.ln_like', "GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood.")
             return -np.inf
 
         # Create the GP of this eclipse
@@ -632,7 +635,7 @@ class SimpleGPEclipse(SimpleEclipse):
         gp_ln_like = gp.log_likelihood(residuals, quiet=True)
 
         if self.DEBUG:
-            self.log("GP computed a ln_like of {}".format(gp_ln_like))
+            self.log('SimpleGPEclipse.ln_like', "GP computed a ln_like of {}".format(gp_ln_like))
 
         return gp_ln_like
 
