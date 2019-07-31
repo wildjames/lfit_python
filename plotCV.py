@@ -342,7 +342,7 @@ def notipy(send_to, fnames, body):
 
 
 def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
-                automated=False):
+                automated=False, corners=True):
     '''Takes the chain file made by mcmcfit.py and summarises the initial
     and final conditions. Uses the input filename normally supplied to
     mcmcfit.py to accurately reconstruct the model.
@@ -363,6 +363,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
       automated: bool
         If this is True, no figures will actually show, and will only be
         saved to file.
+      corners: bool
+        If this is True, create and save corner plots of each eclipse's params
     '''
 
     # Retrieve some info from the input dict.
@@ -531,53 +533,54 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         notipy(destination, fnames, model_preport+model_report)
 
 
-    # Corner plots. Collect the eclipses.
-    eclipses = model.search_node_type("Eclipse")
-    for eclipse in eclipses:
-        # Get the par names from the eclipse.
-        # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
-        # the thumbplot gets confused and dies, since there's no range.
-        # This parameter it typically only important if something goes badly
-        # wrong anyway, so if it gets stuck here, just filter it out.
-        dirac_delta_par0 = False
-        if eclipse.phi0 == 0.0:
-            dirac_delta_par0 = True
-
-        if dirac_delta_par0:
-            par_labels = [par for par in eclipse.node_par_names if 'phi0' not in par]
-        else:
-            par_labels = eclipse.node_par_names
-
-        par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
-
-        # Get the par names from the band
-        band = eclipse.parent
-        par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names]
-
-        # get the par names from the core part of the model
-        my_model = band.parent
-        par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
-
-        print("\nMy par_labels is:")
-        print(par_labels)
-
-        # Get the indexes in the chain file, and gather those columns
-        keys = [colKeys.index(par) for par in par_labels]
-        chain_slice = chain[:, keys]
-        print("chain_slice has the shape:", chain_slice.shape)
-
-        fig = u.thumbPlot(chain_slice, par_labels)
-
-        oname = "Final_figs/" + eclipse.name + '_corners.png'
-        print("Saving to {}...".format(oname))
-        plt.savefig(oname)
-        plt.close()
-
-        del chain_slice
-        try:
-            del fig
-        except:
-            pass
+    if corners:
+        # Corner plots. Collect the eclipses.
+        eclipses = model.search_node_type("Eclipse")
+        for eclipse in eclipses:
+            # Get the par names from the eclipse.
+            # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
+            # the thumbplot gets confused and dies, since there's no range.
+            # This parameter it typically only important if something goes badly
+            # wrong anyway, so if it gets stuck here, just filter it out.
+            dirac_delta_par0 = False
+            if eclipse.phi0 == 0.0:
+                dirac_delta_par0 = True
+    
+            if dirac_delta_par0:
+                par_labels = [par for par in eclipse.node_par_names if 'phi0' not in par]
+            else:
+                par_labels = eclipse.node_par_names
+    
+            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
+    
+            # Get the par names from the band
+            band = eclipse.parent
+            par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names]
+    
+            # get the par names from the core part of the model
+            my_model = band.parent
+            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
+    
+            print("\nMy par_labels is:")
+            print(par_labels)
+    
+            # Get the indexes in the chain file, and gather those columns
+            keys = [colKeys.index(par) for par in par_labels]
+            chain_slice = chain[:, keys]
+            print("chain_slice has the shape:", chain_slice.shape)
+    
+            fig = u.thumbPlot(chain_slice, par_labels)
+    
+            oname = "Final_figs/" + eclipse.name + '_corners.png'
+            print("Saving to {}...".format(oname))
+            plt.savefig(oname)
+            plt.close()
+    
+            del chain_slice
+            try:
+                del fig
+            except:
+                pass
 
 
 if __name__ == "__main__":
@@ -623,6 +626,12 @@ if __name__ == "__main__":
         action='store_true',
         help="If I'm being quiet, no figure will be shown, only saved to file.",
     )
+    parser.add_argument(
+        '--no-corners',
+        dest='corners',
+        action='store_false',
+        help="Do not create the corner plots"
+    )
 
     args = parser.parse_args()
 
@@ -634,5 +643,6 @@ if __name__ == "__main__":
 
     destination = args.notify
     automated=bool(args.quiet)
+    corners = args.corners
 
-    fit_summary(chain_fname, input_fname, nskip, thin, destination, automated=automated)
+    fit_summary(chain_fname, input_fname, nskip, thin, destination, automated=automated, corners=corners)
