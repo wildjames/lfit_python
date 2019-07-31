@@ -138,9 +138,11 @@ class SimpleEclipse(Node):
             print("This is my parameter vector:")
             print(self.cv_parlist)
             print("I'll return flx = np.nan")
+            self.log("SimpleEclipse.calcFlux", "Function timed out. parlist:\n{}\nError:\n{}".format(self.cv_parlist, e))
             flx = np.nan
         except Exception as e:
             print(e)
+            self.log("SimpleEclipse.calcFlux", str(e))
             flx = np.nan
 
         self.log('SimpleEclipse.calcFlux', "Computed a lightcurve flux: \n{}\n\n\n".format(flx))
