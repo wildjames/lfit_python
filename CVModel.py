@@ -16,7 +16,7 @@ from trm import roche
 
 from model import Node, Param
 
-# TEMPORARY hack solution to infinite CV BS calculation. 
+# TEMPORARY hack solution to infinite CV BS calculation.
 from func_timeout import func_timeout, FunctionTimedOut
 
 class Lightcurve:
@@ -127,19 +127,15 @@ class SimpleEclipse(Node):
 
         # Get the model CV lightcurve across our data.
         try:
-            flx = func_timeout(
-                60,
-                self.cv.calcFlux,
-                args=(self.cv_parlist, self.lc.x, self.lc.w),
-            )
-        except FunctionTimedOut as e:
-            print("Warning! I took more than 60 seconds to compute the lightcurve. I got this error:")
-            print(e)
-            print("This is my parameter vector:")
-            print(self.cv_parlist)
-            print("I'll return flx = np.nan")
-            self.log("SimpleEclipse.calcFlux", "Function timed out. parlist:\n{}\nError:\n{}".format(self.cv_parlist, e))
-            flx = np.nan
+            flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+        # except FunctionTimedOut as e:
+        #     print("Warning! I took more than 60 seconds to compute the lightcurve. I got this error:")
+        #     print(e)
+        #     print("This is my parameter vector:")
+        #     print(self.cv_parlist)
+        #     print("I'll return flx = np.nan")
+        #     self.log("SimpleEclipse.calcFlux", "Function timed out. parlist:\n{}\nError:\n{}".format(self.cv_parlist, e))
+        #     flx = np.nan
         except Exception as e:
             print(e)
             self.log("SimpleEclipse.calcFlux", str(e))
