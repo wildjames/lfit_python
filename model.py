@@ -422,7 +422,7 @@ class Node:
             if param.isValid and param.isVar:
                 lnp += param.prior.ln_prob(param.currVal)
 
-            else:
+            elif not param.isValid:
                 if verbose:
                     print("Param {} in {} is invalid!".format(
                         param.name, self.name))
