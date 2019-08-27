@@ -543,7 +543,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         eclipses = model.search_node_type("Eclipse")
         for eclipse in eclipses:
             # Get the par names from the eclipse.
-           print("Doing the corner plot for eclipse {}".format(eclipse))
+            print("Doing the corner plot for eclipse {}".format(eclipse))
 
             # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
             # the thumbplot gets confused and dies, since there's no range.
