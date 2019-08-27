@@ -525,6 +525,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
+        print("Sending a summary email. Corner plots are omitted due to filesize.")
         # Gather the files
         fnames = list(glob.iglob('Final_figs/*.pdf', recursive=True))
         fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
@@ -542,11 +543,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         eclipses = model.search_node_type("Eclipse")
         for eclipse in eclipses:
             # Get the par names from the eclipse.
-
-            print("Doing the corner plot for eclipse {}".format(eclipse))
-            print("The eclipse has the parameters:")
-            for p in eclipse.node_par_names:
-                print("--> {}".format(p))
+           print("Doing the corner plot for eclipse {}".format(eclipse))
 
             # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
             # the thumbplot gets confused and dies, since there's no range.
@@ -566,16 +563,12 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
             # Get the par names from the band
             band = eclipse.parent
-            for p in band.node_par_names:
-                print("--> {}".format(p))
 
             par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names
                 if par in colKeys]
 
             # get the par names from the core part of the model
             my_model = band.parent
-            for p in my_model.node_par_names:
-                print("--> {}".format(p))
 
             # par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
             for par in my_model.node_par_names:
