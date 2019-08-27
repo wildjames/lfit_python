@@ -484,7 +484,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     dof -= 1
 
     model_preport = 'The following is the result of the MCMC fit running in:\n'
-    model_preport += "  Machine name: {}\n  Directory: {}\n".format(os.uname().nodename, os.path.curdir)
+    model_preport += "  Machine name: {}\n  Directory: {}\n".format(os.uname().nodename, os.getcwd())
     model_preport += "\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
     model_preport += "\nEvaluating the model, we get;\n"
     model_preport += "a ln_prior of {:.3f}\n".format(model.ln_prior())
