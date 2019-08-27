@@ -577,8 +577,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             for p in my_model.node_par_names:
                 print("--> {}".format(p))
 
-            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names
-                if par in colKeys]
+            # par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
+            for par in my_model.node_par_names:
+                for col in colKeys:
+                    if par in col:
+                        par_labels.append("{}_{}".format(par, my_model.label))
 
             print("\nMy par_labels is:")
             print(par_labels)
