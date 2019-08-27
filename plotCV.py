@@ -545,37 +545,40 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             dirac_delta_par0 = False
             if eclipse.phi0 == 0.0:
                 dirac_delta_par0 = True
-    
+
             if dirac_delta_par0:
                 par_labels = [par for par in eclipse.node_par_names if 'phi0' not in par]
             else:
                 par_labels = eclipse.node_par_names
-    
-            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
-    
+
+            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels
+                if par in colKeys]
+
             # Get the par names from the band
             band = eclipse.parent
-            par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names]
-    
+            par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names
+                if par in colKeys]
+
             # get the par names from the core part of the model
             my_model = band.parent
-            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
-    
+            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names
+                if par in colKeys]
+
             print("\nMy par_labels is:")
             print(par_labels)
-    
+
             # Get the indexes in the chain file, and gather those columns
             keys = [colKeys.index(par) for par in par_labels]
             chain_slice = chain[:, keys]
             print("chain_slice has the shape:", chain_slice.shape)
-    
+
             fig = u.thumbPlot(chain_slice, par_labels)
-    
+
             oname = "Final_figs/" + eclipse.name + '_corners.png'
             print("Saving to {}...".format(oname))
             plt.savefig(oname)
             plt.close()
-    
+
             del chain_slice
             try:
                 del fig
