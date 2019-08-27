@@ -533,6 +533,10 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         notipy(destination, fnames, model_preport+model_report)
 
 
+    print("The chain file has the folloing variables:")
+    for p in colKeys:
+        print("-> {}".format(p))
+
     if corners:
         # Corner plots. Collect the eclipses.
         eclipses = model.search_node_type("Eclipse")
@@ -571,6 +575,10 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             keys = [colKeys.index(par) for par in par_labels]
             chain_slice = chain[:, keys]
             print("chain_slice has the shape:", chain_slice.shape)
+
+            # If I've nothing to plot, continue to the next thing.
+            if par_labels == []:
+                continue
 
             fig = u.thumbPlot(chain_slice, par_labels)
 
