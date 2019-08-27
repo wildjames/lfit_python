@@ -525,6 +525,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
+        print("Sending a summary email. Corner plots are omitted due to filesize.")
         # Gather the files
         fnames = list(glob.iglob('Final_figs/*.pdf', recursive=True))
         fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
@@ -533,11 +534,17 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         notipy(destination, fnames, model_preport+model_report)
 
 
+    print("The chain file has the folloing variables:")
+    for p in colKeys:
+        print("-> {}".format(p))
+
     if corners:
         # Corner plots. Collect the eclipses.
         eclipses = model.search_node_type("Eclipse")
         for eclipse in eclipses:
             # Get the par names from the eclipse.
+            print("Doing the corner plot for eclipse {}".format(eclipse))
+
             # Sometimes, the walkers can fall into a phi0 == 0.0. When this happens,
             # the thumbplot gets confused and dies, since there's no range.
             # This parameter it typically only important if something goes badly
@@ -556,13 +563,18 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
             # Get the par names from the band
             band = eclipse.parent
+
             par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names
                 if par in colKeys]
 
             # get the par names from the core part of the model
             my_model = band.parent
-            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names
-                if par in colKeys]
+
+            # par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
+            for par in my_model.node_par_names:
+                for col in colKeys:
+                    if par in col:
+                        par_labels.append("{}_{}".format(par, my_model.label))
 
             print("\nMy par_labels is:")
             print(par_labels)
@@ -571,6 +583,10 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             keys = [colKeys.index(par) for par in par_labels]
             chain_slice = chain[:, keys]
             print("chain_slice has the shape:", chain_slice.shape)
+
+            # If I've nothing to plot, continue to the next thing.
+            if par_labels == []:
+                continue
 
             fig = u.thumbPlot(chain_slice, par_labels)
 
