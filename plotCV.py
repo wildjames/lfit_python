@@ -473,6 +473,16 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     # # # # # # # # # # # # # # # # # # # # # # # #
     model = construct_model(input_fname)
 
+    with open('modparams.txt', 'r') as f:
+        f.write("parName,mean,84th percentile,16th percentile\n")
+        lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
+        labels = model.dynasty_par_names
+
+        for n, m, u, l in zip(labels, result, uplim, lolim):
+            s = "{} {} {} {}\n".format(n, m, u, l)
+            f.write(s)
+        f.write('\n')
+
     # We want to know where we started, so we can evaluate improvements.
     # Wok out how many degrees of freedom we have in the model
     eclipses = model.search_node_type('Eclipse')
