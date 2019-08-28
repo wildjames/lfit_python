@@ -308,7 +308,7 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-    with open('modparams.txt', 'r') as f:
+    with open('modparams.txt', 'w') as f:
         f.write("parName,mean,84th percentile,16th percentile\n")
         lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
         labels = model.dynasty_par_names
