@@ -13,8 +13,7 @@ import networkx as nx
 import numpy as np
 import yagmail as yag
 
-import mcmc_utils as u
-import plotCV
+import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
 
 
@@ -380,7 +379,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     with open(chain_fname, 'r') as chain_file:
         colKeys = chain_file.readline().strip().split(' ')[1:]
     print("Reading in the file...")
-    data = u.readchain_dask(chain_fname)
+    data = utils.readchain_dask(chain_fname)
 
     print("Done!\nData shape: {}".format(data.shape))
     print("Expected a shape (nwalkers, nprod, npars): ({}, {}, {})".format(nwalkers, nsteps, len(colKeys)))
@@ -505,7 +504,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     if not automated:
         print("Initial conditions being plotted now...")
 
-    plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Initial_figs')
+    plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Initial_figs')
 
     # Set the parameters of the model to the results of the chain
     for key, value in resultDict.items():
@@ -532,7 +531,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     if not automated:
         print("Final conditions being plotted now...")
 
-    plotCV.plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
+    plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
     if emailme:
         print("Sending a summary email. Corner plots are omitted due to filesize.")
@@ -598,7 +597,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             if par_labels == []:
                 continue
 
-            fig = u.thumbPlot(chain_slice, par_labels)
+            fig = utils.thumbPlot(chain_slice, par_labels)
 
             oname = "Final_figs/" + eclipse.name + '_corners.png'
             print("Saving to {}...".format(oname))
