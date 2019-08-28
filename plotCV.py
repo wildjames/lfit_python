@@ -567,26 +567,25 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             else:
                 par_labels = eclipse.node_par_names
 
-            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels
-                if par in colKeys]
+            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
 
             # Get the par names from the band
             band = eclipse.parent
-
-            par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names
-                if par in colKeys]
+            par_labels += ["{}_{}".format(par, band.label) for par in band.node_par_names]
 
             # get the par names from the core part of the model
             my_model = band.parent
+            par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
 
-            # par_labels += ["{}_{}".format(par, my_model.label) for par in my_model.node_par_names]
-            for par in my_model.node_par_names:
+            # Only plot parameters that are in the chain file.
+            labels = []
+            for par in par_labels:
                 for col in colKeys:
                     if par in col:
-                        par_labels.append("{}_{}".format(par, my_model.label))
+                        labels.append(par)
 
-            print("\nMy par_labels is:")
-            print(par_labels)
+            print("\nMy corner plot labels are:")
+            print(labels)
 
             # Get the indexes in the chain file, and gather those columns
             keys = [colKeys.index(par) for par in par_labels]
