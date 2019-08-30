@@ -558,15 +558,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             # the thumbplot gets confused and dies, since there's no range.
             # This parameter it typically only important if something goes badly
             # wrong anyway, so if it gets stuck here, just filter it out.
-            dirac_delta_par0 = False
-            if eclipse.phi0 == 0.0:
-                dirac_delta_par0 = True
 
-            if dirac_delta_par0:
-                par_labels = [par for par in eclipse.node_par_names if 'phi0' not in par]
-            else:
-                par_labels = eclipse.node_par_names
-
+            par_labels = eclipse.node_par_names
             par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
 
             # Get the par names from the band
@@ -595,6 +588,12 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             # If I've nothing to plot, continue to the next thing.
             if par_labels == []:
                 continue
+
+            dev = np.std(chain_slice, axis=0)
+            dev[np.where(dev == 0)] = np.nan
+            print(dev)
+            chain_slice = chain_slice[~np.isnan(dev)]
+            par_labels  = par_labels[~np.isnan(dev)]
 
             fig = utils.thumbPlot(chain_slice, par_labels)
 
