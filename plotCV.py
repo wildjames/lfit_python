@@ -592,7 +592,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             dev = np.std(chain_slice, axis=0)
             dev[np.where(dev == 0)] = np.nan
             print(dev)
-            chain_slice = chain_slice[~np.isnan(dev)]
+            chain_slice = chain_slice[:, ~np.isnan(dev)]
             par_labels  = par_labels[~np.isnan(dev)]
 
             fig = utils.thumbPlot(chain_slice, par_labels)
