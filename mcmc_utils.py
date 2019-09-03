@@ -24,6 +24,7 @@ try:
     getattr(triangle, "corner")
 except (AttributeError, ImportError):
     # We want the other package
+    print("Could not import package, `triangle`, falling back on `corner.triangle`")
     import corner as triangle
 
 
