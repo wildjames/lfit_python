@@ -10,6 +10,7 @@ from astropy import constants as const
 from astropy import units
 from astropy.table import Column, Table
 from astropy.utils.console import ProgressBar as PB
+
 # see if our astropy version supports quantities or not
 quantitySupport = True
 try:
