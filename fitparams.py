@@ -1,11 +1,12 @@
+import matplotlib.pyplot as plt
+import numpy
+import scipy.stats
+import seaborn
 from scipy.optimize import leastsq as lsq
 from scipy.special import erf
 from scipy.stats import skew
+
 from mcmc_utils import *
-import scipy.stats
-import numpy
-import matplotlib.pyplot as plt
-import seaborn
 
 seaborn.set(style='ticks')
 seaborn.set_style({"xtick.direction": "in","ytick.direction": "in", \
@@ -249,6 +250,3 @@ if __name__ == "__main__":
 
         plt.close(plotMult.fig)
     #plt.show()
-
-
-

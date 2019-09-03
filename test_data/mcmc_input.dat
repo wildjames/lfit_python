@@ -1,0 +1,183 @@
+# MCMC run parameters
+fit            = 1      # actually fit (1), or just plot model as specified (0)
+nburn          = 100    # number of steps to use in burn-in phase
+nprod          = 100    # number of steps to use in production phase
+nwalkers       = 36      # number of walkers per chain, must be even multiple of npars
+
+nthread        = 8     # number of CPU threads to use
+
+usePT          = 0      # use parallel tempering (1), or standard fitting (0)
+ntemps         = 3      # number of chains of different temperatures for Parallel Tempering fitting
+
+
+first_scatter  = 0.10   # fractional scatter to add to starting ball of parameters in first burnin
+double_burnin  = 0      # run two burnin phases (1), or just the one (0)
+second_scatter = 0.05   # fractional scatter to add to starting ball of parameters in second burnin
+comp_scat      = 1      # vary scatter for different params (1), or add uniform scatter (0)
+
+
+
+# all model parameters have both a starting value and a prior
+# priors are specified by type, val1, val2
+# type can be one of 'gauss', 'uniform' or 'log_uniform'
+# if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
+# if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
+
+neclipses = 1
+
+# what phases to plot/fit
+phi_start = -0.2
+phi_end = 0.3
+
+# plot corner plot, yes (1) or no (0)?
+corner = 0 #### Crashes the script before the fits are plotted ####
+
+# complex bright spot, yes (1) or no (0)?
+complex = 1
+
+# fit using Gaussian processes, yes (1) or no (0)?
+useGP = 0
+
+
+# eclipse independent parameters, is parameter to be fit (1) or not (0)?
+  ln_ampin_gp =    -9.5118        uniform        -20.0         -2.0            1
+ ln_ampout_gp =    -9.0953        uniform        -20.0         -2.0            1
+    ln_tau_gp =    -2.2131        uniform         -6.9         -2.0            1
+
+
+         q =       0.1037      uniform       0.0300       0.5000            1
+      dphi =       0.0392      uniform       0.0100       0.1000            1
+       rwd =       0.0187      uniform       0.0010       0.1000            1
+
+
+  wdFlux_g =       0.0528      uniform       0.0010       0.2000            1
+  rsFlux_g =       0.0131      uniform       0.0010       0.2000            1
+
+wdFlux_KG5 =       0.0539      uniform       0.0010       0.2000            1
+rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
+
+  wdFlux_r =       0.0324      uniform       0.0010       0.2000            1
+  rsFlux_r =       0.0262      uniform       0.0010       0.2000            1
+
+
+
+# remaining parameters vary from eclipse to eclipse
+# the following lines should have an entry for each individual eclipse
+
+### g Data
+    file_0 = lightcurves/test_data_0.calib
+    plot_0 = test_data_0
+    band_0 = g
+
+   dFlux_0 =       0.0707      uniform       0.0010       0.2000            1
+   sFlux_0 =       0.0613      uniform       0.0010       0.2000            1
+   ulimb_0 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_0 =       0.2953      uniform       0.2000       0.7000            1
+   scale_0 =       0.0430  log_uniform       0.0010       0.2000            1
+      az_0 =     127.2343      uniform      50.0000     175.0000            1
+     fis_0 =       0.0480      uniform       0.0010       1.0000            1
+    dexp_0 =       0.5000  log_uniform       0.0010       2.0000            1
+    phi0_0 =      -0.023      uniform      -0.2000       0.2000            1
+    exp1_0 =       1.1342      uniform       0.0010       5.0000            1
+    exp2_0 =       4.5971      uniform       0.5000       5.0000            1
+     yaw_0 =      -64.040      uniform     -90.0000      90.0000            1
+    tilt_0 =       8.5079      uniform       0.0010     180.0000            1
+
+
+    file_1 = lightcurves/test_data_1.calib
+    plot_1 = test_data_1
+    band_1 = g
+
+   dFlux_1 =       0.1238      uniform       0.0010       0.2000            1
+   sFlux_1 =       0.1518      uniform       0.0010       0.2000            1
+   ulimb_1 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_1 =       0.5214      uniform       0.2000       0.7000            1
+   scale_1 =       0.0497  log_uniform       0.0010       0.2000            1
+      az_1 =     122.0724      uniform      50.0000     175.0000            1
+     fis_1 =       0.1684      uniform       0.0010       1.0000            1
+    dexp_1 =       1.9539  log_uniform       0.0010       2.0000            1
+    phi0_1 =      -0.0013      uniform      -0.2000       0.2000            1
+    exp1_1 =       3.4876      uniform       0.0010       5.0000            1
+    exp2_1 =       1.4429      uniform       0.5000       5.0000            1
+     yaw_1 =      15.6635      uniform     -90.0000      90.0000            1
+    tilt_1 =      52.4720      uniform       0.0010     180.0000            1
+
+
+
+### KG5 Data
+    file_2 =   lightcurves/test_data_2.calib
+    plot_2 =  test_data_2
+    band_2 = KG5
+
+   dFlux_2 =       0.0496      uniform       0.0010       0.2000            1
+   sFlux_2 =       0.0631      uniform       0.0010       0.2000            1
+   ulimb_2 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_2 =       0.5487      uniform       0.2000       0.7000            1
+   scale_2 =       0.0410  log_uniform       0.0010       0.2000            1
+      az_2 =     125.1563      uniform      50.0000     175.0000            1
+     fis_2 =       0.0467      uniform       0.0010       1.0000            1
+    dexp_2 =       0.7073  log_uniform       0.0010       2.0000            1
+    phi0_2 =      -0.0004      uniform      -0.2000       0.2000            1
+    exp1_2 =       2.7938      uniform       0.0010       5.0000            1
+    exp2_2 =       1.2241      uniform       0.5000       5.0000            1
+     yaw_2 =      -1.3957      uniform     -90.0000      90.0000            1
+    tilt_2 =      49.0896      uniform       0.0010     180.0000            1
+
+
+    file_3 =   lightcurves/test_data_3.calib
+    plot_3 =  test_data_3
+    band_3 = KG5
+
+   dFlux_3 =       0.0938      uniform       0.0010       0.2000            1
+   sFlux_3 =       0.0618      uniform       0.0010       0.2000            1
+   ulimb_3 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_3 =       0.4212      uniform       0.2000       0.7000            1
+   scale_3 =       0.0430  log_uniform       0.0010       0.2000            1
+      az_3 =     125.1298      uniform      50.0000     175.0000            1
+     fis_3 =       0.1099      uniform       0.0010       1.0000            1
+    dexp_3 =       1.0794  log_uniform       0.0010       2.0000            1
+    phi0_3 =      -0.0002      uniform      -0.2000       0.2000            1
+    exp1_3 =       0.2859      uniform       0.0010       5.0000            1
+    exp2_3 =       0.9702      uniform       0.5000       5.0000            1
+     yaw_3 =      -2.4394      uniform     -90.0000      90.0000            1
+    tilt_3 =      52.2358      uniform       0.0010     180.0000            1
+
+
+### r Data
+    file_4 =  lightcurves/test_data_4.calib
+    plot_4 =  test_data_4
+    band_4 = r
+
+   dFlux_4 =       0.1267      uniform       0.0010       0.2000            1
+   sFlux_4 =       0.1084      uniform       0.0010       0.2000            1
+   ulimb_4 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_4 =       0.5954      uniform       0.2000       0.7000            1
+   scale_4 =       0.0487  log_uniform       0.0010       0.2000            1
+      az_4 =      99.1185      uniform      50.0000     175.0000            1
+     fis_4 =       0.0317      uniform       0.0010       1.0000            1
+    dexp_4 =       1.4333  log_uniform       0.0010       2.0000            1
+    phi0_4 =       0.0004      uniform      -0.2000       0.2000            1
+    exp1_4 =       2.9879      uniform       0.0010       5.0000            1
+    exp2_4 =       1.2802      uniform       0.5000       5.0000            1
+     yaw_4 =      22.7125      uniform     -90.0000      90.0000            1
+    tilt_4 =     138.7462      uniform       0.0010     180.0000            1
+
+
+    file_5 = lightcurves/test_data_5.calib
+    plot_5 = test_data_5
+    band_5 = r
+
+   dFlux_5 =       0.0845      uniform       0.0010       0.2000            1
+   sFlux_5 =       0.0697      uniform       0.0010       0.2000            1
+   ulimb_5 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_5 =       0.5702      uniform       0.2000       0.7000            1
+   scale_5 =       0.0191  log_uniform       0.0010       0.2000            1
+      az_5 =     120.9071      uniform      50.0000     175.0000            1
+     fis_5 =       0.0506      uniform       0.0010       1.0000            1
+    dexp_5 =       1.7123  log_uniform       0.0010       2.0000            1
+    phi0_5 =      -0.0000      uniform      -0.2000       0.2000            1
+    exp1_5 =       3.0050      uniform       0.0010       5.0000            1
+    exp2_5 =       1.3828      uniform       0.5000       5.0000            1
+     yaw_5 =       8.6757      uniform     -90.0000      90.0000            1
+    tilt_5 =     111.5294      uniform       0.0010     180.0000            1
+

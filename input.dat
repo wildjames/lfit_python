@@ -1,15 +1,18 @@
 # MCMC run parameters
-nburn    = 20000		# number of steps to use in burn-in phase
-nprod    = 10000	# number of steps to use in production phase
-nwalkers = 200 	# number of walkers per chain, must be even multiple of npars (npars = (3 or 6) + (11 or 15)*necl)
-ntemps = 1      # number of chains of different temperatures for Parallel Tempering fitting
-nthread  = 8	# number of CPU threads to use
-first_scatter  = 0.10 	# fractional scatter to add to starting ball of parameters in first burnin
-second_scatter = 0.10   # fractional scatter to add to starting ball of parameters in second burnin
-comp_scat   = 1  # vary scatter for different params (1), or add uniform scatter (0)
-fit      = 0		# actually fit (1), or just plot model as specified (0)
-usePT    = 0  # use parallel tempering (1), or standard fitting (0)
-double_burnin = 0 # run two burnin phases (1), or just the one (0) 
+nburn            = 20000      # number of steps to use in burn-in phase
+nprod            = 10000      # number of steps to use in production phase
+nwalkers         = 200        # number of walkers per chain, must be even multiple of npars (npars = (3 or 6) + (11 or 15)*necl)
+
+first_scatter    = 0.01       # fractional scatter to add to starting ball of parameters in first burnin
+second_scatter   = 0.01       # fractional scatter to add to starting ball of parameters in second burnin
+comp_scat        = 1          # vary scatter for different params (1), or add uniform scatter (0)
+fit              = 0          # actually fit (1), or just plot model as specified (0)
+
+usePT            = 0          # use parallel tempering (1), or standard fitting (0)
+ntemps           = 1          # number of chains of different temperatures for Parallel Tempering fitting
+nthread          = 8          # number of CPU threads to use
+double_burnin    = 0          # run two burnin phases (1), or just the one (0)
+
 
 # all model parameters have both a starting value and a prior
 # priors are specified by type, val1, val2
@@ -17,65 +20,120 @@ double_burnin = 0 # run two burnin phases (1), or just the one (0)
 # if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
 # if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
 
+
 # eclipse independent parameters, is parameter to be fit (1) or not (0)?
-ampin_gp = -15.0 uniform -25.0 -2.0 1
-ampout_gp = -15.0 uniform -25.0 -2.0 1	
-tau_gp = -15.0 uniform -25.0 -2.0 1
+  ampin_gp =    -15.0      uniform       -25.0    -2.0     1
+ ampout_gp =    -15.0      uniform       -25.0    -2.0     1
+    tau_gp =    -15.0      uniform       -25.0    -2.0     1
 
-q     	= 0.100 uniform 0.001 3.5 1  
-dphi  	= 0.0515 uniform 0.001 1.0 1  
-rwd   	= 0.020 uniform 0.001 0.1 1
+         q =     0.103     uniform        0.001    0.50    1
+      dphi =     0.039     uniform        0.001    0.50    1
+       rwd =     0.018     uniform        0.001    0.50    1
 
-# remaining parameters vary from eclipse to eclipse
-neclipses = 2
+
+  wdFlux_r =     0.03       uniform      0.001     0.2     1
+  rsFlux_r =     0.02       uniform      0.001     0.2     1
+
+  wdFlux_g =     0.0607     uniform      0.001     0.2     1
+  rsFlux_g =     0.0206     uniform      0.001     0.2     1
+
+wdFlux_KG5 =     0.0539     uniform      0.001     0.2     1
+rsFlux_KG5 =     0.0233     uniform      0.001     0.2     1
+
+
+
+
+# neclipses = 2  # If you only want to fit the first N eclipses
 
 # what phases to plot/fit
 phi_start = -0.10
-phi_end = 0.15
+  phi_end =  0.15
 
-# plot corner plot, yes (1) or no (0)?
-corner = 0
+# plot corner plot, yes (1) or no (0)? Fits with many parameters will crash this!
+ corner = 0
 
 # complex bright spot, yes (1) or no (0)?
-complex = 1
+complex = 0
 
 # fit using Gaussian processes, yes (1) or no (0)?
-useGP = 1
+  useGP = 0
+
+
+
 
 # the following lines should have an entry for each individual eclipse
+    file_0 = test_data/SDSSJ0748_0_KG5.calib # file containing data to fit. 3 columns - MJD, flux, err
+    plot_0 = SDSSJ0748_0_KG5
+    band_0 = KG5
 
-file_0  =   		# file containing data to fit. 3 columns - MJD, flux, err
-plot_0  = 	
-wdFlux_0 = 0.3	    uniform	0.001 3.0 1 
-dFlux_0 = 0.6       uniform 0.001 2.0 1
-sFlux_0 = 0.5       uniform 0.001 3.0	1
-rsFlux_0 = 0.04     uniform 0.0 2.0 1  
-ulimb_0 = 0.374	    gauss 0.374 0.001 1 
-rdisc_0 = 0.4	    uniform	0.2 0.7 1  
-scale_0 = 0.08	    log_uniform	0.001 0.2 1 
-az_0 = 115.0        uniform 50.0 180.0 1  
-fis_0 = 0.7         uniform 0.001 1.0	1 
-dexp_0 = 0.6        uniform 0.001 2.5 1 
-phi0_0 = -0.0002    uniform -0.01 0.01 1 
-exp1_0 = 0.8        uniform 0.001 4.0 1 
-exp2_0 = 1.2        uniform 0.001 3.0 1 
-tilt_0 = 9.8        uniform 0.0 180.0 1 
-yaw_0 = 10.0        uniform -90.0 90.0 1
+   dFlux_0 =       0.0496      uniform       0.0010       0.2000            1
+   sFlux_0 =       0.0631      uniform       0.0010       0.2000            1
+   ulimb_0 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_0 =       0.5487      uniform       0.2000       0.7000            1
+   scale_0 =       0.0410  log_uniform       0.0010       0.2000            1
+      az_0 =     125.1563      uniform      50.0000     175.0000            1
+     fis_0 =       0.0467      uniform       0.0010       1.0000            1
+    dexp_0 =       0.7073  log_uniform       0.0010       2.0000            1
+    phi0_0 =      -0.0004      uniform      -0.2000       0.2000            1
+    exp1_0 =       2.7938      uniform       0.0010       5.0000            1
+    exp2_0 =       1.2241      uniform       0.5000       5.0000            1
+     yaw_0 =      -1.3957      uniform     -90.0000      90.0000            1
+    tilt_0 =      49.0896      uniform       0.0010     180.0000            1
 
-file_1  =   		# file containing data to fit. 3 columns - MJD, flux, err
-plot_1  = 	
-wdFlux_1 = 0.3	    uniform	0.001 3.0 1 
-dFlux_1 = 0.6       uniform 0.001 2.0 1
-sFlux_1 = 0.5       uniform 0.001 3.0	1
-rsFlux_1 = 0.04     uniform 0.0 2.0 1  
-ulimb_1 = 0.374	    gauss 0.374 0.001 1 
-rdisc_1 = 0.4	    uniform	0.2 0.7 1  
-scale_1 = 0.08	    log_uniform	0.001 0.2 1 
-az_1 = 115.0        uniform 50.0 180.0 1  
-fis_1 = 0.7         uniform 0.001 1.0	1 
-dexp_1 = 0.6        uniform 0.001 2.5 1 
-phi0_1 = -0.0002    uniform -0.01 0.01 1 
-exp1_1 = 0.8        uniform 0.001 4.0 1 
-exp2_1 = 1.2        uniform 0.001 3.0 1 
-tilt_1 = 9.8        uniform 0.0 180.0 1 
-yaw_1 = 10.0        uniform -90.0 90.0 1
+
+    file_1 = test_data/SDSSJ0748_0_g.calib   # file containing data to fit. 3 columns - MJD, flux, err
+    plot_1 = SDSSJ0748_0_g
+    band_1 = g
+
+   dFlux_1 =       0.0607      uniform       0.0010       0.2000            1
+   sFlux_1 =       0.0813      uniform       0.0010       0.2000            1
+   ulimb_1 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_1 =       0.4953      uniform       0.2000       0.7000            1
+   scale_1 =       0.0330  log_uniform       0.0010       0.2000            1
+      az_1 =     127.2343      uniform      50.0000     175.0000            1
+     fis_1 =       0.0480      uniform       0.0010       1.0000            1
+    dexp_1 =       1.9000  log_uniform       0.0010       2.0000            1
+    phi0_1 =      -0.0003      uniform      -0.2000       0.2000            1
+    exp1_1 =       1.6090      uniform       0.0010       5.0000            1
+    exp2_1 =       0.9879      uniform       0.5000       5.0000            1
+     yaw_1 =      -0.0464      uniform     -90.0000      90.0000            1
+    tilt_1 =      48.5079      uniform       0.0010     180.0000            1
+
+
+    file_2 = test_data/SDSSJ0748_0_r1.calib
+    plot_2 = SDSSJ0748_0_r1
+    band_2 = r
+
+   dFlux_2 =       0.0845      uniform       0.0010       0.2000            1
+   sFlux_2 =       0.0697      uniform       0.0010       0.2000            1
+   ulimb_2 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_2 =       0.5702      uniform       0.2000       0.7000            1
+   scale_2 =       0.0191  log_uniform       0.0010       0.2000            1
+      az_2 =     120.9071      uniform      50.0000     175.0000            1
+     fis_2 =       0.0506      uniform       0.0010       1.0000            1
+    dexp_2 =       1.7123  log_uniform       0.0010       2.0000            1
+    phi0_2 =      -0.0000      uniform      -0.2000       0.2000            1
+    exp1_2 =       3.0050      uniform       0.0010       5.0000            1
+    exp2_2 =       1.3828      uniform       0.5000       5.0000            1
+     yaw_2 =       8.6757      uniform     -90.0000      90.0000            1
+    tilt_2 =      48.5294      uniform       0.0010     180.0000            1
+
+
+
+    file_3 = test_data/SDSSJ0748_0_r2.calib
+    plot_3 = SDSSJ0748_0_r2
+    band_3 = r
+
+   dFlux_3 =       0.1109      uniform       0.0010       0.2000            1
+   sFlux_3 =       0.0773      uniform       0.0010       0.2000            1
+   ulimb_3 =       0.2840        gauss       0.2840       0.0010            1
+   rdisc_3 =       0.5556      uniform       0.2000       0.7000            1
+   scale_3 =       0.0472  log_uniform       0.0010       0.2000            1
+      az_3 =     112.9155      uniform      50.0000     175.0000            1
+     fis_3 =       0.0641      uniform       0.0010       1.0000            1
+    dexp_3 =       1.5766  log_uniform       0.0010       2.0000            1
+    phi0_3 =      -0.0006      uniform      -0.2000       0.2000            1
+    exp1_3 =       3.7206      uniform       0.0010       5.0000            1
+    exp2_3 =       1.5720      uniform       0.5000       5.0000            1
+     yaw_3 =       8.8007      uniform     -90.0000      90.0000            1
+    tilt_3 =      48.9885      uniform       0.0010     180.0000            1

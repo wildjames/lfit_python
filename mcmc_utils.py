@@ -1,9 +1,22 @@
-import numpy as np
-import scipy.stats as stats
-import pandas as pd
-import emcee
+'''
+Helper functions to aid the MCMC nuts and bolts.
+'''
+
+
+import time
+import warnings
+
 import dask.dataframe as dd
+import emcee
+import numpy as np
+import pandas as pd
+import scipy.integrate as intg
+import scipy.stats as stats
 import seaborn
+from matplotlib import pyplot as plt
+# lightweight progress bar
+from tqdm import tqdm
+
 try:
     import triangle
     # This triangle should have a method corner
@@ -13,113 +26,9 @@ except (AttributeError, ImportError):
     # We want the other package
     import corner as triangle
 
-# lightweight progress bar
-from tqdm import tqdm
-import scipy.integrate as intg
-import warnings
-from matplotlib import pyplot as plt
 
 TINY = -np.inf
 
-
-class Prior(object):
-    '''a class to represent a prior on a parameter, which makes calculating
-    prior log-probability easier.
-
-    Priors can be of five types: gauss, gaussPos, uniform, log_uniform and mod_jeff
-
-    gauss is a Gaussian distribution, and is useful for parameters with
-    existing constraints in the literature
-    gaussPos is like gauss but enforces positivity
-    Gaussian priors are initialised as Prior('gauss',mean,stdDev)
-
-    uniform is a uniform prior, initialised like Prior('uniform',low_limit,high_limit)
-    uniform priors are useful because they are 'uninformative'
-
-    log_uniform priors have constant probability in log-space. They are the uninformative prior
-    for 'scale-factors', such as error bars (look up Jeffreys prior for more info)
-
-    mod_jeff is a modified jeffries prior - see Gregory et al 2007
-    they are useful when you have a large uncertainty in the parameter value, so
-    a jeffreys prior is appropriate, but the range of allowed values starts at 0
-
-    they have two parameters, p0 and pmax.
-    they act as a jeffrey's prior about p0, and uniform below p0. typically
-    set p0=noise level
-    '''
-    def __init__(self, type, p1, p2):
-        assert type in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']
-        self.type = type
-        self.p1 = p1
-        self.p2 = p2
-        if type == 'log_uniform' and self.p1 < 1.0e-30:
-            warnings.warn('lower limit on log_uniform prior rescaled from %f to 1.0e-30' % self.p1)
-            self.p1 = 1.0e-30
-        if type == 'log_uniform':
-            self.normalise = 1.0
-            self.normalise = np.fabs(intg.quad(self.ln_prob, self.p1, self.p2)[0])
-        if type == 'mod_jeff':
-            self.normalise = np.log((self.p1+self.p2)/self.p1)
-
-    def ln_prob(self, val):
-        if self.type == 'gauss':
-            prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
-            if prob > 0:
-                return np.log(prob)
-            else:
-                return TINY
-        elif self.type == 'gaussPos':
-            if val <= 0.0:
-                return TINY
-            else:
-                prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
-                if prob > 0:
-                    return np.log(prob)
-                else:
-                    return TINY
-        elif self.type == 'uniform':
-            if (val > self.p1) and (val < self.p2):
-                return np.log(1.0/np.abs(self.p1-self.p2))
-            else:
-                return TINY
-        elif self.type == 'log_uniform':
-            if (val > self.p1) and (val < self.p2):
-                return np.log(1.0 / self.normalise / val)
-            else:
-                return TINY
-        elif self.type == 'mod_jeff':
-            if (val > 0) and (val < self.p2):
-                return np.log(1.0 / self.normalise / (val+self.p1))
-            else:
-                return TINY
-
-
-class Param(object):
-    '''A Param needs a starting value, a current value, and a prior
-    and a flag to state whether is should vary'''
-    def __init__(self, name, startVal, prior, isVar=True):
-        self.name = name
-        self.startVal = startVal
-        self.prior = prior
-        self.currVal = startVal
-        self.isVar = isVar
-
-    @classmethod
-    def fromString(cls, name, parString):
-        fields = parString.split()
-        val = float(fields[0])
-        priorType = fields[1].strip()
-        priorP1 = float(fields[2])
-        priorP2 = float(fields[3])
-        if len(fields) == 5:
-            isVar = bool(int(fields[4]))
-        else:
-            isVar = True
-        return cls(name, val, Prior(priorType, priorP1, priorP2), isVar)
-
-    @property
-    def isValid(self):
-        return np.isfinite(self.prior.ln_prob(self.currVal))
 
 
 def fracWithin(pdf, val):
@@ -142,7 +51,7 @@ def scatterWalkers(pos0, percentScatter):
     return pos0 + percentScatter*pos0*scatter/100.0
 
 
-def initialise_walkers(p, scatter, nwalkers, ln_prior):
+def initialise_walkers(p, scatter, nwalkers, ln_prior, model):
     # Create starting ball of walkers with a certain amount of scatter
     p0 = emcee.utils.sample_ball(p, scatter*p, size=nwalkers)
     # Make initial number of invalid walkers equal to total number of walkers
@@ -152,7 +61,7 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior):
     # All invalid params need to be resampled
     while numInvalid > 0:
         # Create a mask of invalid params
-        isValid = np.array([np.isfinite(ln_prior(p)) for p in p0])
+        isValid = np.array([np.isfinite(ln_prior(p, model)) for p in p0])
         bad = p0[~isValid]
         # Determine the number of good and bad walkers
         nbad = len(bad)
@@ -163,14 +72,15 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior):
         # Create replacement values from valid walkers
         replacements = p0[isValid][replacement_rows]
         # Add scatter to replacement values
-        replacements += 0.5*replacements*scatter*np.random.normal(size=replacements.shape)
+        replacements += 0.5*replacements*scatter*np.random.normal(
+            size=replacements.shape)
         # Replace invalid walkers with new values
         p0[~isValid] = replacements
         numInvalid = len(p0[~isValid])
     return p0
 
 
-def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
+def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior, model):
     # Create starting ball of walkers with a certain amount of scatter
     p0 = np.array([emcee.utils.sample_ball(p, scatter*p, size=nwalkers) for
                    i in range(ntemps)])
@@ -184,7 +94,7 @@ def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
     # All invalid params need to be resampled
     while numInvalid > 0:
         # Create a mask of invalid params
-        isValid = np.array([np.isfinite(ln_prior(p)) for p in p0])
+        isValid = np.array([np.isfinite(ln_prior(p, model)) for p in p0])
         bad = p0[~isValid]
         # Determine the number of good and bad walkers
         nbad = len(bad)
@@ -195,7 +105,8 @@ def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior):
         # Create replacement values from valid walkers
         replacements = p0[isValid][replacement_rows]
         # Add scatter to replacement values
-        replacements += 0.5*replacements*scatter*np.random.normal(size=replacements.shape)
+        replacements += 0.5*replacements*scatter*np.random.normal(
+            size=replacements.shape)
         # Replace invalid walkers with new values
         p0[~isValid] = replacements
         numInvalid = len(p0[~isValid])
@@ -207,7 +118,9 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, state in sampler.sample(startPos, iterations=nSteps, storechain=storechain):
+    for pos, prob, state in sampler.sample(startPos,
+                                           iterations=nSteps,
+                                           storechain=storechain):
         iStep += 1
         if progress:
             bar.update()
@@ -216,45 +129,59 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     return pos, prob, state
 
 
-def run_mcmc_save(sampler, startPos, nSteps, rState, file, progress=True, **kwargs):
+def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
+                  progress=True, **kwargs):
     '''runs an MCMC chain with emcee, and saves steps to a file'''
     # open chain save file
     if file:
-        f = open(file, "w")
-        f.close()
+        with open(file, "w") as f:
+            f.write(col_names)
+            if col_names:
+                f.write("\n")
+
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, state in sampler.sample(startPos, iterations=nSteps, rstate0=rState,
+
+    for pos, prob, state in sampler.sample(startPos,
+                                           iterations=nSteps, rstate0=rState,
                                            storechain=True, **kwargs):
-        if file:
-            f = open(file, "a")
+
         iStep += 1
         if progress:
             bar.update()
+
         for k in range(pos.shape[0]):
             # loop over all walkers and append to file
             thisPos = pos[k]
             thisProb = prob[k]
-            if file:
-                f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
-        if file:
-            f.close()
+
+            with open(file, 'a') as f:
+                f.write("{0:4d} {1:s} {2:f}\n".format(
+                    k, " ".join(map(str, thisPos)), thisProb))
+
     if progress:
         bar.close()
     return sampler
 
 
-def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
+def run_ptmcmc_save(sampler, startPos, nSteps, file,
+                    progress=True, col_names='', **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
     if file:
-        f = open(file, "w")
-        f.close()
+        with open(file, "w") as f:
+            f.write(col_names)
+            if col_names:
+                f.write("\n")
+
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, like in sampler.sample(startPos, iterations=nSteps, storechain=True, **kwargs):
-        f = open(file, "a")
+
+    for pos, prob, like in sampler.sample(startPos,
+                                          iterations=nSteps,
+                                          storechain=True, **kwargs):
+
         iStep += 1
         if progress:
             bar.update()
@@ -263,48 +190,81 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, **kwargs):
         # loop over all walkers for first temp and append to file
         zpos = pos[0, ...]
         zprob = prob[0, ...]
+
         for k in range(zpos.shape[0]):
             thisPos = zpos[k]
             thisProb = zprob[k]
-            f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(map(str, thisPos)), thisProb))
-        f.close()
+
+            with open(file, 'a') as f:
+                f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
+                map(str, thisPos)), thisProb))
+
     if progress:
         bar.close()
     return sampler
 
 
-def flatchain(chain, npars, nskip=0, thin=1):
+def flatchain(chain, npars=None, nskip=0, thin=1):
     '''flattens a chain (i.e collects results from all walkers),
     with options to skip the first nskip parameters, and thin the chain
     by only retrieving a point every thin steps - thinning can be useful when
     the steps of the chain are highly correlated'''
+    if npars is None:
+        npars = chain.shape[2]
     return chain[:, nskip::thin, :].reshape((-1, npars))
 
 
-def readchain(file, nskip=0, thin=1):
-    data = pd.read_csv(file, header=None, compression=None, delim_whitespace=True)
+def readchain(file, **kwargs):
+    '''Reads in the chain file in a single thread.
+    Returns the chain in the shape (nwalkers, nprod, npars)
+    '''
+    data = pd.read_csv(file, header=0, compression=None,
+                       delim_whitespace=True, **kwargs)
     data = np.array(data)
-    nwalkers = int(data[:, 0].max()+1)
-    nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID, last is ln_prob
-    chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
+
+    # Figure out what shape the result should have.
+    nwalkers = int(np.amax(data[:, 0])+1)
+    nprod = int(data.shape[0] / nwalkers)
+    npars = int(data.shape[1] - 1)
+
+    # empty array to fill. Make it nans to be safe?
+    chain = np.zeros((nwalkers, nprod, npars))
+    chain[:, :, :] = np.nan
+
+    for i in range(nwalkers):
+        index = np.where(data[:, 0] == float(i))
+        chain[i] = data[index, 1:]
+
     return chain
 
 
-def readchain_dask(file, nskip=0, thin=1):
-    data = dd.io.read_csv(file, engine='c', header=None, compression=None,
-                          na_filter=False, delim_whitespace=True)
+def readchain_dask(file, **kwargs):
+    '''Reads in the chain file using threading.
+    Returns the chain in the shape (nwalkers, nprod, npars).'''
+    data = dd.io.read_csv(file, engine='c', header=0, compression=None,
+                          na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
     data = np.array(data)
-    nwalkers = int(data[:, 0].max()+1)
-    nprod = int(data.shape[0]/nwalkers)
-    npars = data.shape[1] - 1  # first is walker ID, last is ln_prob
-    chain = np.reshape(data[:, 1:], (nwalkers, nprod, npars))
+
+    # Figure out what shape the result should have.
+    nwalkers = int(np.amax(data[:, 0])+1)
+    nprod = int(data.shape[0] / nwalkers)
+    npars = int(data.shape[1] - 1)
+
+    # empty array to fill. Make it nans to be safe?
+    chain = np.zeros((nwalkers, nprod, npars))
+    chain[:, :, :] = np.nan
+
+    for i in range(nwalkers):
+        index = np.where(data[:, 0] == float(i))
+        chain[i] = data[index, 1:]
+
     return chain
 
 
 def readflatchain(file):
-    data = pd.read_csv(file, header=None, compression=None, delim_whitespace=True)
+    data = pd.read_csv(file, header=None, compression=None,
+                       delim_whitespace=True)
     data = np.array(data)
     return data
 
@@ -336,7 +296,8 @@ def GR_diagnostic(sampler_chain):
         between = sum((psi_j_dot - psi_dot_dot)**2) / (m - 1)
 
         # Calculate within-chain variance
-        inner_sum = np.sum(np.array([(psi_j_t[j, :] - psi_j_dot[j])**2 for j in range(m)]), axis=1)
+        inner_sum = np.sum(np.array([(psi_j_t[j, :] - psi_j_dot[j])**2
+                                     for j in range(m)]), axis=1)
         outer_sum = np.sum(inner_sum)
         W = outer_sum / (m*(n-1))
 
@@ -372,7 +333,7 @@ def ln_marginal_likelihood(params, lnp):
     sigmas = params.std(axis=0)
 
     # now for the magic
-    # at each step in the chain, add up 0.5*((val-best)/sigma)**2 for all params
+    # at each step, add up 0.5*((val-best)/sigma)**2 for all params
     term = 0.5*((params-best)/sigmas)**2
     term = term.sum(axis=1)
 

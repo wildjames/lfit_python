@@ -1,8 +1,19 @@
+'''Uses the output fluxes of a White Dwarf from an MCMC chain, and uses them
+to calculate the limb darkening coefficient that should be used when fitting
+that body. Data is typically not sensitive enough to this to fit it
+independantly, so a few iterations through this script should aid in the
+science.
+'''
+
+
 from __future__ import print_function
-from builtins import input
-from builtins import zip
+
+from builtins import input, zip
+
 import numpy as np
-from scipy.interpolate import interp2d, SmoothBivariateSpline, RectBivariateSpline
+from scipy.interpolate import (RectBivariateSpline, SmoothBivariateSpline,
+                               interp2d)
+
 
 def ld (band,logg,teff,law='linear'):
     assert band in ['u','g','r','i','z']

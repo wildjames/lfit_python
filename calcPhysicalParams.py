@@ -1,10 +1,14 @@
 #!/usr/bin/env python
-from mcmc_utils import *
+import argparse
+import os
+import sys
+from functools import partial
+
 import numpy as np
-from trm import roche
-import os, sys
-from astropy import constants as const, units
-from astropy.table import Table, Column
+import seaborn as sns
+from astropy import constants as const
+from astropy import units
+from astropy.table import Column, Table
 from astropy.utils.console import ProgressBar as PB
 # see if our astropy version supports quantities or not
 quantitySupport = True
@@ -13,12 +17,6 @@ try:
 except:
     quantitySupport = False
 
-from functools import partial
-import argparse
-from scipy import interpolate as interp
-from scipy.optimize import fsolve, brentq
-from matplotlib import pyplot as plt
-import seaborn as sns
 
 def read_wood_file(filename):
     '''The Wood 1995 thick H layer models (CO)
