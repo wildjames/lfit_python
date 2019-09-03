@@ -593,7 +593,12 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             dev[np.where(dev == 0)] = np.nan
             print(dev)
             chain_slice = chain_slice[:, ~np.isnan(dev)]
-            par_labels  = par_labels[~np.isnan(dev)]
+            par_labels = [p for p, d in zip(par_labels, dev) if d != np.nan]
+
+
+            print("\nAfter checking for immobile variables,My corner plot labels are:")
+            print(labels)
+            print("chain_slice has the shape:", chain_slice.shape)
 
             fig = utils.thumbPlot(chain_slice, par_labels)
 
