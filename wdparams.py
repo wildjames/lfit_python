@@ -86,8 +86,8 @@ def model(thisModel,mask):
     nlogg = len(loggs)
     if t >= teffs.max() or t <= teffs.min():
         return -np.inf
-    #assert g >= loggs.min()
-    #assert g <= loggs.max()
+    if g <= loggs.min() or g >= loggs.max():
+        return -np.inf
 
     abs_mags = []
     # u data in col 4, g in 5, r in 6, i in 7, z in 8, kg5 in 9
