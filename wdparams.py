@@ -2,19 +2,20 @@ from __future__ import division, print_function
 
 import os
 import sys
-import warnings
-from builtins import input, object, range
-from collections import MutableSequence
+# import warnings
+from collections.abc import MutableSequence
 from os.path import realpath
 
 import emcee
 import matplotlib.pyplot as plt
-import numpy
+import numpy as np
 import scipy.interpolate as interp
 import seaborn
 from past.utils import old_div
 
-from mcmc_utils import *
+from mcmc_utils import (flatchain, readchain, readchain_dask, readflatchain,
+                        run_burnin, run_mcmc_save, thumbPlot)
+from model import Param
 
 
 class wdModel(MutableSequence):
@@ -75,7 +76,7 @@ def model(thisModel,mask):
     d = thisModel.dist
 
     # load bergeron models
-    root, fn = os.path.split(__file__)
+    root, _ = os.path.split(__file__)
     data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
 
     teffs = np.unique(data[:,0])
@@ -83,8 +84,8 @@ def model(thisModel,mask):
 
     nteff = len(teffs)
     nlogg = len(loggs)
-    assert t <= teffs.max()
-    assert t >= teffs.min()
+    if t >= teffs.max() or t <= teffs.min():
+        return -np.inf
     #assert g >= loggs.min()
     #assert g <= loggs.max()
 
@@ -158,7 +159,7 @@ class Flux(object):
         self.val = val
         self.err = err
         self.band = band
-        self.mag = 2.5*numpy.log10(old_div(3631000,self.val))
+        self.mag = 2.5*np.log10(old_div(3631000,self.val))
         self.magerr = 2.5*0.434*(old_div(self.err,self.val))
 
 def plotFluxes(fluxes,fluxes_err,mask,model):
@@ -235,8 +236,8 @@ def plotColors(mags):
     gr = gmags-rmags
 
     # make grid of teff, logg and colours
-    teff = numpy.unique(data[:,0])
-    logg = numpy.unique(data[:,1])
+    teff = np.unique(data[:,0])
+    logg = np.unique(data[:,1])
     nteff = len(teff)
     nlogg = len(logg)
     # reshape colours onto 2D grid of (logg, teff)
@@ -247,19 +248,19 @@ def plotColors(mags):
     # If u band data available, chances are g and r data available too
     # u-g
     col1  = mags[0].mag - mags[1].mag
-    col1e = numpy.sqrt(mags[0].magerr**2 + mags[1].magerr**2)
+    col1e = np.sqrt(mags[0].magerr**2 + mags[1].magerr**2)
     col1l = mags[0].band + '-' + mags[1].band
 
     if rband_used:
         # g-r
         col2  = mags[1].mag - mags[2].mag
-        col2e = numpy.sqrt(mags[1].magerr**2 + mags[2].magerr**2)
+        col2e = np.sqrt(mags[1].magerr**2 + mags[2].magerr**2)
         col2l = mags[1].band + '-' + mags[2].band
 
     else:
         # g-i
         col2  = mags[1].mag - mags[3].mag
-        col2e = numpy.sqrt(mags[1].magerr**2 + mags[3].magerr**2)
+        col2e = np.sqrt(mags[1].magerr**2 + mags[3].magerr**2)
         col2l = mags[1].band + '-' + mags[3].band
 
     print('%s = %f +/- %f' % (col1l,col1,col1e))
