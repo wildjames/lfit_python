@@ -2,7 +2,7 @@ from __future__ import division, print_function
 
 import os
 import sys
-# import warnings
+import warnings
 from collections.abc import MutableSequence
 from os.path import realpath
 
