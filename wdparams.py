@@ -75,15 +75,8 @@ def model(thisModel,mask):
     d = thisModel.dist
 
     # load bergeron models
-<<<<<<< HEAD
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
-=======
     root, fn = os.path.split(__file__)
     data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
->>>>>>> Debugging
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -174,15 +167,8 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
     d = 1000. / plax
 
     # load bergeron models
-<<<<<<< HEAD
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = numpy.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
-=======
     root, fn = os.path.split(__file__)
     data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
->>>>>>> Debugging
 
     teffs = np.unique(data[:,0])
     loggs = np.unique(data[:,1])
@@ -233,15 +219,8 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
 def plotColors(mags):
 
     # load bergeron models
-<<<<<<< HEAD
-    myLoc = realpath(__file__)
-    myLoc = myLoc.split('/')[:-1]
-    myLoc = '/'.join(myLoc)
-    data = np.loadtxt(myLoc + '/Bergeron/da_ugrizkg5.txt')
-=======
     root, fn = os.path.split(__file__)
     data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
->>>>>>> Debugging
 
     # bergeron model magnitudes
     umags = data[:,4]
@@ -363,56 +342,6 @@ if __name__ == "__main__":
     ebv  = Param.fromString('ebv', input_dict['ebv'] )
 
     syserr = float( input_dict['syserr'] )
-<<<<<<< HEAD
-    neclipses = int( input_dict['neclipses'] )
-
-    complex   = int( input_dict['complex'] )
-    useGP     = int( input_dict['useGP'] )
-    flat      = int( input_dict['flat'] )
-
-    # Add in filters used
-    filters = []
-    for ecl in range(0,neclipses):
-        filters.append(input_dict['fil_{0}'.format(ecl)])
-    filters = np.array(filters)
-    print("I have the following filters:\n", filters)
-
-    # Load in chain file
-    chain_file = input_dict['chain']
-
-    print("Reading in the chain file,", chain_file)
-    if flat:
-        fchain = readflatchain(chain_file)
-    else:
-        #chain = readchain(chain_file)
-        chain = readchain_dask(chain_file)
-        nwalkers, nsteps, npars = chain.shape
-        print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
-        fchain = flatchain(chain,npars,thin=thin)
-    print("Done!")
-
-    # Create array of indexes of same filter type
-    uband_filters = np.where(filters == 'u')
-    gband_filters = np.where(filters == 'g')
-    rband_filters = np.where(filters == 'r')
-    iband_filters = np.where(filters == 'i')
-    zband_filters = np.where(filters == 'z')
-    kg5band_filters = np.where(filters == 'kg5')
-
-    # Which filter bands are used?
-    uband_used = False
-    gband_used = False
-    rband_used = False
-    iband_used = False
-    zband_used = False
-    kg5band_used = False
-    if len(uband_filters[0] > 0): uband_used = True
-    if len(gband_filters[0] > 0): gband_used = True
-    if len(rband_filters[0] > 0): rband_used = True
-    if len(iband_filters[0] > 0): iband_used = True
-    if len(zband_filters[0] > 0): zband_used = True
-    if len(kg5band_filters[0] > 0): kg5band_used = True
-=======
 
     flat = int( input_dict['flat'] )
 
@@ -440,29 +369,16 @@ if __name__ == "__main__":
     filters = [key.lower() for key in colKeys if key.startswith("wdFlux_")]
     filters = np.array(filters)
     print("I have the following filters:\n", filters)
->>>>>>> Debugging
 
     # Create arrays to be filled with all wd fluxes and mags
     fluxes = [0,0,0,0,0,0]
     fluxes_err = [0,0,0,0,0,0]
     mags = [0,0,0,0,0,0]
 
-<<<<<<< HEAD
-    if complex == 1:
-        a = 15
-    else:
-        a = 11
-
-    if useGP == 1:
-        b = 6
-    else:
-        b = 3
-=======
 
     # # # # # # # # # # # # # # # # # # # # # #
     # Collect the fluxes from the fit result. #
     # # # # # # # # # # # # # # # # # # # # # #
->>>>>>> Debugging
 
     # In some circumstances, the uband eclipse has to be fit separately
     # e.g. when it is of poor quality
@@ -485,25 +401,6 @@ if __name__ == "__main__":
             umag = Flux(uflux,uflux_err,'u')
             mags[0] = umag
             print((uflux,uflux_err))
-<<<<<<< HEAD
-
-    # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
-    if uband_used:
-        uband = []
-        print('u band eclipses: {}'.format(uband_filters))
-        uband_filters = uband_filters[0]
-        for i in uband_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                uband.extend(wdflux)
-            else:
-                i = a*i + b
-                print("Getting the u flux from index {}".format(i))
-                wdflux = fchain[:,i]
-                uband.extend(wdflux)
-
-        uband = np.array(uband)
-=======
             uband_used = True
 
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
@@ -512,7 +409,6 @@ if __name__ == "__main__":
         uband = fchain[:,index]
 
         uband = np.array([uband])
->>>>>>> Debugging
         # Need to calculate median values and errors
         uflux = np.median(uband)
         uflux_err = np.sqrt((np.std(uband))**2 + (uflux*syserr)**2)
@@ -522,22 +418,6 @@ if __name__ == "__main__":
         umag = Flux(uflux,uflux_err,'u')
         mags[0] = umag
 
-<<<<<<< HEAD
-    if gband_used:
-        gband = []
-        gband_filters = gband_filters[0]
-        for i in gband_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                gband.extend(wdflux)
-            else:
-                i = a*i + b
-                wdflux = fchain[:,i]
-                gband.extend(wdflux)
-
-        gband = np.array(gband)
-        gflux = np.median(gband)
-=======
         uband_used = True
     else: uband_used = False
 
@@ -546,7 +426,6 @@ if __name__ == "__main__":
         gband = fchain[:,index]
 
         gflux = np.median([gband])
->>>>>>> Debugging
         gflux_err = np.sqrt((np.std(gband))**2 + (gflux*syserr)**2)
         fluxes[1] = gflux
         fluxes_err[1] = gflux_err
@@ -554,21 +433,6 @@ if __name__ == "__main__":
         gmag = Flux(gflux,gflux_err,'g')
         mags[1] = gmag
 
-<<<<<<< HEAD
-    if rband_used:
-        rband = []
-        rband_filters = rband_filters[0]
-        for i in rband_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                rband.extend(wdflux)
-            else:
-                i = a*i + b
-                wdflux = fchain[:,i]
-                rband.extend(wdflux)
-
-        rband = np.array(rband)
-=======
         gband_used = True
     else: gband_used = False
 
@@ -577,7 +441,6 @@ if __name__ == "__main__":
         rband = fchain[:,index]
 
         rband = np.array([rband])
->>>>>>> Debugging
         rflux = np.median(rband)
         rflux_err = np.sqrt((np.std(rband))**2 + (rflux*syserr)**2)
         fluxes[2] = rflux
@@ -586,20 +449,6 @@ if __name__ == "__main__":
         rmag = Flux(rflux,rflux_err,'r')
         mags[2] = rmag
 
-<<<<<<< HEAD
-    if iband_used:
-        iband = []
-        iband_filters = iband_filters[0]
-        for i in iband_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                iband.extend(wdflux)
-            else:
-                i = a*i + b
-                wdflux = fchain[:,i]
-                iband.extend(wdflux)
-        iband = np.array(iband)
-=======
         rband_used = True
     else: rband_used = False
 
@@ -608,7 +457,6 @@ if __name__ == "__main__":
         iband = fchain[:,index]
 
         iband = np.array([iband])
->>>>>>> Debugging
         iflux = np.median(iband)
         iflux_err = np.sqrt((np.std(iband)**2 + (iflux*syserr)**2))
         fluxes[3] = iflux
@@ -617,21 +465,6 @@ if __name__ == "__main__":
         imag = Flux(iflux,iflux_err,'i')
         mags[3] = imag
 
-<<<<<<< HEAD
-    if zband_used:
-        zband = []
-        zband_filters = zband_filters[0]
-        for i in zband_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                zband.extend(wdflux)
-            else:
-                i = a*i + b
-                wdflux = fchain[:,i]
-                zband.extend(wdflux)
-
-        zband = np.array(zband)
-=======
         iband_used = True
     else: iband_used = False
 
@@ -640,7 +473,6 @@ if __name__ == "__main__":
         zband = fchain[:,index]
 
         zband = np.array([zband])
->>>>>>> Debugging
         zflux = np.median(zband)
         zflux_err = np.sqrt((np.std(zband))**2 + (zflux*syserr)**2)
         fluxes[4] = zflux
@@ -649,21 +481,6 @@ if __name__ == "__main__":
         zmag = Flux(zflux,zflux_err,'z')
         mags[4] = zmag
 
-<<<<<<< HEAD
-    if kg5band_used:
-        kg5band = []
-        kg5band_filters = kg5band_filters[0]
-        for i in kg5band_filters:
-            if i == 0:
-                wdflux = fchain[:,i]
-                kg5band.extend(wdflux)
-            else:
-                i = a*i + b
-                wdflux = fchain[:,i]
-                kg5band.extend(wdflux)
-
-        kg5band = np.array(kg5band)
-=======
         zband_used = True
     else: zband_used = False
 
@@ -672,7 +489,6 @@ if __name__ == "__main__":
         kg5band = fchain[:,index]
 
         kg5band = np.array([kg5band])
->>>>>>> Debugging
         kg5flux = np.median(kg5band)
         kg5flux_err = np.sqrt((np.std(kg5band))**2 + (kg5flux*syserr)**2)
         fluxes[5] = kg5flux
@@ -681,12 +497,9 @@ if __name__ == "__main__":
         kg5mag = Flux(kg5flux,kg5flux_err,'kg5')
         mags[5] = kg5mag
 
-<<<<<<< HEAD
-=======
         kg5band_used = True
     else: kg5band_used = False
 
->>>>>>> Debugging
     # Arrays containing all fluxes and errors
     fluxes = np.array(fluxes)
     fluxes_err = np.array(fluxes_err)
@@ -699,21 +512,11 @@ if __name__ == "__main__":
 
     mask = np.array([uband_used,gband_used,rband_used,iband_used,zband_used,kg5band_used])
 
-<<<<<<< HEAD
-=======
-
->>>>>>> Debugging
     print("I'm using the filters:")
     temp = ['u', 'g', 'r','i' , 'z', 'kg5']
     for t, m, flux in zip(temp, mask, fluxes):
         report = ''
         if m:
-<<<<<<< HEAD
-            report = ' - Mean Flux: {:3f}'.format(flux)
-        print("{}: {}{}".format(t, m, report))
-    myModel = wdModel(teff,logg,plax,ebv)
-
-=======
             report = '  -> Mean Flux: {:3f}'.format(flux)
         print("{}: {}{}".format(t, m, report))
 
@@ -723,7 +526,6 @@ if __name__ == "__main__":
     # # # # # # # # #
 
     myModel = wdModel(teff,logg,plax,ebv)
->>>>>>> Debugging
     npars = myModel.npars
 
     if toFit:
@@ -757,12 +559,8 @@ if __name__ == "__main__":
     else:
         bestPars = [par for par in myModel]
 
-<<<<<<< HEAD
-    print("Chisq = %.2f (%d D.O.F)" % (chisq(myModel,y,e,mask),(len(mags)-mags.count(0))-npars-1))
-=======
     dof = len(mags) - mags.count(0) - npars - 1
     print("Chisq = %.2f (%d D.O.F)" % (chisq(myModel,y,e,mask), dof))
->>>>>>> Debugging
 
     # Plot color-color plot
     if mask[0]:
@@ -770,9 +568,3 @@ if __name__ == "__main__":
 
     # Plot measured and model fluxes
     plotFluxes(fluxes,fluxes_err,mask,bestPars)
-<<<<<<< HEAD
-
-
-
-=======
->>>>>>> Debugging
