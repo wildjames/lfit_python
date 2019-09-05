@@ -547,7 +547,7 @@ if __name__ == "__main__":
 
         # Plot the likelihoods
         fig, ax = plt.subplots()
-        likes = chain[:, :, -1]
+        likes = sampler.chain[:, :, -1]
 
         # Plot the mean likelihood evolution
         likes = np.mean(likes, axis=0)
