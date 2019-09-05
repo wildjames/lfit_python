@@ -322,7 +322,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Fit WD Fluxes')
     parser.add_argument('file',action='store',help="input file")
-    parser.add_argument('summarise', dest='summarise', action='store_true', help='Summarise existing chain file without running a new fit.')
+    parser.add_argument('--summarise', dest='summarise', action='store_true', help='Summarise existing chain file without running a new fit.')
 
     args = parser.parse_args()
 
