@@ -94,7 +94,7 @@ Actually using the software is fairly easy. In essence,
 
 In reality, this is often iterative, and the result of one chain leads into the start position of another, until convergence is reached. Then, the resulting converged chain is fed into `wdparams.py` for conversion into physical parameters.
 
-This branch also has a notifier, which will email the resulting lightcurve figures, and the likelihood history and summary of the chain_prod file. Corner plots are not sent, as these are often several MB each, so must be retrieved manually. To use this, first a gmail bot needs to be created, and its credentials supplied in a file called `PATH/TO/LFIT_PYTHON/email_details.json`, with the following format:
+This branch also has a notifier, which will email the resulting lightcurve figures, and the likelihood history and summary of the chain_prod file. Corner plots are not sent, as these are often several MB each, so must be retrieved manually. To use this, first a gmail bot account needs to be created (this is just a normal gmail account, but with a dumber email address. I used mcmcfit.bot@gmail.com, as an example.), and its credentials supplied in a file called `PATH/TO/LFIT_PYTHON/email_details.json`, with the following format:
 ```json
 {
   "user": "ADDRESS",
