@@ -329,6 +329,8 @@ if __name__ == "__main__":
     # Use parseInput function to read data from input file
     input_dict = parseInput(args.file)
     summarise = args.summarise
+    if summarise:
+        print("I will NOT run a fit, but just re-create the output figures!")
 
     # Read information about mcmc, priors, neclipses, sys err
     nburn    = int( input_dict['nburn'] )
@@ -557,16 +559,19 @@ if __name__ == "__main__":
         plt.savefig('likelihoods.png')
         plt.close()
 
-
+        # Flatten the chain for the thumbplot. Strip off the ln_prob, too
+        flat = flatchain(chain[:, :, :-1])
         bestPars = []
         for i in range(npars):
-            par = chain[:,i]
+            par = flat[:,i]
             lolim,best,uplim = np.percentile(par,[16,50,84])
             myModel[i] = best
 
             print("%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim))
             bestPars.append(best)
-        fig = thumbPlot(chain,nameList)
+
+        print("Creating corner plots...")
+        fig = thumbPlot(flat, nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
         plt.close()
@@ -575,19 +580,30 @@ if __name__ == "__main__":
 
     if toFit:
         guessP = np.array(myModel)
-        nameList = ['Teff','log g','Parallax','E(B-V)']
+        nameList = ['Teff','log_g','Parallax','E(B-V)']
 
-        p0 = emcee.utils.sample_ball(guessP,scatter*guessP,size=nwalkers)
-        sampler = emcee.EnsembleSampler(nwalkers,npars,ln_prob,args=[myModel,y,e,mask],threads=nthread)
+        p0 = emcee.utils.sample_ball(guessP, scatter*guessP, size=nwalkers)
+        sampler = emcee.EnsembleSampler(
+            nwalkers,
+            npars,
+            ln_prob,
+            args=[myModel, y, e, mask],
+            threads=nthread
+        )
 
         #burnIn
-        pos, prob, state = run_burnin(sampler,p0,nburn)
+        pos, prob, state = run_burnin(sampler, p0, nburn)
         #pos, prob, state = sampler.run_mcmc(p0,nburn)
 
         #production
         sampler.reset()
-        sampler = run_mcmc_save(sampler,pos,nprod,state,"chain_wd.txt")
-        chain = flatchain(sampler.chain,npars,thin=thin)
+        col_names = "walker_no " + ' '.join(nameList) + ' ln_prob'
+        sampler = run_mcmc_save(
+            sampler,
+            pos, nprod, state,
+            "chain_wd.txt", col_names=col_names
+        )
+        chain = flatchain(sampler.chain, npars, thin=thin)
 
         # Plot the likelihoods
         fig, ax = plt.subplots()
@@ -620,12 +636,15 @@ if __name__ == "__main__":
 
             print("%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim))
             bestPars.append(best)
+        print("Creating corner plots...")
         fig = thumbPlot(chain,nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
         plt.close()
     else:
         bestPars = [par for par in myModel]
+
+    print("Done!")
 
     dof = len(mags) - mags.count(0) - npars - 1
     print("Chisq = %.2f (%d D.O.F)" % (chisq(myModel,y,e,mask), dof))
