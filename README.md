@@ -5,7 +5,9 @@ This project is the successor to `LFIT` - a `C++` code for fitting cataclysmic v
 ## LFIT; functional knowledge you're gonna need
 [lfit](https://github.com/StuartLittlefair/lfit) is a pretty robust piece of code. It's core functionality is easy to use, though perhaps a bit finnicky to pass parameters to. More on this in a few paragraphs.
 
-`lfit` operates not in time space, but rather in pahse space. This necessitates a but of pre-processing to get a lightcurve from the raw format, into flux as a function of eclipse phase. The eclipse minimum is assumed to occur at phase 0.0, though a variable in the model is a phase offset to tweak this... as a last resort! Good ephemeral data is much better than putting a plaster on the problem. To reiterate - `lfit` will output a lightcurve in `phase`, `flux`. 
+`lfit` operates not in time space, but rather in phase space. This necessitates a bit of pre-processing to get a lightcurve from the raw format, into flux as a function of eclipse phase. The eclipse minimum is assumed to occur at phase 0.0, though a variable in the model is a phase offset to tweak this... as a last resort! Good ephemeral data is much better than putting a plaster on the problem. 
+
+To reiterate - `lfit` will output a lightcurve in `phase`, `flux`. 
 
 The module has, essentially, one main useful object with one main function. The `lfit.CV` class handles the four components that are considered (namely, the disc, donor star, white dwarf, and bright spot), and puts them all together for you. These components *can* be called individually, but this **usually** is more useful for diagnostics than for modelling. The `lfit.CV` has a `calcFlux()` method, which will make up your lightcurve.
 
@@ -113,6 +115,6 @@ The input file needs a few parameters at a minimum. It's almost certainly easier
 
 
 ## TODO 
-- AIES samplers are likely not suitable for parameter spaces with N > ~5. Should we move to a different algorithm?
+- AIES samplers are [likely not suitable for parameter spaces with N > ~5](https://statmodeling.stat.columbia.edu/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/). Should we move to a different algorithm?
 - The `emcee` implimentation of parallel tempering is deprecated. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
 - The `watchparams` branch is now broken, due to the migration to the node tree. This needs porting over to the new version. 
