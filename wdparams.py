@@ -322,11 +322,15 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Fit WD Fluxes')
     parser.add_argument('file',action='store',help="input file")
+    parser.add_argument('--summarise', dest='summarise', action='store_true', help='Summarise existing chain file without running a new fit.')
 
     args = parser.parse_args()
 
     # Use parseInput function to read data from input file
     input_dict = parseInput(args.file)
+    summarise = args.summarise
+    if summarise:
+        print("I will NOT run a fit, but just re-create the output figures!")
 
     # Read information about mcmc, priors, neclipses, sys err
     nburn    = int( input_dict['nburn'] )
@@ -344,6 +348,7 @@ if __name__ == "__main__":
 
     syserr = float( input_dict['syserr'] )
 
+    chain_file = input_dict['chain']
     flat = int( input_dict['flat'] )
 
 
@@ -351,7 +356,6 @@ if __name__ == "__main__":
     # Load in chain file  #
     # # # # # # # # # # # #
 
-    chain_file = input_dict['chain']
     print("Reading in the chain file,", chain_file)
     if flat:
         with open(chain_file, 'r') as f:
@@ -529,25 +533,81 @@ if __name__ == "__main__":
     myModel = wdModel(teff,logg,plax,ebv)
     npars = myModel.npars
 
-    if toFit:
-        guessP = np.array(myModel)
+    if summarise:
+        chain = readchain_dask('chain_wd.txt')
         nameList = ['Teff','log g','Parallax','E(B-V)']
-
-        p0 = emcee.utils.sample_ball(guessP,scatter*guessP,size=nwalkers)
-        sampler = emcee.EnsembleSampler(nwalkers,npars,ln_prob,args=[myModel,y,e,mask],threads=nthread)
-
-        #burnIn
-        pos, prob, state = run_burnin(sampler,p0,nburn)
-        #pos, prob, state = sampler.run_mcmc(p0,nburn)
-
-        #production
-        sampler.reset()
-        sampler = run_mcmc_save(sampler,pos,nprod,state,"chain_wd.txt")
-        chain = flatchain(sampler.chain,npars,thin=thin)
 
         # Plot the likelihoods
         fig, ax = plt.subplots()
         likes = chain[:, :, -1]
+
+        # Plot the mean likelihood evolution
+        likes = np.mean(likes, axis=0)
+        steps = np.arange(len(likes))
+        std = np.std(likes)
+
+        # Make the likelihood plot
+        fig, ax = plt.subplots(figsize=(11, 8))
+        ax.fill_between(steps, likes-std, likes+std, color='red', alpha=0.4)
+        ax.plot(steps, likes, color="green")
+
+        ax.set_xlabel("Step")
+        ax.set_ylabel("ln_like")
+
+        plt.tight_layout()
+        plt.show()
+        plt.savefig('likelihoods.png')
+        plt.close()
+
+        # Flatten the chain for the thumbplot. Strip off the ln_prob, too
+        flat = flatchain(chain[:, :, :-1])
+        bestPars = []
+        for i in range(npars):
+            par = flat[:,i]
+            lolim,best,uplim = np.percentile(par,[16,50,84])
+            myModel[i] = best
+
+            print("%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim))
+            bestPars.append(best)
+
+        print("Creating corner plots...")
+        fig = thumbPlot(flat, nameList)
+        fig.savefig('cornerPlot.pdf')
+        fig.show()
+        plt.close()
+
+        toFit = False
+
+    if toFit:
+        guessP = np.array(myModel)
+        nameList = ['Teff','log_g','Parallax','E(B-V)']
+
+        p0 = emcee.utils.sample_ball(guessP, scatter*guessP, size=nwalkers)
+        sampler = emcee.EnsembleSampler(
+            nwalkers,
+            npars,
+            ln_prob,
+            args=[myModel, y, e, mask],
+            threads=nthread
+        )
+
+        #burnIn
+        pos, prob, state = run_burnin(sampler, p0, nburn)
+        #pos, prob, state = sampler.run_mcmc(p0,nburn)
+
+        #production
+        sampler.reset()
+        col_names = "walker_no " + ' '.join(nameList) + ' ln_prob'
+        sampler = run_mcmc_save(
+            sampler,
+            pos, nprod, state,
+            "chain_wd.txt", col_names=col_names
+        )
+        chain = flatchain(sampler.chain, npars, thin=thin)
+
+        # Plot the likelihoods
+        fig, ax = plt.subplots()
+        likes = sampler.chain[:, :, -1]
 
         # Plot the mean likelihood evolution
         likes = np.mean(likes, axis=0)
@@ -576,12 +636,15 @@ if __name__ == "__main__":
 
             print("%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim))
             bestPars.append(best)
+        print("Creating corner plots...")
         fig = thumbPlot(chain,nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
         plt.close()
     else:
         bestPars = [par for par in myModel]
+
+    print("Done!")
 
     dof = len(mags) - mags.count(0) - npars - 1
     print("Chisq = %.2f (%d D.O.F)" % (chisq(myModel,y,e,mask), dof))
