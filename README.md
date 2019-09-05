@@ -115,3 +115,4 @@ The input file needs a few parameters at a minimum. It's almost certainly easier
 ## TODO 
 - AIES samplers are likely not suitable for parameter spaces with N > ~5. Should we move to a different algorithm?
 - The `emcee` implimentation of parallel tempering is deprecated. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
+- The `watchparams` branch is now broken, due to the migration to the node tree. This needs porting over to the new version. 
