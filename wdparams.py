@@ -545,6 +545,29 @@ if __name__ == "__main__":
         sampler = run_mcmc_save(sampler,pos,nprod,state,"chain_wd.txt")
         chain = flatchain(sampler.chain,npars,thin=thin)
 
+        # Plot the likelihoods
+        fig, ax = plt.subplots()
+        likes = chain[:, :, -1]
+
+        # Plot the mean likelihood evolution
+        likes = np.mean(likes, axis=0)
+        steps = np.arange(len(likes))
+        std = np.std(likes)
+
+        # Make the likelihood plot
+        fig, ax = plt.subplots(figsize=(11, 8))
+        ax.fill_between(steps, likes-std, likes+std, color='red', alpha=0.4)
+        ax.plot(steps, likes, color="green")
+
+        ax.set_xlabel("Step")
+        ax.set_ylabel("ln_like")
+
+        plt.tight_layout()
+        plt.show()
+        plt.savefig('likelihoods.png')
+        plt.close()
+
+
         bestPars = []
         for i in range(npars):
             par = chain[:,i]

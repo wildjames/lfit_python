@@ -411,7 +411,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     ax.plot(steps, likes, color="green")
 
     ax.set_xlabel("Step")
-    ax.set_ylabel("-ln_like")
+    ax.set_ylabel("ln_like")
 
     plt.tight_layout()
 
