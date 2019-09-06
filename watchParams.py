@@ -91,7 +91,7 @@ class Watcher():
         self.doc.title = 'MCMC Chain Supervisor'
 
         # Is the file open? Check once a second until it is, then once we find it remove this callback.
-        self.doc.add_next_tick_callback(self.update_lc_model)
+        self.update_lc_model('value', '', '')
 
         print("Finished initialising the dashboard!")
 
@@ -148,10 +148,13 @@ class Watcher():
                 title = title,
                 start = param[1],
                 end   = param[2],
+                value_throttled = param[0],
                 value = param[0],
                 step  = (param[2] - param[1]) / 100,
                 width = 200,
-                format='0.0000'
+                format='0.0000',
+                callback_throttle=50,
+                callback_policy='mouseup'
             )
 
             self.par_sliders.append(slider)
@@ -168,10 +171,13 @@ class Watcher():
                 title = title,
                 start = param[1],
                 end   = param[2],
+                value_throttled = param[0],
                 value = param[0],
                 step  = (param[2] - param[1]) / 100,
                 width = 200,
-                format='0.0000'
+                format='0.0000',
+                callback_throttle=50,
+                callback_policy='mouseup'
             )
 
             self.par_sliders_complex.append(slider)
@@ -188,20 +194,22 @@ class Watcher():
                 title = title,
                 start = param[1],
                 end   = param[2],
+                value_throttled = param[0],
                 value = param[0],
                 step  = (param[2] - param[1]) / 100,
                 width = 200,
-                format='0.0000'
+                format='0.0000',
+                callback_throttle=50,
+                callback_policy='mouseup'
             )
 
             self.par_sliders_GP.append(slider)
 
         # Add the callbacks:
         for slider in self.par_sliders:
-            slider.on_change('value', self.update_lc_model)
-        if self.complex:
-            for slider in self.par_sliders_complex:
-                slider.on_change('value', self.update_lc_model)
+            slider.on_change('value_throttled', self.update_lc_model)
+        for slider in self.par_sliders_complex:
+            slider.on_change('value_throttled', self.update_lc_model)
         print("Made the sliders...")
 
         # Data file picker
@@ -226,11 +234,12 @@ class Watcher():
 
         print("Grabbing the observations...")
         # Grab the data from the file, to start with just use the first in the list
-        self.lc_obs = read_csv(menu[0][1],
-                sep=' ', comment='#',
-                header=None,
-                names=['phase', 'flux', 'err'],
-                skipinitialspace=True)
+        self.lc_obs = {}
+        self.lc_obs['phase'] = self.current_eclipse.lc.x
+        self.lc_obs['flux']  = self.current_eclipse.lc.y
+        self.lc_obs['err']  = self.current_eclipse.lc.ye
+
+        self.lc_obs = DataFrame(self.lc_obs)
         self.lc_obs.dropna(inplace=True, axis='index', how='any')
 
         # Total model lightcurve
@@ -353,6 +362,8 @@ class Watcher():
     def write2input(self):
         '''Get the slider values, and modify mcmc_input.dat to match them.'''
         print("I should write the slider value back to the file!")
+        all_sliders = self.par_sliders + self.par_sliders_complex
+
         # newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
         #     parname_label,
         #     value,
@@ -388,10 +399,14 @@ class Watcher():
         # Gather the parameters we can use
         self.complex  = bool(int(self.mcmc_input_dict['complex']))
         self.nWalkers = int(self.mcmc_input_dict['nwalkers'])
-        self.necl     = int(self.mcmc_input_dict['neclipses'])
         self.GP       = bool(int(self.mcmc_input_dict['useGP']))
         self.nBurn    = int(self.mcmc_input_dict['nburn'])
         self.nProd    = int(self.mcmc_input_dict['nprod'])
+
+        try:
+            self.necl = int(self.mcmc_input_dict['neclipses'])
+        except:
+            self.necl = len(self.model.search_node_type("Eclipse"))
 
         # Query thre model for the eclipses it has
         self.eclipses = list(self.model.search_node_type('Eclipse'))
@@ -406,7 +421,7 @@ class Watcher():
         if self.GP:
             print("Using the GP!")
 
-        self.menu = [(ecl.lc.name, ecl.lc.fname) for ecl in self.model.search_node_type('Eclipse')]
+        self.menu = [(ecl.name, ecl.lc.fname) for ecl in self.model.search_node_type('Eclipse')]
         print("The menu looks like this:")
         for m in self.menu:
             print(m)
@@ -437,7 +452,31 @@ class Watcher():
 
     def reset_sliders(self):
         '''Set the parameters to the initial guesses.'''
-        print("I should reset the sliders!")
+
+        print("resetting the sliders to new values")
+        all_sliders = self.par_sliders + self.par_sliders_complex
+
+        # Disable the callbacks
+        for slider in all_sliders:
+            slider.remove_on_change('value_throttled', self.update_lc_model)
+
+        # The GP sliders dont need their callbacks removed
+        all_sliders += self.par_sliders_GP
+
+        for par_name, param in self.parDict.items():
+            for slider in all_sliders:
+                if slider.name == par_name:
+                    slider.value_throttled = param[0]
+                    slider.start = param[1]
+                    slider.end   = param[2]
+
+        # Re-enable the calbacks
+        for slider in all_sliders:
+            slider.on_change('value_throttled', self.update_lc_model)
+
+        self.update_lc_model('value_throttled', '', '')
+
+        print("Done resetting sliders")
 
     def update_like_header(self, gp=False):
         print("res: {} data, err: {} data".format(len(self.lc_obs.data['res']), len(self.lc_obs.data['err'])))
@@ -454,6 +493,7 @@ class Watcher():
         '''Handler for toggling the complex button. This should just enable/disable the complex sliders '''
 
         print("Toggling the complex model...")
+        print("The complex variable was {}".format('on' if self.complex else 'off'))
         self.complex = self.complex_button.active
         print("The complex variable is now {}".format('on' if self.complex else 'off'))
 
@@ -461,12 +501,12 @@ class Watcher():
             print("Changing to the complex BS model")
             # Complex sliders update the model
             for slider in self.par_sliders_complex:
-                slider.on_change('value', self.update_lc_model)
+                slider.on_change('value_throttled', self.update_lc_model)
             print("Enabled the comlpex sliders")
 
             # Initialise a new CV object with the new BS model
-            pars = [slider.value for slider in self.par_sliders]
-            pars.extend([slider.value for slider in self.par_sliders_complex])
+            pars = [slider.value_throttled for slider in self.par_sliders]
+            pars.extend([slider.value_throttled for slider in self.par_sliders_complex])
             self.cv = CV(pars)
             print("Re-initialised the CV model")
 
@@ -476,23 +516,23 @@ class Watcher():
             print("Changing to the simple BS model")
             # Change the complex sliders to do nothing
             for slider in self.par_sliders_complex:
-                slider.remove_on_change('value', self.update_lc_model)
+                slider.remove_on_change('value_throttled', self.update_lc_model)
             print("Disabled the comlpex sliders")
 
             # Initialise a new CV object with the new BS model
-            pars = [slider.value for slider in self.par_sliders]
+            pars = [slider.value_throttled for slider in self.par_sliders]
             print("Re-initialised the CV model")
 
             self.complex_button.button_type = 'danger'
 
-        self.update_lc_model()
+        self.update_lc_model('value', '', '')
 
     def update_lc_model(self, attr, old, new):
         '''Callback to recalculate and redraw the CV model'''
-        print("I want to update {} with the slider values".format(
+        print("\n\nCALLED UPDATE_LC_MODEL")
+        print("I want to update {} with the slider values.".format(
             self.current_eclipse.name
         ))
-        obs = self.lc_obs
 
         # Get the band this eclipse belongs to
         band = self.current_eclipse.parent
@@ -511,31 +551,39 @@ class Watcher():
                 for slider in eclipse_par_sliders:
                     if par_name.startswith(slider.name):
                         # print("Slider {} found, taking its value".format(slider.name))
-                        par_vals[i] = slider.value
+                        par_vals[i] = slider.value_throttled
 
             if par_name.endswith(band.label):
                 for slider in self.par_sliders:
                     if par_name.startswith(slider.name):
                         # print("Slider {} found, taking its value".format(slider.name))
-                        par_vals[i] = slider.value
+                        par_vals[i] = slider.value_throttled
 
             if par_name.endswith(self.model.label):
                 for slider in self.par_sliders:
                     if par_name.startswith(slider.name):
                         # print("Slider {} found, taking its value".format(slider.name))
-                        par_vals[i] = slider.value
+                        par_vals[i] = slider.value_throttled
 
         print("I altered the the following parameter vector components:")
-        for i, (old_par, new_par) in enumerate(zip(self.model.dynasty_par_vals, par_vals)):
+        old_pars = self.model.dynasty_par_vals
+        for i, (old_par, new_par) in enumerate(zip(old_pars, par_vals)):
             if old_par != new_par:
-                print("parameter {} --- Old value: {:.3f}  ---  New value: {:.3f}".format(i, old_par, new_par))
+                print("parameter {} --- Old value: {:.3f}  ---  New value: {:.3f}".format(
+                    i, old_par, new_par
+                ))
         self.model.dynasty_par_vals = par_vals
 
         # Pull out a copy of the observations
         new_obs = dict(self.lc_obs.data)
 
         # Calculate
-        components = self.current_eclipse.calcComponents()
+        try:
+            components = self.current_eclipse.calcComponents()
+        except:
+            print("Invalid model parameters!")
+            self.model.dynasty_par_vals = old_pars
+            return
 
         # Total model lightcurve
         new_obs['calc']  = components[0]
@@ -553,87 +601,57 @@ class Watcher():
 
     def update_lc_obs(self, attr, old, new):
         '''callback to redraw the observations for the lightcurve'''
+        print("\n\nCALLED UPDATE_LC_OBS")
 
-        print("Redrawing the observations")
-        # Re-read the observations
-        fname = self.lc_change_fname_button.value
-        fname = str(fname)
-        self.lc_obs_fname = fname
-
-        print("Plotting data from file {}".format(fname))
-        new_obs = read_csv(fname,
-                sep=' ', comment='#', header=None, names=['phase', 'flux', 'err']
-                )
-        # Remove any row with a nan in it
-        new_obs.dropna(inplace=True, axis='index', how='any')
-        # new_obs['upper'] = new_obs['flux'] + new_obs['err']
-        # new_obs['lower'] = new_obs['flux'] - new_obs['err']
-
-        # Figure out which eclipse we're looking at
-        template = 'file_{}'
-        for i in range(self.necl):
-            if self.mcmc_input_dict[template.format(i)] == fname:
-                break
-        print('This is file {}'.format(i))
-
-        # Set the sliders to the initial guesses for that file
-        parNames = ['wdFlux_{}', 'dFlux_{}', 'sFlux_{}', 'rsFlux_{}', 'q', 'dphi', 'rdisc_{}', 'ulimb_{}',
-            'rwd', 'scale_{}', 'az_{}', 'fis_{}', 'dexp_{}', 'phi0_{}']
-        parNames = [x.format(i) for x in parNames]
-        for par, slider in zip(parNames, self.par_sliders):
-            slider.remove_on_change('value', self.update_lc_model)
-            value = self.parDict[par][0]
-            slider.value = value
-            slider.on_change('value', self.update_lc_model)
-
-        # Are we complex? If yes, set those too
-        if self.complex:
-            parNamesComplex = ['exp1_{}', 'exp2_{}', 'tilt_{}', 'yaw_{}']
-            parNamesComplex = [x.format(i) for x in parNamesComplex]
-            for par, slider in zip(parNamesComplex, self.par_sliders_complex):
-                slider.remove_on_change('value', self.update_lc_model)
-                value = self.parDict[par][0]
-                slider.value = value
-                slider.on_change('value', self.update_lc_model)
-
-        # Regenerate the model lightcurve
-        pars = [slider.value for slider in self.par_sliders]
-        if self.complex:
-            pars.extend([slider.value for slider in self.par_sliders_complex])
+        print("\nRedrawing the observations")
+        print("I want to take the menu item: {}".format(new))
+        for ecl in self.eclipses:
+            if ecl.lc.fname == new:
+                print("Found the eclipse!")
+                self.current_eclipse = ecl
 
 
-        self.cv = CV(pars)
-        print("Re-initialised the CV model")
+        new_obs = {}
+        phi = self.current_eclipse.lc.x
+        flx = self.current_eclipse.lc.y
+        err = self.current_eclipse.lc.ye
+
+        new_obs['phase'] = phi
+        new_obs['flux']  = flx
+        new_obs['err']   = err
 
         # Total model lightcurve
-        new_obs['calc'] = self.cv.calcFlux(pars, np.array(new_obs['phase']))
-        new_obs['res']  = new_obs['flux'] - new_obs['calc']
+        new_obs['calc']  = np.zeros_like(new_obs['phase'])
+        new_obs['res']   = np.zeros_like(new_obs['phase'])
         # Components
-        new_obs['sec']   = self.cv.yrs
-        new_obs['bspot'] = self.cv.ys
-        new_obs['wd']    = self.cv.ywd
-        new_obs['disc']  = self.cv.yd
-
+        new_obs['sec']   = np.zeros_like(new_obs['phase'])
+        new_obs['bspot'] = np.zeros_like(new_obs['phase'])
+        new_obs['wd']    = np.zeros_like(new_obs['phase'])
+        new_obs['disc']  = np.zeros_like(new_obs['phase'])
         # GP
         new_obs['GP_up'] = np.zeros_like(new_obs['phase'])
         new_obs['GP_lo'] = np.zeros_like(new_obs['phase'])
 
-        # Push that into the data frame
-        self.lc_obs.data = dict(new_obs)
-        # self.recalc_GP_model()
+        self.lc_obs.data = DataFrame(new_obs)
 
-        # Set the plotting area title
-        fname = fname.split('/')[-1]
+        print("\nUpdate the parDict")
+        self.update_par_dict()
+
+        print("\nReset the sliders")
+        self.reset_sliders()
+
+        print("\nSet the plotting area title")
+        fname = self.current_eclipse.lc.name
         print("Trying to change the title of the plot")
         print("Old title: {}".format(self.lc_plot.title.text))
         self.lc_plot.title.text = fname
-        print("The title should now be {}!!".format(fname))
+        print("The title should now be {}".format(fname))
 
-        self.update_like_header(gp=self.GP)
+        # self.update_like_header(gp=self.GP)
 
     def junk(self, attr, old, new):
         '''Sometimes, you just don't want to do anything'''
-        print("Calling the junk pile")
+        # print("Calling the junk pile")
         pass
 
 if __name__ in '__main__':

@@ -23,7 +23,7 @@ comp_scat      = 1      # vary scatter for different params (1), or add uniform 
 # if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
 # if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
 
-neclipses = 3
+# neclipses = 3
 
 # what phases to plot/fit
 phi_start = -0.2
@@ -77,7 +77,7 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
       az_0 =     127.2343      uniform      50.0000     175.0000            1
      fis_0 =       0.0480      uniform       0.0010       1.0000            1
     dexp_0 =       0.5000  log_uniform       0.0010       2.0000            1
-    phi0_0 =      -0.023      uniform      -0.2000       0.2000            1
+    phi0_0 =       0.0010      uniform      -0.2000       0.2000            1
     exp1_0 =       1.1342      uniform       0.0010       5.0000            1
     exp2_0 =       4.5971      uniform       0.5000       5.0000            1
      yaw_0 =      -64.040      uniform     -90.0000      90.0000            1
@@ -175,7 +175,7 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
       az_5 =     120.9071      uniform      50.0000     175.0000            1
      fis_5 =       0.0506      uniform       0.0010       1.0000            1
     dexp_5 =       1.7123  log_uniform       0.0010       2.0000            1
-    phi0_5 =      -0.0000      uniform      -0.2000       0.2000            1
+    phi0_5 =      -0.0010      uniform      -0.2000       0.2000            1
     exp1_5 =       3.0050      uniform       0.0010       5.0000            1
     exp2_5 =       1.3828      uniform       0.5000       5.0000            1
      yaw_5 =       8.6757      uniform     -90.0000      90.0000            1
