@@ -362,16 +362,62 @@ class Watcher():
     def write2input(self):
         '''Get the slider values, and modify mcmc_input.dat to match them.'''
         print("I should write the slider value back to the file!")
-        all_sliders = self.par_sliders + self.par_sliders_complex
 
-        # newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
-        #     parname_label,
-        #     value,
-        #     prior_type,
-        #     p1,
-        #     p2,
-        #     isVar
-        # )
+        to_write = {}
+
+        band = self.current_eclipse.parent
+        core = band.parent
+
+        for par, param in self.current_eclipse.ancestor_param_dict.items():
+            if par in band.node_par_names:
+                parname_label = "{}_{}".format(par, band.label)
+            if par in core.node_par_names:
+                parname_label = "{}_{}".format(par, core.label)
+            if par in self.current_eclipse.node_par_names:
+                parname_label = "{}_{}".format(par, self.current_eclipse.label)
+
+            # Collect the data
+            value = param.currVal
+            prior_type = param.prior.type
+            p1 = param.prior.p1
+            p2 = param.prior.p2
+            isVar = param.isVar
+
+            newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
+                parname_label,
+                value,
+                prior_type,
+                p1,
+                p2,
+                isVar
+            )
+
+            to_write[par] = newline
+
+        with open(self.mcmc_fname, 'r') as f:
+            mcmc_file = f.readlines()
+
+        for key, item in to_write.items():
+            print("\npar: {}".format(key))
+            print("new line:\n{}".format(newline))
+
+        with open("new_mcmc_input.dat", 'w') as f:
+            for line in mcmc_file:
+                changeme = False
+
+                if not line.startswith('#'):
+                    splitted = line.strip().split(' ')
+
+                    if len(splitted) > 0:
+                        par = splitted[0]
+
+                        if par in to_write.keys():
+                            changeme = True
+
+                if changeme:
+                    line = to_write[par]
+
+                f.write(line)
 
     def parse_mcmc_input(self):
         '''Parse the mcmc input dict, and store the following:
