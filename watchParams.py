@@ -77,89 +77,11 @@ class Watcher():
         # Parse the mcmc_input file
         self.parse_mcmc_input()
 
-        # Get the observation data file from the input
-        print("Grabbing data files from the input dict...")
-        menu = []
-        for i in range(self.necl):
-            # Grab the filename
-            fname = self.mcmc_input_dict["file_{}".format(i)]
-            # Append it to menu
-            menu.append((fname.split('/')[-1], fname))
-        # The observational data filenames will be safe enough in a button.
-
-        # Parameter keys
-        parNames = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
-                'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
-        parNameTemplate = ['wdFlux_{0}', 'dFlux_{0}', 'sFlux_{0}', 'rsFlux_{0}',\
-                'rdisc_{0}', 'ulimb_{0}', 'scale_{0}', 'az_{0}', 'fis_{0}', 'dexp_{0}', 'phi0_{0}']
-
-        # Extra parameters for the complex model
-        if self.complex:
-            parNames.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
-            parNameTemplate.extend(['exp1_{0}', 'exp2_{0}', 'tilt_{0}', 'yaw_{0}'])
-            print("Using the complex BS model!")
-        else:
-            print("Using the simple BS model!")
-
-        # Extra parameters for the GP
-        parNames.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
-
-        # Extend the parameter names for each eclipse
-        for i in range(1, self.necl):
-            parNames.extend([template.format(i) for template in parNameTemplate])
-
-        # Copy the above onto self
-        self.parNames = list(parNames)
-        # Human-readable names
-        self.parDesc = ['White Dwarf Flux', 'Disc Flux', 'Bright Spot Flux', 'Secondary Flux', 'Mass Ratio',
-            'Eclipse Duration', 'Disc Radius', 'Limb Darkening', 'White Dwarf Radius', 'Bright Spot Scale',
-            'Bright Spot Azimuth', 'Isotropic Emission Fract.', 'Disc Profile', 'Phase Offset',
-            'BS Exponent 1', 'BS Exponent 2', 'BS Emission Tilt', 'BS Emission Yaw', 'GP amp. in', 'GP amp. out',
-            'GP timescale']
-
-
-        #####################################################
-        ############# Tab 1: Parameter History ##############
-        #####################################################
-
-        print("Creating the Parameter History tab...")
-        # Drop down box to add parameters to track
-        self.selectList = [('', '')]
-        self.plotPars = Dropdown(width=120, label='Track Parameter', button_type='primary', menu=self.selectList)
-        self.plotPars.on_change('value', self.add_tracking_plot)
-        # Call the update_selectList function
-        self.update_selectList()
-        print("Made the parameter picker...")
-
-        # Lets report some characteristics of the chain
-        self.reportChain_label = markups.Div(width=1000)
-        self.make_header()
-        print("Made the little header")
-
-        # Thinning input
-        self.thin_input = TextInput(placeholder='Number of steps to skip over', width=200)
-        self.thin_input.on_change('value', self.update_thinning)
-
-        # Shortcut to the Likelihood plot
-        self.likelihood_shortcut = Button(label='Quick Pars', width=200)
-        self.likelihood_shortcut.on_click(self.add_likelihood_plot)
-
-        # Add stuff to a layout for the area
-        self.tab1_layout = column([
-            self.reportChain_label,
-            self.thin_input,
-            row([self.plotPars, self.likelihood_shortcut])])
-
-        # Add that layout to a tab
-        self.tab1 = Panel(child=self.tab1_layout, title="Parameter History")
-        print("First tab done!")
-
-
         ######################################################
         ############### Tab 2: Model inspector ###############
         ######################################################
 
-        print("Creating the second tab...")
+        print("Creating the model tweaker tab...")
         # I need a myriad of parameter sliders. The ranges on these should be set by the priors.
         self.par_sliders = []
         for par, title in zip(self.parNames[:14], self.parDesc[:14]):
@@ -330,7 +252,7 @@ class Watcher():
         self.like_label = markups.Div(width=1000)
 
         # Arrange the tab layout
-        self.tab2_layout = row([
+        tab2_layout = row([
             column([
                 row([self.lc_change_fname_button, self.complex_button, self.GP_button, self.lc_isvalid, self.write2input_button]),
             self.lc_plot, self.lc_res_plot,
@@ -343,64 +265,38 @@ class Watcher():
             ])
         ])
 
-        self.tab2 = Panel(child=self.tab2_layout, title="Lightcurve Inspector")
+        tab2 = Panel(child=tab2_layout, title="Lightcurve Inspector")
         print("Constructed the Lightcurve Inspector tab!")
 
-        ######################################################
-        ################# Tab 3: Param Table #################
-        ######################################################
+        # ######################################################
+        # ################# Tab 3: Param Table #################
+        # ######################################################
 
-        self.tableColumns = ['wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'rdisc',
-            'ulimb', 'scale', 'az', 'fis', 'dexp', 'phi0']
+        # self.tableColumns = ['wdFlux', 'dFlux', 'sFlux', 'rsFlux', 'rdisc',
+        #     'ulimb', 'scale', 'az', 'fis', 'dexp', 'phi0']
 
-        # Extra parameters for the complex model
-        if self.complex:
-            self.tableColumns.extend(['exp1', 'exp2', 'tilt', 'yaw'])
+        # # Extra parameters for the complex model
+        # if self.complex:
+        #     self.tableColumns.extend(['exp1', 'exp2', 'tilt', 'yaw'])
 
-        tableDict = {}
-        for p in self.tableColumns:
-            get = p + "_{}"
-            tableDict[p] = [self.parDict[get.format(i)][0] for i in range(self.necl)]
-        # This is opaque, but just trust me. Couldn't be bothered to be clearer.
-        tableDict['file'] = [self.mcmc_input_dict['file_{}'.format(i)].split('/')[-1] for i in range(self.necl)]
+        # tableDict = {}
+        # for p in self.tableColumns:
+        #     get = p + "_{}"
+        #     tableDict[p] = [self.parDict[get.format(i)][0] for i in range(self.necl)]
+        # # This is opaque, but just trust me. Couldn't be bothered to be clearer.
+        # tableDict['file'] = [self.mcmc_input_dict['file_{}'.format(i)].split('/')[-1] for i in range(self.necl)]
 
-        self.lastStep_CDS = ColumnDataSource(tableDict)
-        columns = [
-            TableColumn(field=par, title=par, formatter=tables.NumberFormatter(format='0.0000')) for par in self.tableColumns
-        ]
-        columns.insert(0,
-            TableColumn(field='file', title='File', width=1200)
-            )
-        self.parameter_table = DataTable(source=self.lastStep_CDS, columns=columns, width=1600)
+        # self.lastStep_CDS = ColumnDataSource(tableDict)
+        # columns = [
+        #     TableColumn(field=par, title=par, formatter=tables.NumberFormatter(format='0.0000')) for par in self.tableColumns
+        # ]
+        # columns.insert(0,
+        #     TableColumn(field='file', title='File', width=1200)
+        #     )
+        # self.parameter_table = DataTable(source=self.lastStep_CDS, columns=columns, width=1600)
 
-        self.tab3_layout = column([self.parameter_table])
-        self.tab3 = Panel(child=self.tab3_layout, title="Parameter table")
-
-
-        ######################################################
-        ################# Tab 4: Corner plot #################
-        ######################################################
-
-        # Make corner plots. I need to know how long the burn in is though!
-        self.burn_input = TextInput(placeholder='No. steps to discard', )
-        self.corner_plot_button = Button(label='Make corner plots')
-        self.corner_plot_button.on_click(self.make_corner_plots)
-        print("Defualt button type is {}".format(self.corner_plot_button.button_type))
-
-        self.cornerReporter = markups.Div(width=700)
-        self.cornerReporter.text = "The chain file will have <b>{:,d}</b> steps when completed</br>".format(self.nProd)
-        self.cornerReporter.text += "We're using <b>{:,d}</b> walkers, making for <b>{:,d}</b> total lines to read in.</br>".format(
-            self.nWalkers, self.nProd*self.nWalkers)
-        self.cornerReporter.text += "I've not yet added support for embedded images here, and bokeh isn't a great tool for corner plots this big. You'll probably have to scp the files manually."
-        curdir = getcwd()
-        self.cornerReporter.text += "This one-liner should do it:</br><b>scp callisto:{}/eclipse*.png .</b>".format(curdir)
-
-        # #TODO:
-        # # - Show the corner plots in the page? Or, add a link to download them?
-        # # - Corner plots can make the server run out of memory for large files! can we fix this?
-
-        # self.tab4_layout = column([self.burn_input, self.corner_plot_button, self.cornerReporter])
-        # self.tab4 = Panel(child=self.tab4_layout, title="Corner Plotting")
+        # tab3_layout = column([self.parameter_table])
+        # tab3 = Panel(child=tab3_layout, title="Parameter table")
 
 
         ######################################################
@@ -408,7 +304,7 @@ class Watcher():
         ######################################################
 
         # Make a tabs object
-        self.tabs = Tabs(tabs=[self.tab1, self.tab2, self.tab3])#, self.tab4])
+        self.tabs = Tabs(tabs=[self.tab1, tab2])
         # Add it
         self.doc = curdoc()
         self.doc.add_root(self.tabs)
@@ -440,6 +336,85 @@ class Watcher():
         self.doc.add_next_tick_callback(self.recalc_lc_model)
 
         print("Finished initialising the dashboard!")
+
+    def make_header(self):
+        '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
+
+        header  = "I'm working from the directory: <b>{}</b></br>".format(getcwd())
+        header +=  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
+            self.nBurn, self.nProd)
+        header += " We're using <b>{:,d}</b> walkers,".format(self.nWalkers)
+
+        if bool(int(self.mcmc_input_dict['usePT'])):
+            header += ' with parallel tempering sampling <b>{:,d}</b> temperatures,'.format(
+                int(self.mcmc_input_dict['ntemps']))
+
+        header += ' and running on <b>{:,d}</b> cores.</br>'.format(int(self.mcmc_input_dict['nthread']))
+
+        # self.reportChain_label.text = header
+
+    def write2input(self):
+        '''Get the slider values, and modify mcmc_input.dat to match them.'''
+
+        # Figure out which eclipse we're looking at
+        fname = self.lc_obs_fname
+        template = 'file_{}'
+        for i in range(self.necl):
+            this = self.mcmc_input_dict[template.format(i)]
+            if fname in this:
+                break
+            else: i = None
+        if i is None:
+            print("Couldn't find the index of that file!")
+            return
+        fileNumber = int(i)
+        print('This is file {}'.format(fileNumber))
+
+        # Get a list of the parameters we're going to change
+        values = [slider.value for slider in self.par_sliders]
+
+        labels = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
+                'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
+        if self.complex:
+            labels.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
+            values.extend([slider.value for slider in self.par_sliders_complex])
+
+        labels = [l.replace('_0', '_{}'.format(fileNumber)) for l in labels]
+
+        newvalues = {}
+        for par, value in zip(labels, values):
+            newvalues[par] = value
+
+        # Make a copy of the mcmc_input file and edit that.
+        mcmc_file = []
+        with open(self.mcmc_fname, 'r') as f:
+            for line in f:
+                line_components = line.strip().split()
+                if len(line_components) > 0:
+                    par = line_components[0]
+                    if par in labels:
+                        value = newvalues[par]
+
+                        newline = line_components.copy()
+                        newline[2] = value
+                        newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
+                            str(newline[0]),
+                            float(newline[2]),
+                            str(newline[3]),
+                            float(newline[4]),
+                            float(newline[5]),
+                            int(newline[6])
+                            )
+
+                        line = newline
+                mcmc_file.append(line)
+
+        # Overwrite the old mcmc_input file.
+        print('Writing new file, {}'.format(self.mcmc_fname))
+        with open(self.mcmc_fname, 'w') as f:
+            for line in mcmc_file:
+                f.write(line)
+        self.parse_mcmc_input()
 
     def parse_mcmc_input(self):
         '''Parse the mcmc input dict, and store the following:
@@ -509,296 +484,8 @@ class Watcher():
             parameter = [float(x) for x in line]
             self.parDict[param] = list(parameter)
 
+        self.parNames = parNames
         self.model = construct_model(self.mcmc_fname)
-
-    def open_file(self):
-        '''Check if the chain file has been created yet. If not, do nothing. If it is, set it to self.f'''
-        # Open the file, and keep it open
-        chain_file = self.chain_fname
-        self.f = open(chain_file, 'r')
-
-        # Determine the number of walkers, just to check
-        nWalkers = 0
-        while True:
-            line = self.f.readline()
-            line = line.split()
-            walker = int(line[0])
-            if nWalkers == walker:
-                nWalkers += 1
-            else:
-                break
-
-        # Close and reopen the file to move the cursor back to the beginning.
-        self.f.close()
-        # We're at step 0 now
-        self.f = open(chain_file, 'r')
-
-        print("Expected {} walkers, got {} walkers in the file!".format(self.nWalkers, nWalkers))
-        if nWalkers != self.nWalkers:
-            print("Got a walker mismatch. Using the walkers I found by looking in the file...")
-            self.nWalkers = nWalkers
-
-        # Remove the callback that keeps trying to open the file.
-        # This is down here, in case the above fails. This way,
-        # if it does we should check again in a bit until it works
-        try:
-            self.doc.remove_periodic_callback(self.check_file)
-            print("No longer re-checking for the file.")
-        except:
-            pass
-
-        # Create a new callback that periodically reads the file
-        print('Adding next tick callback')
-        self.doc.add_next_tick_callback(self.update_chain)
-
-        print("Succesfully opened the chain '{}'!".format(chain_file))
-
-    def readStep(self):
-        '''Attempt to read in the next step of the chain file.
-        If we get an unexpected number of walkers, quit the script.
-        If we're at the end of the file, do nothing.'''
-        # TODO: UPDATE
-
-        stepData = np.zeros((self.nWalkers, len(self.pars)), dtype=float)
-        # If true, return the data. If False, the end of the file was reached before the step was fully read in.
-        flag = True
-
-
-        self.thinstep += 1
-
-        if self.thin:
-            if self.thinstep % self.thin != 0:
-                # This only processes the line once every <thin> lines
-                flag = None
-
-        try:
-            # Remember where we started
-            start = self.f.tell()
-            lastStep = np.zeros(len(self.selectList)-2, dtype=np.float64)
-            for i in np.arange(self.nWalkers):
-                # Get the next line
-                line = self.f.readline().strip()
-
-                # Do we actually want to process this data?
-                if flag is True:
-                    # Are we at the end of the file?
-                    if line == '':
-                        # The file is over.
-                        flag = False
-                        break
-
-                    line = np.array(line.split(), dtype=np.float64)
-
-                    # Check for infinities, replace with nans. Handles bad walkers
-                    line[np.isinf(line)] = np.nan
-
-                    # Which walker are we?
-                    w = int(line[0])
-                    if w != i:
-                        flag = False
-                        break
-
-                    # Gather the desired numbers
-                    lastStep += line[1:-1]
-                    values = line[self.pars]
-
-                    stepData[w, :] = values
-            lastStep /= float(self.nWalkers)
-        except IndexError:
-            print("I got an index error!!! here's the line:")
-            # Sometimes empty lines slip through. Catch the exceptions
-            print(line)
-            print(len(line))
-            flag = False
-
-        if flag is True:
-            # We successfully read in the chunk!
-            self.s += 1
-            # print("Successful step, Adding next tick callback")
-            self.next_read = self.doc.add_next_tick_callback(self.update_chain)
-            self.init = start
-            self.lastStep = np.array(lastStep)
-            return stepData
-        elif flag is False:
-            # The most recent step wasn't completely read in
-            self.f.seek(start)
-            # print("Adding timeout callback")
-            print('  End of file! waiting for new step to be written...', end='\r')
-            self.next_read = self.doc.add_timeout_callback(self.update_chain, 10000)
-
-            if not self.lastStep is None:
-                # print("\nUpdating the table with lastStep...")
-                # trim leading empty cell, and trailing likelihood
-                params = [p[0] for p in self.selectList][1:-1]
-
-
-                # print(self.lastStep)
-                # for i, p in enumerate(params):
-                    # print(i, p, self.lastStep[i])
-
-
-                for p in self.tableColumns:
-                    get = p + "_{}"
-
-                    l = []
-                    for i in range(self.necl):
-                        # work out the name of the parameter
-                        g = get.format(i)
-
-                        try:
-                            # grab the value from lastStep
-                            index = params.index(g)
-                            val = self.lastStep[index]
-                            # print("I want to get the parameter {}, from index {}".format(g, index))
-                            # print("Got a value of {} for parameter {}".format(val, g))
-                        except:
-                            # If the valus isn't in lastStep, take it from the parDict
-                            # print("The parameter {} is not fitted. Taking from initial condition:".format(g))
-                            val = self.parDict[g][0]
-                            # print("Got a value of {} for parameter {}".format(val, g))
-                        # store
-                        l.append(val)
-                        # print()
-
-                    self.lastStep_CDS.data[p] = np.array(l)
-
-
-            return None
-        else:
-            # We read in a step but we don't want it.
-            self.s += 1
-            # print("Step we want to skip, adding next tick callback")
-            self.next_read = self.doc.add_next_tick_callback(self.update_chain)
-            self.init = start
-            return None
-
-    def update_chain(self):
-        '''Call the readStep() function, and stream the live chain data to the plotter.'''
-
-        # Do we have anything to plot?
-        if self.labels != []:
-            step = self.readStep()
-
-            if step is None:
-                # No data to plot
-                pass
-            else:
-                # Generate summaries
-                means = np.nanmean(step, axis=0)
-                stds  = np.nanstd(step,  axis=0)
-
-                stds[np.isnan(means)]  = 0.0
-                means[np.isnan(means)] = 0.0
-
-
-                # Stream accepts a dict of lists
-                newdata = dict()
-                newdata['step'] = np.array([self.s])
-
-                for i, label in enumerate(self.labels):
-                    newdata[label+'Mean'] = np.array([means[i]])
-                    newdata[label+'StdUpper']  = np.array([means[i]+stds[i]])
-                    newdata[label+'StdLower']  = np.array([means[i]-stds[i]])
-
-                # Add to the plot.
-                self.paramFollowSource.stream(newdata, self.tail)
-
-    def add_tracking_plot(self, attr, old, new):
-        '''Add a user-defined to the page'''
-
-        print("Attempting to add a plot to the page")
-
-        label = str(self.plotPars.value)
-        params = [par[0] for par in self.selectList]
-        par = params.index(label)
-
-
-
-        self.add_par_plot(label, par)
-
-    def add_likelihood_plot(self):
-        '''Add the global parameters to the page'''
-
-        # What column is the likelihood?
-        search = ["Likelihood", 'q', 'dphi', 'rwd']
-
-        if self.GP:
-            search.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
-
-        pars = []
-        labels = []
-        for p in search:
-            print("Is {} in the selectList?".format(p))
-            if (p,p) in self.selectList:
-                index = self.selectList.index( (p,p) )
-                print("Yes! at index {}".format(index))
-                pars.append(index)
-                labels.append(p)
-
-
-        for label, par in zip(labels, pars):
-            self.add_par_plot(label, par)
-
-    def add_par_plot(self, label, par):
-        '''Add a plot to the page'''
-
-        print("Adding a plot to the page: Label, Par: {}, {}".format(label, par))
-
-        if not label in [x[0] for x in self.selectList]:
-            print("The parameter '{}' is NOT being fitted!".format(label))
-            return
-
-        names = {'q':"Mass Ratio", 'dphi':"Eclipse Duration", 'rwd':"White Dwarf Radius"}
-        if label in names:
-            label = names[label]
-
-
-        self.labels.append(label)
-        self.pars.append(par)
-
-        # Clear data from the source structure
-        self.paramFollowSource.data = {'step': []}
-        for l in self.labels:
-            self.paramFollowSource.data[l+'Mean']     = []
-            self.paramFollowSource.data[l+'StdUpper'] = []
-            self.paramFollowSource.data[l+'StdLower'] = []
-
-        print("Reset the data storage to empty")
-
-        # Move the file cursor back to the beginning of the file
-        if not self.f is False:
-            self.f.close()
-            self.f = self.sftp_client.open(self.chain_fname, 'r')
-            self.s = 0
-
-        print("Closed and re-opened the file!")
-
-        new_plot = bk.plotting.figure(title=label, plot_height=300, plot_width=1600,
-            toolbar_location='above', y_axis_location="right",
-            tools="ypan,ywheel_zoom,ybox_zoom,reset")
-            # tools=[])
-        new_plot.line(x='step', y=label+'Mean', alpha=1, line_width=3, color='red', source=self.paramFollowSource)
-        band = Band(base='step', lower=label+'StdLower', upper=label+'StdUpper', source=self.paramFollowSource,
-                    level='underlay', fill_alpha=0.5, line_width=0, line_color='black', fill_color='green')
-        new_plot.add_layout(band)
-
-        new_plot.x_range.follow = "end"
-        new_plot.x_range.follow_interval = self.tail
-        new_plot.x_range.range_padding = 0
-        new_plot.y_range.range_padding_units = 'percent'
-        new_plot.y_range.range_padding = 1
-
-        # Make this add to the right tab
-        self.tab1_layout.children += [row(new_plot)]
-
-        self.lc_isvalid.label = 'Get current step'
-        self.lc_isvalid.button_type = 'default'
-
-
-        print("Added a new plot!")
-
-        if not self.f is False:
-            self.doc.add_next_tick_callback(self.update_chain)
 
     def reset_sliders(self):
         '''Set the parameters to the initial guesses.'''
@@ -897,87 +584,6 @@ class Watcher():
         self.update_lc_model('value', '', '')
         self.lc_isvalid.button_type = 'default'
 
-    def calcChangepoints(self):
-        # What data range are we looking at?
-        phi = self.lc_obs.data['phase']
-        # Also get object for dphi, q and rwd as this is required to determine changepoints
-        dphi = self.par_sliders[5].value
-        q = self.par_sliders[4].value
-        rwd = self.par_sliders[8].value
-
-        # Calculate inclination
-        inc = roche.findi(q,dphi)
-        # Calculate wd contact phases 3 and 4
-        phi3, phi4 = roche.wdphases(q, inc, rwd, ntheta=10)
-        # Calculate length of wd egress
-        dpwd = phi4 - phi3
-        # Distance from changepoints to mideclipse
-        dist_cp = (dphi+dpwd)/2.
-
-        # Find location of all changepoints
-        min_ecl = int(np.floor(np.nanmin(phi)))
-        max_ecl = int(np.ceil(np.nanmax(phi)))
-        eclipses = [e for e in range(min_ecl, max_ecl+1) if np.logical_and(e>phi.min(), e<1 + phi.max())]
-        changepoints = []
-        for e in eclipses:
-            # When did the last eclipse end?
-            egress = (e-1) + dist_cp
-            # When does this eclipse start?
-            ingress = e - dist_cp
-            changepoints.append([egress, ingress])
-
-
-        return changepoints
-
-    def createGP(self):
-        """Constructs a kernel, which is used to create Gaussian processes.
-
-        Using values for the two hyperparameters (amp,tau), amp_ratio and dphi, this function:
-        creates kernels for both inside and out of eclipse, works out the location of any
-        changepoints present, constructs a single (mixed) kernel and uses this kernel to create GPs"""
-
-        # Get objects for ampin_gp, ampout_gp, tau_gp and find the exponential of their current values
-        ln_ampin, ln_ampout, ln_tau = [float(slider.value) for slider in self.par_sliders_GP]
-
-        ampin = np.exp(ln_ampin)
-        ampout = np.exp(ln_ampout)
-        tau = np.exp(ln_tau)
-
-        # Calculate kernels for both out of and in eclipse WD eclipse
-        # Kernel inside of WD has smaller amplitude than that of outside eclipse
-        # First, get the changepoints
-        changepoints = self.calcChangepoints()
-
-        # We need to make a fairly complex kernel.
-        # Global flicker
-        kernel = ampin * g.kernels.Matern32Kernel(tau)
-        # inter-eclipse flicker
-        for gap in changepoints:
-            kernel += ampout * g.kernels.Matern32Kernel(tau, block=gap)
-
-        # Use that kernel to make a GP object
-        georgeGP = g.GP(kernel, solver=g.HODLRSolver)
-
-        self.gp = georgeGP
-
-    def recalc_GP_model(self):
-        pars = [slider.value for slider in self.par_sliders]
-        if self.complex:
-            pars.extend([slider.value for slider in self.par_sliders_complex])
-
-        self.cv = CV(pars)
-        self.createGP()
-        self.gp.compute(self.lc_obs.data['phase'], self.lc_obs.data['err'])
-
-        # GP
-        samples = self.gp.sample_conditional(self.lc_obs.data['res'], self.lc_obs.data['phase'], size = 300)
-        mu = np.mean(samples,axis=0)
-        std = np.std(samples,axis=0)
-        self.lc_obs.data['GP_up'] = mu + std
-        self.lc_obs.data['GP_lo'] = mu - std
-
-        self.update_like_header(gp=True)
-
     def update_like_header(self, gp=False):
         print("res: {} data, err: {} data".format(len(self.lc_obs.data['res']), len(self.lc_obs.data['err'])))
         chisq =  self.lc_obs.data['res'] / self.lc_obs.data['err']
@@ -993,77 +599,6 @@ class Watcher():
         print("label text was before: {}".format(self.like_label.text))
         self.like_label.text = "<i>GP ln(likelihood): <b>{:.1f}</b>, Chi Squared: <b>{:.1f}</b></i>".format(self.lnlike, chisq)
         print("label text is now: {}".format(self.like_label.text))
-
-    def recalc_lc_model(self):
-        try:
-            # Regenerate the model lightcurve
-            pars = [slider.value for slider in self.par_sliders]
-            if self.complex:
-                pars.extend([slider.value for slider in self.par_sliders_complex])
-
-            self.cv = CV(pars)
-
-            rwd = pars[8]
-            scale = pars[9]
-
-
-            self.lc_obs.data['calc']  = self.cv.calcFlux(pars, np.array(self.lc_obs.data['phase']))
-            self.lc_obs.data['res']   = self.lc_obs.data['flux'] - self.lc_obs.data['calc']
-            # Components
-            self.lc_obs.data['sec']   = self.cv.yrs
-            self.lc_obs.data['bspot'] = self.cv.ys
-            self.lc_obs.data['wd']    = self.cv.ywd
-            self.lc_obs.data['disc']  = self.cv.yd
-
-            self.lc_isvalid.button_type = 'default'
-            self.lc_isvalid.label = 'Get current step'
-
-            if rwd < (1./3.)*scale or scale > 3.*rwd:
-                print("BS Scale must be between 1/3 and 3 time WD size!")
-                self.lc_isvalid.button_type = 'danger'
-                self.lc_isvalid.label = 'BAD BS/RWD RATIO!'
-
-        except Exception:
-            print("Invalid parameters!")
-            self.lc_isvalid.button_type = 'danger'
-            self.lc_isvalid.label = 'Invalid Parameters'
-
-        if self.lnlike is None:
-            self.recalc_GP_model()
-
-        self.update_like_header(gp=False)
-
-    def update_selectList(self):
-        '''Change the options on self.plotPars to reflect how many eclipses are in the MCMC chain'''
-
-        print("Updating the number of eclipses in the plotPars list.")
-
-        parNames = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
-            'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
-        parNameTemplate = ['wdFlux_{0}', 'dFlux_{0}', 'sFlux_{0}', 'rsFlux_{0}',\
-            'rdisc_{0}', 'ulimb_{0}', 'scale_{0}', 'az_{0}', 'fis_{0}', 'dexp_{0}', 'phi0_{0}']
-
-        # complex has extra parameters
-        if self.complex:
-            print("Adding complex params")
-            parNames.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
-            parNameTemplate.extend(['exp1_{0}', 'exp2_{0}', 'tilt_{0}', 'yaw_{0}'])
-
-        if self.GP:
-            print("Adding GP params")
-            parNames.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
-
-        # Format labels
-        for i in range(self.necl-1):
-            for name in parNameTemplate:
-                parNames.append(name.format(i+1))
-
-        self.parNames = list(parNames)
-
-        self.selectList = [(par, par) for par in parNames if self.parDict[par][3]]
-        self.selectList.insert(0, ('', ''))
-        self.selectList.append(('Likelihood', 'Likelihood'))
-        self.plotPars.menu = self.selectList
 
     def update_complex(self, new):
         '''Handler for toggling the complex button. This should just enable/disable the complex sliders '''
@@ -1102,32 +637,9 @@ class Watcher():
 
         self.recalc_lc_model()
 
-    def update_thinning(self, attr, old, new):
-        thin = self.thin_input.value
-        try:
-            thin = int(thin)
-        except:
-            self.thin_input.value = ''
-
-        self.thin = thin
-        self.make_header()
-
-        # Clear data from the source structure
-        self.paramFollowSource.data = {'step': []}
-        for l in self.labels:
-            self.paramFollowSource.data[l+'Mean']     = []
-            self.paramFollowSource.data[l+'StdUpper'] = []
-            self.paramFollowSource.data[l+'StdLower'] = []
-
-        print("Reset the data storage to empty")
-
-        # Move the file cursor back to the beginning of the file
-        if not self.f is False:
-            self.f.close()
-            self.f = self.sftp_client.open(self.chain_fname, 'r')
-            self.s = 0
-
-        print("Closed and re-opened the file!")
+    def update_lc_model(self, attr, old, new):
+        '''Callback to recalculate and redraw the CV model'''
+        pass
 
     def update_lc_obs(self, attr, old, new):
         '''callback to redraw the observations for the lightcurve'''
@@ -1209,185 +721,6 @@ class Watcher():
 
         self.update_like_header(gp=self.GP)
 
-    def update_lc_model(self, attr, old, new):
-        '''Callback to redraw the model lightcurve in the second tab'''
-        self.recalc_lc_model()
-
-    def update_GP_model(self, attr, old, new):
-        '''callback to recalc the GP'''
-        self.recalc_GP_model()
-
-    def make_header(self):
-        '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
-
-        header  = "I'm working from the directory: <b>{}</b></br>".format(getcwd())
-        header +=  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
-            self.nBurn, self.nProd)
-        header += " We're using <b>{:,d}</b> walkers,".format(self.nWalkers)
-
-        if bool(int(self.mcmc_input_dict['usePT'])):
-            header += ' with parallel tempering sampling <b>{:,d}</b> temperatures,'.format(
-                int(self.mcmc_input_dict['ntemps']))
-
-        header += ' and running on <b>{:,d}</b> cores.</br>'.format(int(self.mcmc_input_dict['nthread']))
-        if self.thin:
-            p = str(self.thin)
-            if p == '1':
-                write = 'other'
-            elif p[-1] == '1':
-                write = p+'st'
-            elif p[-1] == '2':
-                write = p+'nd'
-            elif p[-1] == '3':
-                write = p+'rd'
-            else:
-                write = p+'th'
-
-            header += " When plotting parameter evolutions, I'm plotting every "
-            header += "<b>{}</b> step and only keeping the last <b>{:,d}</b> steps".format(write, self.tail)
-        else:
-            header += " When plotting parameter evolutions, I'll plot every step, and keep the last <b>{:,d}</b> steps.".format(self.tail)
-
-        self.reportChain_label.text = header
-
-    def write2input(self):
-        '''Get the slider values, and modify mcmc_input.dat to match them.'''
-
-        # Figure out which eclipse we're looking at
-        fname = self.lc_obs_fname
-        template = 'file_{}'
-        for i in range(self.necl):
-            this = self.mcmc_input_dict[template.format(i)]
-            if fname in this:
-                break
-            else: i = None
-        if i is None:
-            print("Couldn't find the index of that file!")
-            return
-        fileNumber = int(i)
-        print('This is file {}'.format(fileNumber))
-
-        # Get a list of the parameters we're going to change
-        values = [slider.value for slider in self.par_sliders]
-
-        labels = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
-                'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
-        if self.complex:
-            labels.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
-            values.extend([slider.value for slider in self.par_sliders_complex])
-
-        labels = [l.replace('_0', '_{}'.format(fileNumber)) for l in labels]
-
-        newvalues = {}
-        for par, value in zip(labels, values):
-            newvalues[par] = value
-
-        # Make a copy of the mcmc_input file and edit that.
-        mcmc_file = []
-        with self.sftp_client.open(self.mcmc_fname, 'r') as f:
-            for line in f:
-                line_components = line.strip().split()
-                if len(line_components) > 0:
-                    par = line_components[0]
-                    if par in labels:
-                        value = newvalues[par]
-
-                        newline = line_components.copy()
-                        newline[2] = value
-                        newline = "{:>10s} = {:>12.4f} {:>12} {:>12.4f} {:>12.4f} {:>12}\n".format(
-                            str(newline[0]),
-                            float(newline[2]),
-                            str(newline[3]),
-                            float(newline[4]),
-                            float(newline[5]),
-                            int(newline[6])
-                            )
-
-                        line = newline
-                mcmc_file.append(line)
-
-        # Overwrite the old mcmc_input file.
-        print('Writing new file, {}'.format(self.mcmc_fname))
-        with self.sftp_client.open(self.mcmc_fname, 'w') as f:
-            for line in mcmc_file:
-                f.write(line)
-        self.parse_mcmc_input()
-
-    def make_corner_plots(self):
-        print("Making corner plots...")
-        self.cornerReporter.text += "</br>Reading chain file (this can take a while)...  "
-        print("Reading chain file...")
-        chainFile = self.sftp_client.open('chain_prod.txt', 'r')
-        chain = u.readchain(chainFile)
-        self.cornerReporter.text += "Done!"
-        print("Done!")
-
-        N = self.burn_input.value
-        try:
-            N = int(N)
-            self.cornerReporter.text += "</br>Throwing away the first {:,d} steps of the product phase...".format(N)
-        except:
-            N = 0
-
-        chain = chain[:, N:, :]
-        self.cornerReporter.text += "</br>Using {:,d} steps".format(chain.shape[1])
-        flat = u.flatchain(chain, chain.shape[2])
-        self.cornerReporter.text += ", which is {:,d} lines of the file...".format(flat.shape[0])
-
-        # Label all the columns in the chain file
-        necl    = self.necl
-        complex = self.complex
-        useGP   = self.GP
-
-        # Get labels
-        parNames = ['wdFlux_0', 'dFlux_0', 'sFlux_0', 'rsFlux_0', 'q', 'dphi',\
-                'rdisc_0', 'ulimb_0', 'rwd', 'scale_0', 'az_0', 'fis_0', 'dexp_0', 'phi0_0']
-        parNameTemplate = ['wdFlux_{0}', 'dFlux_{0}', 'sFlux_{0}', 'rsFlux_{0}',\
-                'rdisc_{0}', 'ulimb_{0}', 'scale_{0}', 'az_{0}', 'fis_{0}', 'dexp_{0}', 'phi0_{0}']
-
-        perm = [4,5,8]
-
-        c = 11
-        if complex:
-            self.cornerReporter.text += "</br>Using the complex model"
-            parNames.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
-            parNameTemplate.extend(['exp1_0', 'exp2_0', 'tilt_0', 'yaw_0'])
-            c = 15
-        if useGP:
-            self.cornerReporter.text += "</br>Using the Gaussian process"
-            parNames.extend(['ampin_gp', 'ampout_gp', 'tau_gp'])
-            perm.extend([parNames.index(i) for i in  ['ampin_gp', 'ampout_gp', 'tau_gp']])
-
-        for i in range(necl-1):
-            for name in parNameTemplate:
-                parNames.append(name.format(i+1))
-
-        # Make the corner plots. This is pretty CPU intensive!
-        a = 0; b = 14; j = 0
-        while b <= len(parNames):
-            night = flat[:, a:b]
-            labels = parNames[a:b]
-            if a:
-                for i in perm:
-                    labels.append(parNames[i])
-
-                night = np.concatenate((night, flat[:, perm]), axis=1)
-
-            self.cornerReporter.text += "</br>Making the figure for eclipse {}...".format(j)
-            print("Making the figure for eclipse {}".format(j))
-            fig = u.thumbPlot(night, labels)
-            oname = 'eclipse{}.png'.format(j)
-            print("Done!")
-            self.cornerReporter.text += "</br>Done! Saving to memory..."
-            fig.savefig(oname)
-            self.cornerReporter.text += "</br>Done figure '{}'".format(oname)
-            del fig
-            del night
-
-            a = b
-            b += c
-            j += 1
-
     def junk(self, attr, old, new):
         '''Sometimes, you just don't want to do anything'''
         print("Calling the junk pile")
@@ -1398,9 +731,6 @@ if __name__ in '__main__':
     print("  bokeh serve --show watchParams.py")
     print("Stopping!")
 else:
-    fname = 'chain_prod.txt'
     mc_fname = 'mcmc_input.dat'
-    tail = 10000
-    thin = 20
 
-    watcher = Watcher(chain=fname, mcmc_input=mc_fname, tail=tail, thin=thin)
+    watcher = Watcher(mcmc_input=mc_fname)
