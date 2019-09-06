@@ -1,16 +1,18 @@
-from __future__ import division
-from __future__ import print_function
-from future import standard_library
-standard_library.install_aliases()
-from past.utils import old_div
+from __future__ import division, print_function
+
+import os
+import subprocess
+import sys
+import time
+
+import lfit
 import matplotlib.pyplot as plt
 import numpy as np
+from future import standard_library
+from past.utils import old_div
 from trm import roche
-import sys
-import lfit
-import time
-import subprocess
-import os
+
+standard_library.install_aliases()
 
 q = 0.1
 inc = 86.9
