@@ -1,29 +1,29 @@
-import bokeh as bk
-from bokeh.layouts import row, column, gridplot, layout
-from bokeh.models import ColumnDataSource, Band, Whisker, Span
-from bokeh.models.annotations import Title
-from bokeh.plotting import curdoc, figure
-from bokeh.server.callbacks import NextTickCallback
-from bokeh.models.widgets import inputs, markups, DataTable, TableColumn, tables
-from bokeh.models.widgets.buttons import Toggle, Button
-from bokeh.models.widgets import Slider, Panel, Tabs, Dropdown, TextInput
+import json
+import sys
+import time
+from os import getcwd, path
 
+import bokeh as bk
+import configobj
 # For corner plots
 import matplotlib
+import numpy as np
+from bokeh.layouts import column, gridplot, layout, row
+from bokeh.models import Band, ColumnDataSource, Span, Whisker
+from bokeh.models.annotations import Title
+from bokeh.models.widgets import (DataTable, Dropdown, Panel, Slider,
+                                  TableColumn, Tabs, TextInput, inputs,
+                                  markups, tables)
+from bokeh.models.widgets.buttons import Button, Toggle
+from bokeh.plotting import curdoc, figure
+from bokeh.server.callbacks import NextTickCallback
+from pandas import DataFrame, read_csv
+
+import george as g
+
 matplotlib.use("Agg")
 
-import numpy as np
-from pandas import read_csv, DataFrame
-import configobj
-import time
-from os import path
-from os import getcwd
-import sys
-import json
-import paramiko
 
-from pprint import pprint
-import george as g
 
 try:
     from lfit import CV
