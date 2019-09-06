@@ -23,7 +23,7 @@ comp_scat      = 1      # vary scatter for different params (1), or add uniform 
 # if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
 # if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
 
-neclipses = 1
+neclipses = 3
 
 # what phases to plot/fit
 phi_start = -0.2
