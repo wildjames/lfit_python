@@ -662,7 +662,8 @@ class Node:
 
     @property
     def ancestor_param_dict(self):
-        '''A dict of the Param objects ABOVE! this node'''
+        '''A dict of the Param objects ABOVE! this node
+        Gets all params, regardless of if ther're variable'''
         return {key: val for key, val in
                 zip(self.__get_inherited_parameter_names__(),
                     self.__get_inherited_parameter_vector__())}
