@@ -5,8 +5,6 @@ from os import getcwd, path
 
 import bokeh as bk
 import configobj
-# For corner plots
-import matplotlib
 import numpy as np
 from bokeh.layouts import column, gridplot, layout, row
 from bokeh.models import Band, ColumnDataSource, Span, Whisker
@@ -21,7 +19,7 @@ from pandas import DataFrame, read_csv
 
 import george as g
 
-matplotlib.use("Agg")
+from CVModel import construct_model
 
 
 
@@ -45,7 +43,7 @@ class Watcher():
         - Ability to plot a live chain file's evolution over time
         - Interactive lightcurve model, with input sliders or the ability to grab the last step's mean
     '''
-    def __init__(self, chain, mcmc_input, tail=5000, thin=0):
+    def __init__(self, mcmc_input, tail=5000, thin=0):
         '''
         In the following order:
             - Save the tail and thin parameters to the self.XX
@@ -71,33 +69,10 @@ class Watcher():
         #####################################################
 
         print("Gathering information about my initial conditions...")
-        # Save the tail and thin optional parameters to the self object
-        self.tail = tail
-        self.thin = thin
-        self.lastStep = None
-        print("I'll follow {:,d} data points, and thin the chain file by {:,d}".format(self.tail, self.thin))
-
         # Save these, just in case I need to use them again later.
         self.mcmc_fname  = mcmc_input
-        self.chain_fname = chain
 
-        fname = 'sync_details.json'
-        with open(fname, 'r') as deets:
-            details = json.load(deets)
-
-        hostname = details['hostname']
-        password = details['password']
-        source   = details['source']
-        username = details['username']
-        port = 22
-
-        self.t = paramiko.Transport((hostname, port))
-        self.t.connect(username=username, password=password)
-        self.sftp_client = self.t.open_sftp_client()
-        self.sftp_client.chdir(source)
-        print("Created an sftp buffer to the target directory")
-
-        print("Looking for the mcmc input '{}', and the chain file {}".format(self.mcmc_fname, self.chain_fname))
+        print("Looking for the mcmc input '{}'".format(self.mcmc_fname))
 
         # Parse the mcmc_input file
         self.parse_mcmc_input()
@@ -203,10 +178,10 @@ class Watcher():
 
         # Default values for the complex BS, as simple mcmc_input files may not have them:
         defaults = {
-            'exp1_0': [ 1.00, 0.001,  5.0],
-            'exp2_0': [ 2.00, 0.001,  5.0],
-            'tilt_0': [45.00, 0.001,  180],
-            'yaw_0':  [ 0.00, -90.0, 90.0],
+            'exp1_0':    [ 1.00, 0.001,  5.0],
+            'exp2_0':    [ 2.00, 0.001,  5.0],
+            'tilt_0':    [45.00, 0.001,  180],
+            'yaw_0':     [ 0.00, -90.0, 90.0],
             'ampin_gp':  [-9.99, -25.0, -1.0],
             'ampout_gp': [-9.99, -25.0, -1.0],
             'tau_gp':    [-5.00, -20.0, -1.0]
@@ -484,8 +459,7 @@ class Watcher():
                 The number of product steps.
         '''
         print("Parsing the mcmc_input file, '{}'...".format(self.mcmc_fname))
-        mcmc_file = self.sftp_client.open(self.mcmc_fname, 'r')
-        self.mcmc_input_dict = parseInput(mcmc_file)
+        self.mcmc_input_dict = parseInput(self.mcmc_fname)
 
         # Gather the parameters we can use
         self.complex  = bool(int(self.mcmc_input_dict['complex']))
@@ -535,17 +509,13 @@ class Watcher():
             parameter = [float(x) for x in line]
             self.parDict[param] = list(parameter)
 
+        self.model = construct_model(self.mcmc_fname)
+
     def open_file(self):
         '''Check if the chain file has been created yet. If not, do nothing. If it is, set it to self.f'''
         # Open the file, and keep it open
         chain_file = self.chain_fname
-        try:
-            self.f = self.sftp_client.open(chain_file, 'r')
-            print("Found the file, '{}'!".format(chain_file))
-        except:
-            self.f = False
-            self.doc.add_timeout_callback(self.open_file, 10000)
-            return
+        self.f = open(chain_file, 'r')
 
         # Determine the number of walkers, just to check
         nWalkers = 0
@@ -561,7 +531,7 @@ class Watcher():
         # Close and reopen the file to move the cursor back to the beginning.
         self.f.close()
         # We're at step 0 now
-        self.f = self.sftp_client.open(chain_file, 'r')
+        self.f = open(chain_file, 'r')
 
         print("Expected {} walkers, got {} walkers in the file!".format(self.nWalkers, nWalkers))
         if nWalkers != self.nWalkers:
@@ -587,6 +557,7 @@ class Watcher():
         '''Attempt to read in the next step of the chain file.
         If we get an unexpected number of walkers, quit the script.
         If we're at the end of the file, do nothing.'''
+        # TODO: UPDATE
 
         stepData = np.zeros((self.nWalkers, len(self.pars)), dtype=float)
         # If true, return the data. If False, the end of the file was reached before the step was fully read in.
