@@ -5,8 +5,9 @@ from os import getcwd, path
 
 import bokeh as bk
 import configobj
+import george as g
 import numpy as np
-from bokeh.layouts import column, gridplot, layout, row, Spacer
+from bokeh.layouts import Spacer, column, gridplot, layout, row
 from bokeh.models import Band, ColumnDataSource, Span, Whisker
 from bokeh.models.annotations import Title
 from bokeh.models.widgets import (DataTable, Dropdown, Panel, Slider,
@@ -17,11 +18,7 @@ from bokeh.plotting import curdoc, figure
 from bokeh.server.callbacks import NextTickCallback
 from pandas import DataFrame, read_csv
 
-import george as g
-
 from CVModel import construct_model
-
-
 
 try:
     from lfit import CV
