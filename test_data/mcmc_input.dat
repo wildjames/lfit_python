@@ -36,13 +36,13 @@ corner = 0 #### Crashes the script before the fits are plotted ####
 complex = 1
 
 # fit using Gaussian processes, yes (1) or no (0)?
-useGP = 0
+useGP = 1
 
 
 # eclipse independent parameters, is parameter to be fit (1) or not (0)?
-  ln_ampin_gp =    -9.5118        uniform        -20.0         -2.0            1
- ln_ampout_gp =    -9.0953        uniform        -20.0         -2.0            1
-    ln_tau_gp =    -2.2131        uniform         -6.9         -2.0            1
+ln_ampin_gp =      -9.5118      uniform     -20.0000      -2.0000            1
+ln_ampout_gp =      -9.0953      uniform     -20.0000      -2.0000            1
+ ln_tau_gp =      -2.2131      uniform      -6.9000      -2.0000            1
 
 
          q =       0.1037      uniform       0.0300       0.5000            1
@@ -50,11 +50,11 @@ useGP = 0
        rwd =       0.0187      uniform       0.0010       0.1000            1
 
 
-  wdFlux_g =       0.0528      uniform       0.0010       0.2000            1
+  wdFlux_g =       0.0547      uniform       0.0010       0.2000            1
   rsFlux_g =       0.0131      uniform       0.0010       0.2000            1
 
-wdFlux_KG5 =       0.0539      uniform       0.0010       0.2000            1
-rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
+wdFlux_KG5 =       0.0508      uniform       0.0010       0.2000            1
+rsFlux_KG5 =       0.0262      uniform       0.0010       0.2000            1
 
   wdFlux_r =       0.0324      uniform       0.0010       0.2000            1
   rsFlux_r =       0.0262      uniform       0.0010       0.2000            1
@@ -74,14 +74,14 @@ rsFlux_KG5 =       0.0203      uniform       0.0010       0.2000            1
    ulimb_0 =       0.2840        gauss       0.2840       0.0010            1
    rdisc_0 =       0.2953      uniform       0.2000       0.7000            1
    scale_0 =       0.0430  log_uniform       0.0010       0.2000            1
-      az_0 =     127.2343      uniform      50.0000     175.0000            1
+      az_0 =     120.0000      uniform      50.0000     175.0000            1
      fis_0 =       0.0480      uniform       0.0010       1.0000            1
     dexp_0 =       0.5000  log_uniform       0.0010       2.0000            1
     phi0_0 =       0.0010      uniform      -0.2000       0.2000            1
     exp1_0 =       1.1342      uniform       0.0010       5.0000            1
     exp2_0 =       4.5971      uniform       0.5000       5.0000            1
-     yaw_0 =      -64.040      uniform     -90.0000      90.0000            1
-    tilt_0 =       8.5079      uniform       0.0010     180.0000            1
+     yaw_0 =       5.4000      uniform     -90.0000      90.0000            1
+    tilt_0 =      72.0006      uniform       0.0010     180.0000            1
 
 
     file_1 = lightcurves/test_data_1.calib

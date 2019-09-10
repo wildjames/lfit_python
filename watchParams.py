@@ -6,7 +6,7 @@ from os import getcwd, path
 import bokeh as bk
 import configobj
 import numpy as np
-from bokeh.layouts import column, gridplot, layout, row
+from bokeh.layouts import column, gridplot, layout, row, Spacer
 from bokeh.models import Band, ColumnDataSource, Span, Whisker
 from bokeh.models.annotations import Title
 from bokeh.models.widgets import (DataTable, Dropdown, Panel, Slider,
@@ -43,6 +43,17 @@ class Watcher():
         - Ability to plot a live chain file's evolution over time
         - Interactive lightcurve model, with input sliders or the ability to grab the last step's mean
     '''
+    # Set the initial values of q, rwd, and dphi. These will be used to
+    # caclulate the location of the GP changepoints. Setting to initially
+    # unrealistically high values will ensure that the first time
+    # calcChangepoints is called, the changepoints are calculated.
+    _olddphi = 9e99
+    _oldq = 9e99
+    _oldrwd = 9e99
+
+    # _dist_cp is initially set to whatever, it will be overwritten anyway.
+    _dist_cp = 9e99
+
     def __init__(self, mcmc_input, tail=5000, thin=0):
         '''
         In the following order:
@@ -120,9 +131,9 @@ class Watcher():
             'az': 'BS Azimuth',
             'fis': 'BS Isotropic Fraction',
             'dexp': 'Disc Exponent',
+            'phi0': 'Phase Offset',
         }
         complex_parDesc = {
-            'phi0': 'Phase Offset',
             'exp1': 'BS Exponent 1',
             'exp2': 'BS Exponent 2',
             'tilt': 'BS Tilt',
@@ -210,6 +221,8 @@ class Watcher():
             slider.on_change('value_throttled', self.update_lc_model)
         for slider in self.par_sliders_complex:
             slider.on_change('value_throttled', self.update_lc_model)
+        for slider in self.par_sliders_GP:
+            slider.on_change('value_throttled', self.update_lc_model)
         print("Made the sliders...")
 
         # Data file picker
@@ -220,17 +233,22 @@ class Watcher():
         print("Made the data picker...")
 
         # Button to switch from the complex to simple BS model, and vice versa
-        if self.complex:
-            col = 'success'
-        else:
-            col = 'danger'
-        self.complex_button = Toggle(label='Complex BS?', width=120, button_type=col, active=self.complex)
+        col = 'success' if self.complex else 'danger'
+        self.complex_button = Toggle(
+            label='Complex BS?', width=120,
+            button_type=col, active=self.complex
+        )
         self.complex_button.on_click(self.update_complex)
         print("Made the complex button...")
 
-        # # Button to force GP update
-        self.GP_button = Button(label='Update GP', width=120)
-        # self.GP_button.on_click(self.recalc_GP_model)
+        # Button for the GP
+        col = 'success' if self.GP else 'danger'
+        self.GP_button = Toggle(
+            label='Use GP?', width=120,
+            button_type=col, active=self.GP
+        )
+        self.GP_button.on_click(self.update_GP)
+        print("Made the GP button...")
 
         print("Grabbing the observations...")
         # Grab the data from the file, to start with just use the first in the list
@@ -265,6 +283,7 @@ class Watcher():
         title = menu[0][0]
         self.lc_plot = bk.plotting.figure(title=title, plot_height=500, plot_width=1200,
             toolbar_location='above', y_axis_location="left", x_axis_location=None)
+
         # Plot the lightcurve data
         self.lc_plot.scatter(x='phase', y='flux', source=self.lc_obs, size=5, color='black')
 
@@ -278,9 +297,11 @@ class Watcher():
         self.lc_res_plot.renderers += [Span(location=0, dimension='width', line_color='green', line_width=1)]
 
         # Plot the GP over the residuals
-        band = Band(base='phase', lower='GP_lo', upper='GP_up', source=self.lc_obs,
-                    level='underlay', fill_alpha=0.3, line_width=0,
-                    line_color='black', fill_color='red')
+        band = Band(
+            base='phase', lower='GP_lo', upper='GP_up',
+            source=self.lc_obs,
+            level='underlay', fill_alpha=0.3, line_width=0,
+            line_color='black', fill_color='black')
         self.lc_res_plot.add_layout(band)
 
         # Plot the model
@@ -329,14 +350,25 @@ class Watcher():
         # Arrange the tab layout
         inspector_layout = row([
             column([
-                row([self.lc_change_fname_button, self.complex_button, self.GP_button, self.lc_isvalid, self.write2input_button]),
+                row(
+                    [self.lc_change_fname_button,
+                    self.complex_button, self.GP_button,
+                    self.lc_isvalid, self.write2input_button]),
             self.lc_plot, self.lc_res_plot,
             ]),
             column([
                 self.like_label,
-                gridplot(self.par_sliders, ncols=2, toolbar_options={'logo': None}),
-                gridplot(self.par_sliders_complex, ncols=2, toolbar_options={'logo': None}),
-                gridplot(self.par_sliders_GP, ncols=2, toolbar_options={'logo': None})
+                gridplot(
+                    self.par_sliders, ncols=2,
+                    toolbar_options={'logo': None}),
+                Spacer(width=200, height=15, sizing_mode='scale_width'),
+                gridplot(
+                    self.par_sliders_complex, ncols=2,
+                    toolbar_options={'logo': None}),
+                Spacer(width=200, height=15, sizing_mode='scale_width'),
+                gridplot(
+                    self.par_sliders_GP, ncols=2,
+                    toolbar_options={'logo': None})
             ])
         ])
 
@@ -369,10 +401,10 @@ class Watcher():
         core = band.parent
 
         for par, param in self.current_eclipse.ancestor_param_dict.items():
+            if par in core.node_par_names:
+                parname_label = "{}".format(par)
             if par in band.node_par_names:
                 parname_label = "{}_{}".format(par, band.label)
-            if par in core.node_par_names:
-                parname_label = "{}_{}".format(par, core.label)
             if par in self.current_eclipse.node_par_names:
                 parname_label = "{}_{}".format(par, self.current_eclipse.label)
 
@@ -392,18 +424,17 @@ class Watcher():
                 isVar
             )
 
-            to_write[par] = newline
+            to_write[parname_label] = newline
 
         with open(self.mcmc_fname, 'r') as f:
             mcmc_file = f.readlines()
 
         for key, item in to_write.items():
             print("\npar: {}".format(key))
-            print("new line:\n{}".format(newline))
+            print("new line:\n{}".format(item))
 
-        with open("new_mcmc_input.dat", 'w') as f:
+        with open("mcmc_input.dat", 'w') as f:
             for line in mcmc_file:
-                changeme = False
 
                 if not line.startswith('#'):
                     splitted = line.strip().split(' ')
@@ -411,12 +442,18 @@ class Watcher():
                     if len(splitted) > 0:
                         par = splitted[0]
 
+                        # print("This line in the file starts with: '{}'".format(par))
                         if par in to_write.keys():
-                            changeme = True
+                            # print("Replacing the line with the line:")
+                            # print(" --> {}".format(to_write[par]))
+                            line = to_write[par]
 
-                if changeme:
-                    line = to_write[par]
+                        if par.lower() == 'usegp':
+                            line = "useGP = {}\n".format(int(self.GP_button.active))
+                        if par.lower() == 'complex':
+                            line = "complex = {}\n".format(int(self.complex))
 
+                # print("Writing the line:\n{}".format(line))
                 f.write(line)
 
     def parse_mcmc_input(self):
@@ -499,20 +536,20 @@ class Watcher():
     def reset_sliders(self):
         '''Set the parameters to the initial guesses.'''
 
-        print("resetting the sliders to new values")
-        all_sliders = self.par_sliders + self.par_sliders_complex
+        print("resetting the sliders to new values.")
+        print("Removing the callbacks...")
+        all_sliders = self.par_sliders + self.par_sliders_complex + self.par_sliders_GP
 
         # Disable the callbacks
         for slider in all_sliders:
             slider.remove_on_change('value_throttled', self.update_lc_model)
-
-        # The GP sliders dont need their callbacks removed
-        all_sliders += self.par_sliders_GP
+        print("Removed all the callbacks.\nSetting the slider values...")
 
         for par_name, param in self.parDict.items():
             for slider in all_sliders:
                 if slider.name == par_name:
                     slider.value_throttled = param[0]
+                    slider.value = param[0]
                     slider.start = param[1]
                     slider.end   = param[2]
 
@@ -534,6 +571,11 @@ class Watcher():
 
         print("label text was before: {}".format(self.like_label.text))
         print("label text is now: {}".format(self.like_label.text))
+
+    def update_GP(self, new):
+        '''Update the colour of the GP button'''
+        self.GP = self.GP_button.active
+        self.GP_button.button_type = 'success' if self.GP else 'danger'
 
     def update_complex(self, new):
         '''Handler for toggling the complex button. This should just enable/disable the complex sliders '''
@@ -644,6 +686,7 @@ class Watcher():
         # Push back into lc_obs
         self.lc_obs.data = dict(new_obs)
 
+        self.recalc_GP_model('')
 
     def update_lc_obs(self, attr, old, new):
         '''callback to redraw the observations for the lightcurve'''
@@ -694,6 +737,147 @@ class Watcher():
         print("The title should now be {}".format(fname))
 
         # self.update_like_header(gp=self.GP)
+
+    def calcChangepoints(self):
+        '''Caclulate the WD ingress and egresses, i.e. where we want to switch
+        on or off the extra GP amplitude.
+
+        Requires an eclipse object, since this is specific to a given phase
+        range.
+        '''
+
+        # Also get object for dphi, q and rwd as this is required to determine
+        # changepoints
+        pardict = {}
+        for slider in self.par_sliders:
+            pardict[slider.name] = slider.value_throttled
+
+        dphi = pardict['dphi']
+        q    = pardict['q']
+        rwd  = pardict['rwd']
+        phi0 = pardict['phi0']
+
+        # Have they changed significantly?
+        # If not, dont bother recalculating dist_cp
+        dphi_change = np.fabs(self._olddphi - dphi) / dphi
+        q_change = np.fabs(self._oldq - q) / q
+        rwd_change = np.fabs(self._oldrwd - rwd) / rwd
+
+        # Check to see if our model parameters have changed enough to
+        # significantly change the location of the changepoints.
+        if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
+            # Calculate inclination
+            inc = roche.findi(q, dphi)
+
+            # Calculate wd contact phases 3 and 4
+            phi3, phi4 = roche.wdphases(q, inc, rwd, ntheta=10)
+
+            # Calculate length of wd egress
+            dpwd = phi4 - phi3
+
+            # Distance from changepoints to mideclipse
+            dist_cp = (dphi+dpwd)/2.
+
+            # save these values for speed
+            self._dist_cp = dist_cp
+            self._oldq = q
+            self._olddphi = dphi
+            self._oldrwd = rwd
+        else:
+            # Use the old values
+            dist_cp = self._dist_cp
+
+        # Find location of all changepoints
+        phase = self.lc_obs.data['phase']
+        min_ecl = int(np.floor(phase.min()))
+        max_ecl = int(np.ceil(phase.max()))
+
+        eclipses = [e for e in range(min_ecl, max_ecl+1)
+                    if np.logical_and(e > phase.min(),
+                                      e < 1+phase.max()
+                                      )
+                    ]
+
+        changepoints = []
+        for e in eclipses:
+            # When did the last eclipse end?
+            egress = (e-1) + dist_cp + phi0
+            # When does this eclipse start?
+            ingress = e - dist_cp + phi0
+            changepoints.append([egress, ingress])
+
+        return changepoints
+
+    def create_GP(self):
+        """Constructs a kernel, which is used to create Gaussian processes.
+
+        Creates kernels for both inside and out of eclipse,
+        works out the location of any changepoints present, constructs a single
+        (mixed) kernel and uses this kernel to create GPs
+
+        Requires an Eclipse object to create the GP for. """
+
+        # Get objects for ln_ampin_gp, ln_ampout_gp, ln_tau_gp and find the exponential
+        # of their current values
+        pardict = {}
+        for slider in self.par_sliders_GP:
+            pardict[slider.name] = slider.value_throttled
+
+        ln_ampin   = pardict['ln_ampin_gp']
+        ln_ampout  = pardict['ln_ampout_gp']
+        ln_tau     = pardict['ln_tau_gp']
+
+        ampin_gp   = np.exp(ln_ampin)
+        ampout_gp  = np.exp(ln_ampout)
+        tau_gp     = np.exp(ln_tau)
+
+        # Calculate kernels for both out of and in eclipse WD eclipse
+        # Kernel inside of WD has smaller amplitude than that of outside
+        # eclipse.
+
+        # First, get the changepoints
+        changepoints = self.calcChangepoints()
+
+        # We need to make a fairly complex kernel.
+        # Global flicker
+        kernel = ampin_gp * g.kernels.Matern32Kernel(tau_gp)
+        # inter-eclipse flicker
+        for gap in changepoints:
+            kernel += ampout_gp * g.kernels.Matern32Kernel(
+                tau_gp,
+                block=gap
+            )
+
+        # Use that kernel to make a GP object
+        georgeGP = g.GP(kernel, solver=g.HODLRSolver)
+
+        return georgeGP
+
+    def recalc_GP_model(self, new):
+        '''Update the GP model'''
+        lc_obs = dict(self.lc_obs.data)
+
+        phi = lc_obs['phase']
+        err = lc_obs['err']
+        res = lc_obs['res']
+
+        # Create the GP
+        gp = self.create_GP()
+
+        # Compute the matrix
+        gp.compute(phi, err)
+
+        # Draw samples from the GP
+        samples = gp.sample_conditional(res, phi, size=100)
+
+        # Get the mean, mu, standard deviation, and
+        mu = np.mean(samples, axis=0)
+        std = np.std(samples, axis=0)
+
+        lc_obs['GP_up'] = mu + std
+        lc_obs['GP_lo'] = mu - std
+
+        self.lc_obs.data = lc_obs
 
     def junk(self, attr, old, new):
         '''Sometimes, you just don't want to do anything'''
