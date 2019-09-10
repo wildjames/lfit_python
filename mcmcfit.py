@@ -242,6 +242,8 @@ if __name__ in '__main__':
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
                                           nwalkers, ntemps, ln_prior, model)
         # Create the sampler
+        # TODO: The emcee PTSampler is deprecated. Use this package instead:
+        # https://github.com/willvousden/ptemcee
         sampler = emcee.PTSampler(ntemps, nwalkers, npars,
                                   ln_like, ln_prior,
                                   loglargs=(model,),
