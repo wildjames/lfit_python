@@ -196,7 +196,6 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
     return fig, axs
 
-
 def plot_GP_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                     save_dir='.', ext='.png'):
     '''Plot my data. Returns fig, ax
