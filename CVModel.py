@@ -134,6 +134,15 @@ class SimpleEclipse(Node):
         self.log('SimpleEclipse.calcFlux', "Computed a lightcurve flux: \n{}\n\n\n".format(flx))
         return flx
 
+    def calcComponents(self):
+        '''Return a list of the component fluxes as well as the total
+        returns:
+          (tot_flx, wdFlux, sFlux, rsFlux, dFlux)
+        '''
+        flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
+
+        return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.ywd
+
     def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''
         self.log('SimpleEclipse.chisq', "Doing chisq")
