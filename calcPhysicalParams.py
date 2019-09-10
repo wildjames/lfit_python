@@ -10,6 +10,10 @@ from astropy import constants as const
 from astropy import units
 from astropy.table import Column, Table
 from astropy.utils.console import ProgressBar as PB
+from scipy import interpolate as interp
+from scipy.optimize import brentq
+
+import mcmc_utils as utils
 
 # see if our astropy version supports quantities or not
 quantitySupport = True
@@ -221,14 +225,14 @@ if __name__ == "__main__":
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = readflatchain(file)
+        fchain = utils.readflatchain(file)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
         #chain = readchain(file)
-        chain = readchain_dask(file)
+        chain = utils.readchain_dask(file)
         nwalkers, nsteps, npars = chain.shape
-        fchain = flatchain(chain,npars,thin=thin)
+        fchain = utils.flatchain(chain,npars,thin=thin)
     print("Done!")
 
     # this is the order of the params in the chain
