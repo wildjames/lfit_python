@@ -2,9 +2,9 @@
 fit            = 1      # actually fit (1), or just plot model as specified (0)
 nburn          = 100    # number of steps to use in burn-in phase
 nprod          = 100    # number of steps to use in production phase
-nwalkers       = 36      # number of walkers per chain, must be even multiple of npars
+nwalkers       = 36     # number of walkers per chain, must be even multiple of npars
 
-nthread        = 8     # number of CPU threads to use
+nthread        = 8      # number of CPU threads to use
 
 usePT          = 0      # use parallel tempering (1), or standard fitting (0)
 ntemps         = 3      # number of chains of different temperatures for Parallel Tempering fitting
@@ -49,7 +49,7 @@ useGP = 0
       dphi =       0.0392      uniform       0.0100       0.1000            1
        rwd =       0.0187      uniform       0.0010       0.1000            1
 
-
+# White dwarf flux, and Red Secondary flux, in the band labelled g
   wdFlux_g =       0.0528      uniform       0.0010       0.2000            1
   rsFlux_g =       0.0131      uniform       0.0010       0.2000            1
 
