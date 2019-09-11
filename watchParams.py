@@ -81,6 +81,7 @@ class Watcher():
 
         # Parse the mcmc_input file
         self.parse_mcmc_input()
+        self.init_data_storage()
 
         # Create the model inspector tab
         self.create_model_inspector_tab()
@@ -247,34 +248,6 @@ class Watcher():
         self.GP_button.on_click(self.update_GP)
         print("Made the GP button...")
 
-        print("Grabbing the observations...")
-        # Grab the data from the file, to start with just use the first in the list
-        self.lc_obs = {}
-        self.lc_obs['phase'] = self.current_eclipse.lc.x
-        self.lc_obs['flux']  = self.current_eclipse.lc.y
-        self.lc_obs['err']  = self.current_eclipse.lc.ye
-
-        self.lc_obs = DataFrame(self.lc_obs)
-        self.lc_obs.dropna(inplace=True, axis='index', how='any')
-
-        # Total model lightcurve
-        self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['res']   = np.zeros_like(self.lc_obs['phase'])
-        # Components
-        self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['disc']  = np.zeros_like(self.lc_obs['phase'])
-        # GP
-        self.lc_obs['GP_up'] = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['GP_lo'] = np.zeros_like(self.lc_obs['phase'])
-
-        print("Read in the observation, with the shape {}".format(self.lc_obs.shape))
-
-        # Whisker can only take the ColumnDataSource, not the pandas array
-        self.lc_obs = ColumnDataSource(self.lc_obs)
-
-
         print("Creating the LC plot...", end='')
         # Initialise the figure
         title = menu[0][0]
@@ -371,6 +344,34 @@ class Watcher():
 
         self.inspector_tab = Panel(child=inspector_layout, title="Lightcurve Inspector")
         print("Constructed the Lightcurve Inspector tab!")
+
+    def init_data_storage(self):
+        print("Grabbing the observations...")
+        # Grab the data from the file, to start with just use the first in the list
+        self.lc_obs = {}
+        self.lc_obs['phase'] = self.current_eclipse.lc.x
+        self.lc_obs['flux']  = self.current_eclipse.lc.y
+        self.lc_obs['err']  = self.current_eclipse.lc.ye
+
+        self.lc_obs = DataFrame(self.lc_obs)
+        self.lc_obs.dropna(inplace=True, axis='index', how='any')
+
+        # Total model lightcurve
+        self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['res']   = np.zeros_like(self.lc_obs['phase'])
+        # Components
+        self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['disc']  = np.zeros_like(self.lc_obs['phase'])
+        # GP
+        self.lc_obs['GP_up'] = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['GP_lo'] = np.zeros_like(self.lc_obs['phase'])
+
+        print("Read in the observation, with the shape {}".format(self.lc_obs.shape))
+
+        # Whisker can only take the ColumnDataSource, not the pandas array
+        self.lc_obs = ColumnDataSource(self.lc_obs)
 
     def make_header(self):
         '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
