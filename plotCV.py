@@ -536,7 +536,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         print("Sending a summary email. Corner plots are omitted due to filesize.")
         # Gather the files
         fnames = list(glob.iglob('Final_figs/*.pdf', recursive=True))
-        fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
+        fnames += list(glob.iglob('Final_figs/*.png', recursive=True))
+
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
         notipy(destination, fnames, model_preport+model_report)
