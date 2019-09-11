@@ -576,6 +576,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 for col in colKeys:
                     if par in col:
                         labels.append(par)
+            par_labels = labels
 
             print("\nMy corner plot labels are:")
             print(labels)
