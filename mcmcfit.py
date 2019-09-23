@@ -114,18 +114,15 @@ if __name__ in '__main__':
     ntemps         = int(input_dict['ntemps'])
     scatter_1      = float(input_dict['first_scatter'])
     scatter_2      = float(input_dict['second_scatter'])
-    to_fit         = int(input_dict['fit'])
+    to_fit         = bool(int(input_dict['fit']))
     use_pt         = bool(int(input_dict['usePT']))
     double_burnin  = bool(int(input_dict['double_burnin']))
     comp_scat      = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
-    try:
-        neclipses = int(input_dict['neclipses'])
-    except KeyError:
-        neclipses = len(model.search_node_type("Eclipses"))
-        print("The model has {} eclipses.".format(neclipses))
+    neclipses = len(model.search_node_type("Eclipse"))
+    print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
     # How many data points do we have?
