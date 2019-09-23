@@ -165,7 +165,10 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                     zorder=0)
 
     # Labelling. Top one gets title, bottom one gets x label
-    axs[0].set_title(ecl_node.lc.name)
+    title_text = "{} --- chisq: {:.1f} --- ln_prob: {:.1f}".format(
+        ecl_node.lc.name, ecl_node.chisq(), ecl_node.ln_prob()
+    )
+    axs[0].set_title(title_text)
     axs[0].set_ylabel('Flux, mJy')
 
     axs[1].set_xlabel('Phase')
@@ -328,7 +331,7 @@ def notipy(send_to, fnames, body):
         return
 
     whoami = os.uname().nodename
-    whereami = os.path.split(os.getcwd())
+    whereami = os.getcwd()
     subject = "Machine {}, Ran at: '{}'".format(whoami, whereami)
 
     # Construct the email contents
@@ -530,6 +533,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+    model_report += "\n\nThe final fits of this chain are attached below."
 
     if not automated:
         print("Final conditions being plotted now...")

@@ -377,7 +377,7 @@ class Watcher():
         '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
 
         header  = "I'm working from the directory: <b>{}</b></br>".format(getcwd())
-        header +=  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
+        header += 'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
             self.nBurn, self.nProd)
         header += " We're using <b>{:,d}</b> walkers,".format(self.nWalkers)
 
