@@ -141,7 +141,7 @@ class SimpleEclipse(Node):
         '''
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
 
-        return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.ywd
+        return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.yd
 
     def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''

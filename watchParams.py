@@ -250,8 +250,10 @@ class Watcher():
 
         print("Creating the LC plot...", end='')
         # Initialise the figure
-        title = menu[0][0]
-        self.lc_plot = bk.plotting.figure(title=title, plot_height=500, plot_width=1200,
+        fname = self.current_eclipse.lc.name
+        band_name = self.current_eclipse.parent.label
+        title_text = "{} --- Band: {}".format(fname, band_name)
+        self.lc_plot = bk.plotting.figure(title=title_text, plot_height=500, plot_width=1200,
             toolbar_location='above', y_axis_location="left", x_axis_location=None)
 
         # Plot the lightcurve data
@@ -729,10 +731,12 @@ class Watcher():
 
         print("\nSet the plotting area title")
         fname = self.current_eclipse.lc.name
+        band_name = self.current_eclipse.parent.label
+        title_text = "{} --- Band: {}".format(fname, band_name)
         print("Trying to change the title of the plot")
         print("Old title: {}".format(self.lc_plot.title.text))
-        self.lc_plot.title.text = fname
-        print("The title should now be {}".format(fname))
+        self.lc_plot.title.text = title_text
+        print("The title should now be {}".format(title_text))
 
         # self.update_like_header(gp=self.GP)
 
