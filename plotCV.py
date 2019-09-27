@@ -185,7 +185,7 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
         # If we didnt get told to use a certain fname, use this node's name
         if fname is None:
-            fname = ecl_node.lc.name.replace('.calib', ext)
+            fname = ecl_node.lc.name.replace('.calib', ext).replace('.txt', ext)
 
         # Make the filename
         fname = '/'.join([save_dir, fname])
@@ -407,9 +407,14 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     # plt.show()
 
     # Plot the mean likelihood evolution
+    std = np.std(likes, axis=0)
     likes = np.mean(likes, axis=0)
-    steps = np.arange(nskip, nskip+len(likes))
-    std = np.std(likes)
+
+    steps = np.arange(likes.shape[0])
+
+    likes = likes[nskip::thin]
+    std = std[nskip::thin]
+    steps = steps[nskip::thin]
 
     # Make the likelihood plot
     fig, ax = plt.subplots(figsize=(11, 8))

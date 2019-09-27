@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import argparse
 import os
 import sys
@@ -14,6 +13,7 @@ from scipy import interpolate as interp
 from scipy.optimize import brentq
 
 import mcmc_utils as utils
+from trm import roche
 
 # see if our astropy version supports quantities or not
 quantitySupport = True
@@ -204,23 +204,68 @@ def solve(input_data,baseDir):
 if __name__ == "__main__":
 
     sns.set()
-    parser = argparse.ArgumentParser(description='Calculate physical parameters from MCMC chain of LFIT parameters')
-    parser.add_argument('file',action='store',help='input file from MCMC run')
-    parser.add_argument('twd',action='store',type=float,help='white dwarf temperature (K)')
-    parser.add_argument('e_twd',action='store',type=float,help='error on wd temp')
-    parser.add_argument('p',action='store',type=float,help='orbital period (days)')
-    parser.add_argument('e_p',action='store',type=float,help='error on period')
-    parser.add_argument('--thin','-t',type=int,help='amount to thin MCMC chain by',default=1)
-    parser.add_argument('--nthreads','-n',type=int,help='number of threads to run',default=6)
-    parser.add_argument('--flat','-f',type=int,help='Factor of thinning if flattened chain used',default=0)
+    parser = argparse.ArgumentParser(
+        description='Calculate physical parameters from MCMC chain of LFIT parameters'
+    )
+    parser.add_argument(
+        'file',
+        action='store',
+        help='Output chain file from MCMC run with wdparams.py'
+    )
+    parser.add_argument(
+        'twd', action='store',
+        type=float,
+        help='white dwarf temperature (K)'
+    )
+    parser.add_argument(
+        'e_twd', action='store',
+        type=float,
+        help='error on wd temp'
+    )
+    parser.add_argument(
+        'p', action='store',
+        type=float,
+        help='orbital period (days)'
+    )
+    parser.add_argument(
+        'e_p', action='store',
+        type=float,
+        help='error on period'
+    )
+    parser.add_argument(
+        '--thin', '-t',
+        type=int,
+        help='amount to thin MCMC chain by',
+        default=1
+    )
+    parser.add_argument(
+        '--nthreads', '-n',
+        type=int,
+        help='number of threads to run',
+        default=6
+    )
+    parser.add_argument(
+        '--flat', '-f',
+        type=int,
+        help='Factor of thinning if flattened chain used',
+    default=0)
+    parser.add_argument(
+        '--dir', '-d',
+        help='directory with WD models',
+        default=None
+    )
 
-    parser.add_argument('--dir','-d',help='directory with WD models',default='/Users/mmc/lfit/params')
     args = parser.parse_args()
     file = args.file
     thin = args.thin
     nthreads = args.nthreads
     flat = args.flat
     baseDir = args.dir
+
+    if baseDir is None:
+        print("Using the script location as the WD model files location")
+        baseDir = os.path.split(__file__)[0]
+    print("baseDir: {}".format(baseDir))
 
     print("Reading chain file...")
     if flat > 0:
@@ -236,16 +281,39 @@ if __name__ == "__main__":
     print("Done!")
 
     # this is the order of the params in the chain
-    nameList = ['fwd','fdisc','fbs','fd','q','dphi','rdisc','ulimb','rwd','scale', \
-            'az','frac','rexp','off','exp1','exp2','tilt','yaw','amp_gp','tau_gp','lnprob']
+    with open(file, 'r') as f:
+        # First in the namelist is 'walker_no', but we care about the flatchain
+        nameList = f.readline().split()[1:]
     # we need q, dphi, rw from the chain
-    qVals = fchain[:,4]
-    dphiVals = fchain[:,5]
-    rwVals  = fchain[:,8]
+    qIndex = nameList.index('q_core')
+    dphiIndex = nameList.index('dphi_core')
+    rwIndex = nameList.index('rwd_core')
+
+    print("In the chain file, {};".format(file))
+    print("   q is at index, {}".format(qIndex))
+    print("   dphi is at index, {}".format(dphiIndex))
+    print("   rw is at index, {}".format(rwIndex))
+
+
+    qVals = fchain[:, qIndex]
+    dphiVals = fchain[:, dphiIndex]
+    rwVals  = fchain[:, rwIndex]
+
     chainLength = len(qVals)
+    print("The chain contains {} samples".format(chainLength))
+
+    print("Means; ")
+    print("  q: {:.3f}".format(np.mean(qVals)))
+    print("  dphi: {:.3f}".format(np.mean(dphiVals)))
+    print("  rwd: {:.3f}".format(np.mean(rwVals)))
 
     # white dwarf temp
-    twdVals = np.random.normal(loc=args.twd,scale=args.e_twd,size=chainLength)*units.K
+    twdVals = np.random.normal(
+        loc=args.twd,
+        scale=args.e_twd,
+        size=chainLength
+    )
+    twdVals *= units.K
     # period
     pVals = np.random.normal(loc=args.p,scale=args.e_p,size=chainLength)*units.d
 
@@ -258,6 +326,7 @@ if __name__ == "__main__":
     # function below extracts value from quantity and floats alike
     getval = lambda el: getattr(el,'value',el)
 
+    print("Running MCMC...")
     psolve = partial(solve,baseDir=baseDir)
     data = zip(qVals,dphiVals,rwVals,twdVals,pVals)
     solvedParams = PB.map(psolve,data,multiprocess=True)
@@ -269,5 +338,13 @@ if __name__ == "__main__":
         if thisResult is not None:
             results.add_row(thisResult)
 
-    print('Found solutions for %d percent of samples in MCMC chain' % (100*float(len(results))/float(chainLength)))
-    results.write('physicalparams.log',format='ascii.commented_header')
+    print(
+        'Found solutions for {:.2f} percent of samples in MCMC chain'.format(
+        100 * float(len(results))/float(chainLength)
+        )
+    )
+    results.write(
+        'physicalparams.log',
+        format='ascii.commented_header',
+        overwrite=True
+    )
