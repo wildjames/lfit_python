@@ -3,7 +3,8 @@ This project is the successor to `LFIT` - a `C++` code for fitting cataclysmic v
 
 
 ## Setting up an MCMC run
-The input file will define how a model is set up, and some of the details for the MCMC fit. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, and the comments in it shoudl explain what the parameters mean. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
+The input file will define how a model is set up, and some of the details for the MCMC fit. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, and the comments in it shoudl explain what the parameters mean. Something that may not be 100% clear, however, is how labels work - a parameter typically looks like this:
+`variableName_nodeLabel`. The underscore separates the two, with the former telling the code which of the parameters from 'Calc-ing Flux' is being set, and the latter telling it which node (i.e. band or eclipse) it belongs to. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
 
 
 ## LFIT; functional knowledge you're gonna need
