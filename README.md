@@ -2,6 +2,10 @@
 This project is the successor to `LFIT` - a `C++` code for fitting cataclysmic variable (CV) star's eclipse lightcurves. `LFIT` is fast but cannot be easily adapted to fit ligthcurves with lots of flickering or to fit individual eclipses whilst sharing certain parameters (e.g eclipse width) between eclipses. This software uses a tree structure, to group eclipses into branches that can share some parameters but not others. 
 
 
+## Setting up an MCMC run
+The input file will define how a model is set up, and some of the details for the MCMC fit. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, and the comments in it shoudl explain what the parameters mean. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
+
+
 ## LFIT; functional knowledge you're gonna need
 [lfit](https://github.com/StuartLittlefair/lfit) is a pretty robust piece of code. It's core functionality is easy to use, though perhaps a bit finnicky to pass parameters to. More on this in a few paragraphs.
 
@@ -104,9 +108,6 @@ This branch also has a notifier, which will email the resulting lightcurve figur
 }
 ```
 ***DO NOT USE YOUR PERSONAL EMAIL*** as the credentials are stored here in plaintext. Just make a new (gmail!) account fresh for this.
-
-### input.dat
-The input file needs a few parameters at a minimum. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, so just look in there for the documentation. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
 
 ## Installation
 1. Install `lfit`, as per the instructions.
