@@ -127,7 +127,7 @@ def find_wdmass(wdtemp,scaled_mass,rw_a,baseDir,model='hamada'):
     valAtHiLimit = funcToSolve(mhi)
     if np.sign(valAtLoLimit * valAtHiLimit) > 0:
         # get here only when they are the same sign
-        raise Exception('No valid solution for this model')
+        raise ValueError('No valid solution for this model')
 
     # OK, there should be a solution: return it
     return brentq(funcToSolve,mlo,mhi)*units.M_sun
@@ -150,21 +150,21 @@ def solve(input_data,baseDir):
             twd, scaled_mass, rw_a, baseDir,
             model='wood'
         )
-    except:
+    except ValueError:
         # try panei models (usually for masses above 1 Msun)
         try:
             mw = find_wdmass(
                 twd, scaled_mass, rw_a, baseDir,
                 model='panei'
             )
-        except:
+        except ValueError:
             # try hamada models (for masses less than 0.4 or more than 1.2 Msun)
             try:
                 mw = find_wdmass(
                     twd, scaled_mass, rw_a, baseDir,
                     model='hamada'
                 )
-            except Exception:
+            except ValueError:
                 solved = False
 
     # do nothing if none of the models yielded a solution

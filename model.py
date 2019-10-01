@@ -4,7 +4,6 @@ hierarchical model structure, that can also track the prior knowledge of the
 parameters of that model.
 '''
 
-import sys
 import os
 import warnings
 

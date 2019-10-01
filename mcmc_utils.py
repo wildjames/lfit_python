@@ -8,7 +8,6 @@ import dask.dataframe as dd
 import emcee
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
 import seaborn
 from matplotlib import pyplot as plt
 # lightweight progress bar

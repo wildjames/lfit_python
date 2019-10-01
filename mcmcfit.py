@@ -157,7 +157,7 @@ if __name__ in '__main__':
 
     # If we're not running the fit, plot our stuff.
     if not to_fit:
-        import plotCV
+        import plot_lc_model as plotCV
 
         plotCV.nxdraw(model)
 

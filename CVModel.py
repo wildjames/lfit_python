@@ -179,7 +179,7 @@ class SimpleEclipse(Node):
         self.log("SimpleEclipse.ln_like", "Returning a ln_like of {}".format(-0.5*chisq))
         return -0.5 * chisq
 
-    def ln_prior(self, verbose, *args, **kwargs):
+    def ln_prior(self, verbose=False, *args, **kwargs):
         '''At the eclipse level, three constrains must be validated for each
         leaf of the tree.
 
@@ -395,7 +395,7 @@ class LCModel(Node):
     # Set the parameter names for this layer
     node_par_names = ('q', 'dphi', 'rwd')
 
-    def ln_prior(self, verbose=False):
+    def ln_prior(self, verbose=False, *args, **kwargs):
         '''Before we calculate the ln_prior of myself or my children, I check
         that my parameters are valid. I check that dphi is not too large for
         the current value of q.
@@ -430,7 +430,7 @@ class LCModel(Node):
                 self.log('LCModel.ln_prior', "dphi is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
-        except:
+        except roche.RocheError:
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
@@ -603,7 +603,7 @@ class SimpleGPEclipse(SimpleEclipse):
         self.log('SimpleGPEclipse.create_GP', "Successfully created a new GP!")
         return georgeGP
 
-    def ln_like(self):
+    def ln_like(self, *args, **kwargs):
         '''The GP sits at the top of the tree. It replaces the LCModel
         class. When the evaluate function is called, this class should
         hijack it, calculate the residuals of all the eclipses in the tree,

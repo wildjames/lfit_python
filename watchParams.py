@@ -1,10 +1,9 @@
 from os import getcwd
 
-import bokeh as bk
 import configobj
 import numpy as np
 from bokeh.layouts import Spacer, column, gridplot, row
-from bokeh.models import ColumnDataSource, Span, Whisker, Band
+from bokeh.models import ColumnDataSource, Span, Band
 from bokeh.models.widgets import Dropdown, Panel, Slider, Tabs, markups
 from bokeh.models.widgets.buttons import Button, Toggle
 from bokeh.plotting import curdoc, figure
