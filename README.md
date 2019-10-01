@@ -96,7 +96,8 @@ Actually using the software is fairly easy. In essence,
 3. Wait. 
 4. Run `wdparams.py` with its relevant input file, e.g. `python3 /PATH/TO/LFIT_PYTHON/wdparams.py wdinput.dat`
 5. Use `ldparams.py` to calculate the limb darkening coefficient of this WD model
-6. Repeat steps 1-4 with the new value of limb darkening
+6. Repeat steps 1-4 with the new value of limb darkening, until the value doesn't change
+7. Use `caclPhysicalParams.py` to compute the physical system parameters, <a href="https://www.codecogs.com/eqnedit.php?latex=$q,&space;M_{wd},&space;R_{wd},&space;M_2,&space;R_2,&space;sep,&space;K_{wd},&space;K_2,&space;inclination,&space;log(g)$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$q,&space;M_{wd},&space;R_{wd},&space;M_2,&space;R_2,&space;sep,&space;K_{wd},&space;K_2,&space;inclination,&space;log(g)$" title="$q, M_{wd}, R_{wd}, M_2, R_2, sep, K_{wd}, K_2, inclination, log(g)$" /></a>
 5. Analyse results!
 
 In reality, this is often iterative, and the result of one chain leads into the start position of another, until convergence is reached. Then, the resulting converged chain is fed into `wdparams.py` for conversion into physical parameters.
