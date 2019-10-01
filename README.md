@@ -74,6 +74,7 @@ It's hopefully obvious that we generally have less than infinite computer time. 
 
 This package uses a tree structure to group observational data. It's easier to explain with a diagram;
 
+```
                        Trunk
                          |
                         / \
@@ -81,12 +82,13 @@ This package uses a tree structure to group observational data. It's easier to e
                |                  |
               / \                / \
          leaf1   leaf2      leaf3   leaf4
+```
 
 Parameters are set from the top with an ordered list (as per `emcee` docs), and sorted down into the branches and leaves by the model structure. The eclipses are stored and modelled on the leaves, with the branches separating different observational filters and the `Trunk` storing the global parameters, `q`, `dhpi`, and `rwd`. When we want to evaluate an eclipse fit, say that of `leaf1`, we call `leaf1.calcFlux`. This retrieves the parameters it inherits from its parent, `Branch1`, and grandparent, `Trunk`, passes them off to `lfit.CV`, and returns the result.
 
 By segregating the eclipses like this, rather than fitting each individually, much better constraints on parameters can be achieved, even with less than stellar data. CV flickering can cause the BS ingress and egress to be ambiguous, as the amplitude of this stochastic process is often similar to the size of the BS features. It is unlikely that two eclipses will be unfortunate enough to be masked in this way _in the same place_, so by fitting them together, the MCMC should find it preferable to settle on the feature common to them both. Similarly, the white dwarf and donor fluxes (which should not change on human timescales) should be constant between eclipses - hence are shared at the branch level.
 
-### If you want to use this...
+### If you want to use this
 
 The core functionality is ambiguous to the model being fitted, and sub-classed to work with `lfit` & `emcee`. This means that this structure should be _relatively_ easy to apply to other models in similar use-cases. The tree is constructed of `Node`s, that can have at most one parent, and any number of children. It can also be arbitrarily deep, for example the above illustration could have two levels of branches, one separating branches, and another layer separating observations that are distant in time, for a 4-layer model.
 
