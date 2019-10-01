@@ -603,7 +603,7 @@ class Node:
     @property
     def name(self):
         '''The name of this object, of the form <class name>_<label>'''
-        return "{}:{}".format(self.__class__.__name__, self.label)
+        return "{}_{}".format(self.__class__.__name__, self.label)
 
     @property
     def parent(self):
