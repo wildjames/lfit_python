@@ -1,30 +1,23 @@
-import json
-import sys
-import time
-from os import getcwd, path
+from os import getcwd
 
 import bokeh as bk
 import configobj
-import george as g
 import numpy as np
-from bokeh.layouts import Spacer, column, gridplot, layout, row
-from bokeh.models import Band, ColumnDataSource, Span, Whisker
-from bokeh.models.annotations import Title
-from bokeh.models.widgets import (DataTable, Dropdown, Panel, Slider,
-                                  TableColumn, Tabs, TextInput, inputs,
-                                  markups, tables)
+from bokeh.layouts import Spacer, column, gridplot, row
+from bokeh.models import ColumnDataSource, Span, Whisker, Band
+from bokeh.models.widgets import Dropdown, Panel, Slider, Tabs, markups
 from bokeh.models.widgets.buttons import Button, Toggle
 from bokeh.plotting import curdoc, figure
-from bokeh.server.callbacks import NextTickCallback
-from pandas import DataFrame, read_csv
+from pandas import DataFrame
 
+import george as g
 from CVModel import construct_model
 
 try:
     from lfit import CV
     print("Successfully imported CV class from lfit!")
-    import mcmc_utils as u
-    print("Successfully imported mcmc_utils")
+    # import mcmc_utils
+    # print("Successfully imported mcmc_utils")
     from trm import roche
     print("Successfully imported trm.roche!")
 except ImportError:
@@ -66,8 +59,8 @@ class Watcher():
             - Start watching for the creation of the chain file
         '''
         #TODO:
-        # - Make a parameter tweaker, based on the new model
-        # -
+        # - Parameter reporting table
+        # - Physcial params corresponding to params?
 
         #####################################################
         ############### Information Gathering ###############
@@ -253,14 +246,14 @@ class Watcher():
         fname = self.current_eclipse.lc.name
         band_name = self.current_eclipse.parent.label
         title_text = "{} --- Band: {}".format(fname, band_name)
-        self.lc_plot = bk.plotting.figure(title=title_text, plot_height=500, plot_width=1200,
+        self.lc_plot = figure(title=title_text, plot_height=500, plot_width=1200,
             toolbar_location='above', y_axis_location="left", x_axis_location=None)
 
         # Plot the lightcurve data
         self.lc_plot.scatter(x='phase', y='flux', source=self.lc_obs, size=5, color='black')
 
         # also plot residuals
-        self.lc_res_plot = bk.plotting.figure(plot_height=250, plot_width=1200,
+        self.lc_res_plot = figure(plot_height=250, plot_width=1200,
             toolbar_location=None, y_axis_location="left",
             x_range=self.lc_plot.x_range)#, y_range=self.lc_plot.y_range)
 

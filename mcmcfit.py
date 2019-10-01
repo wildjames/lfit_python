@@ -13,7 +13,6 @@ import multiprocessing as mp
 import os
 from pprint import pprint
 from shutil import rmtree
-from sys import exit
 
 import configobj
 import emcee

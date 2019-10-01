@@ -143,7 +143,7 @@ class SimpleEclipse(Node):
 
         return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.yd
 
-    def chisq(self):
+    def chisq(self, *args, **kwargs):
         '''Return the chisq of this eclipse, given current params.'''
         self.log('SimpleEclipse.chisq', "Doing chisq")
         flx = self.calcFlux()
@@ -166,7 +166,7 @@ class SimpleEclipse(Node):
         self.log('SimpleEclipse.chisq', "Computed a chisq of {}".format(chisq))
         return chisq
 
-    def ln_like(self):
+    def ln_like(self, *args, **kwargs):
         '''Calculate the chisq of this eclipse, against the data stored in its
         lightcurve object.
 

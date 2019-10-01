@@ -11,8 +11,7 @@ from __future__ import print_function
 from builtins import input, zip
 
 import numpy as np
-from scipy.interpolate import (RectBivariateSpline, SmoothBivariateSpline,
-                               interp2d)
+from scipy.interpolate import RectBivariateSpline, SmoothBivariateSpline
 
 
 def ld (band,logg,teff,law='linear'):

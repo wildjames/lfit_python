@@ -1,26 +1,18 @@
 import argparse
 import os
-import sys
 from functools import partial
 
 import numpy as np
 import seaborn as sns
 from astropy import constants as const
 from astropy import units
-from astropy.table import Column, Table
+from astropy.table import Table
 from astropy.utils.console import ProgressBar as PB
 from scipy import interpolate as interp
 from scipy.optimize import brentq
 
 import mcmc_utils as utils
 from trm import roche
-
-# see if our astropy version supports quantities or not
-quantitySupport = True
-try:
-    from astropy.table import QTable
-except:
-    quantitySupport = False
 
 
 def read_wood_file(filename):
@@ -154,16 +146,25 @@ def solve(input_data,baseDir):
     solved = True
     try:
         # try wood models
-        mw = find_wdmass(twd,scaled_mass,rw_a,baseDir,model='wood')
+        mw = find_wdmass(
+            twd, scaled_mass, rw_a, baseDir,
+            model='wood'
+        )
     except:
         # try panei models (usually for masses above 1 Msun)
         try:
-            mw = find_wdmass(twd,scaled_mass,rw_a,baseDir,model='panei')
+            mw = find_wdmass(
+                twd, scaled_mass, rw_a, baseDir,
+                model='panei'
+            )
         except:
             # try hamada models (for masses less than 0.4 or more than 1.2 Msun)
             try:
-                mw=find_wdmass(twd,scaled_mass,rw_a,baseDir,model='hamada')
-            except:
+                mw = find_wdmass(
+                    twd, scaled_mass, rw_a, baseDir,
+                    model='hamada'
+                )
+            except Exception:
                 solved = False
 
     # do nothing if none of the models yielded a solution

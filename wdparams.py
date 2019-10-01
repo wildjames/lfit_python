@@ -1,10 +1,8 @@
 from __future__ import division, print_function
 
 import os
-import sys
 import warnings
 from collections.abc import MutableSequence
-from os.path import realpath
 
 import emcee
 import matplotlib.pyplot as plt
@@ -13,7 +11,7 @@ import scipy.interpolate as interp
 import seaborn
 from past.utils import old_div
 
-from mcmc_utils import (flatchain, readchain, readchain_dask, readflatchain,
+from mcmc_utils import (flatchain, readchain_dask, readflatchain,
                         run_burnin, run_mcmc_save, thumbPlot)
 from model import Param
 
@@ -47,7 +45,7 @@ class wdModel(MutableSequence):
         self.data.remove(ind)
     def __len__(self):
         return len(self.data)
-    def insert(self,ind,val):
+    def insert(self, ind, val):
         self.data.insert(ind,val)
     @property
     def npars(self):
@@ -227,9 +225,9 @@ def plotColors(mags):
     umags = data[:,4]
     gmags = data[:,5]
     rmags = data[:,6]
-    imags = data[:,7]
-    zmags = data[:,8]
-    kg5mags = data[:,9]
+    # imags = data[:,7]
+    # zmags = data[:,8]
+    # kg5mags = data[:,9]
 
     # calculate colours
     ug = umags-gmags

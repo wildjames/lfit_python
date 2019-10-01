@@ -624,7 +624,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             del chain_slice
             try:
                 del fig
-            except:
+            except NameError:
                 pass
 
 
