@@ -2,6 +2,11 @@
 
 This project is the successor to `LFIT` - a `C++` code for fitting cataclysmic variable (CV) star's eclipse lightcurves. `LFIT` is fast but cannot be easily adapted to fit ligthcurves with lots of flickering or to fit individual eclipses whilst sharing certain parameters (e.g eclipse width) between eclipses. This software uses a tree structure, to group eclipses into branches that can share some parameters but not others.
 
+## Setting up an MCMC run
+The input file will define how a model is set up, and some of the details for the MCMC fit. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, and the comments in it shoudl explain what the parameters mean. Something that may not be 100% clear, however, is how labels work - a parameter typically looks like this:
+`variableName_nodeLabel`. The underscore separates the two, with the former telling the code which of the parameters from 'Calc-ing Flux' is being set, and the latter telling it which node (i.e. band or eclipse) it belongs to. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
+
+
 ## LFIT; functional knowledge you're gonna need
 
 [lfit](https://github.com/StuartLittlefair/lfit) is a pretty robust piece of code. It's core functionality is easy to use, though perhaps a bit finnicky to pass parameters to. More on this in a few paragraphs.
@@ -96,13 +101,14 @@ The core functionality is ambiguous to the model being fitted, and sub-classed t
 
 Actually using the software is fairly easy. In essence,
 
-1.  Write a configuration file defining the initial conditions, and parameters of the MCMC
-2.  Run `mcmcfit.py` with the input file, e.g. `python3 /PATH/TO/LFIT_PYTHON/mcmcift.py mcmc_input.dat`
-3.  Wait.
-4.  Run `wdparams.py` with its relevant input file, e.g. `python3 /PATH/TO/LFIT_PYTHON/wdparams.py wdinput.dat`
-5.  Use `ldparams.py` to calculate the limb darkening coefficient of this WD model
-6.  Repeat steps 1-4 with the new value of limb darkening
-7.  Analyse results!
+1. Write a configuration file defining the initial conditions, and parameters of the MCMC
+2. Run `mcmcfit.py` with the input file, e.g. `python3 /PATH/TO/LFIT_PYTHON/mcmcift.py mcmc_input.dat`
+3. Wait. 
+4. Run `wdparams.py` with its relevant input file, e.g. `python3 /PATH/TO/LFIT_PYTHON/wdparams.py wdinput.dat`
+5. Use `ldparams.py` to calculate the limb darkening coefficient of this WD model
+6. Repeat steps 1-4 with the new value of limb darkening, until the value doesn't change
+7. Use `calcPhysicalParams.py` to compute the physical system parameters, <a href="https://www.codecogs.com/eqnedit.php?latex=$q,&space;M_{wd},&space;R_{wd},&space;M_2,&space;R_2,&space;sep,&space;K_{wd},&space;K_2,&space;inclination,&space;log(g)$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$q,&space;M_{wd},&space;R_{wd},&space;M_2,&space;R_2,&space;sep,&space;K_{wd},&space;K_2,&space;inclination,&space;log(g)$" title="$q, M_{wd}, R_{wd}, M_2, R_2, sep, K_{wd}, K_2, inclination, log(g)$" /></a>
+8. Analyse results!
 
 In reality, this is often iterative, and the result of one chain leads into the start position of another, until convergence is reached. Then, the resulting converged chain is fed into `wdparams.py` for conversion into physical parameters.
 
@@ -117,9 +123,6 @@ This branch also has a notifier, which will email the resulting lightcurve figur
 
 **_DO NOT USE YOUR PERSONAL EMAIL_** as the credentials are stored here in plaintext. Just make a new (gmail!) account fresh for this.
 
-### input.dat
-
-The input file needs a few parameters at a minimum. It's almost certainly easier to understand the structure by looking at the [example](test_data/mcmc_input.dat) file, so just look in there for the documentation. Similarly, the `wdparams` script needs an input configuration, and this [example](./wdinput.dat) is also given.
 
 ## Installation
 
@@ -129,6 +132,10 @@ The input file needs a few parameters at a minimum. It's almost certainly easier
 
 ## TODO
 
--   AIES samplers are [likely not suitable for parameter spaces with N > ~5](https://statmodeling.stat.columbia.edu/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/). Should we move to a different algorithm?
--   The `emcee` implimentation of parallel tempering is deprecated. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
--   The `watchparams` branch is now broken, due to the migration to the node tree. This needs porting over to the new version.
+## TODO 
+- AIES samplers are [likely not suitable for parameter spaces with N > ~5](https://statmodeling.stat.columbia.edu/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/). Should we move to a different algorithm?
+- The `emcee` implimentation of parallel tempering is deprecated in the latest version. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
+
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/e32287a32e864c278f1a06beeeb8e7fb)](https://www.codacy.com/manual/wildjames/lfit_python?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=wildjames/lfit_python&amp;utm_campaign=Badge_Grade)
+
