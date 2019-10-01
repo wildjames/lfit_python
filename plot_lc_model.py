@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import yagmail as yag
+from random import choice
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
@@ -75,8 +76,7 @@ def hierarchy_pos(G,
             # Allows back compatibility with nx version 1.11
             root = next(iter(nx.topological_sort(G)))
         else:
-            import random
-            root = random.choice(list(G.nodes))
+            root = choice(list(G.nodes))
 
     return _hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
 

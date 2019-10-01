@@ -47,8 +47,9 @@ def panei_mr(targetTemp,baseDir):
     '''given a target temp, returns a function giving
     radius as a function of mass.
     function is derived from cubic interpolation of Panei models'''
-    assert np.all((targetTemp>=5000*units.K)&(targetTemp<45000*units.K)), \
-        "Model invalid at temps less than 4000 or greater than 45,000 K"
+    if not np.all((targetTemp>=5000*units.K)&(targetTemp<45000*units.K)):
+        N_invalid = np.sum((targetTemp>=5000*units.K)&(targetTemp<45000*units.K))
+        raise ValueError("Model invalid at temps less than 4000 or greater than 45,000 K ({} data are invalid)".format(N_invalid))
 
     # read panei model grid in
     teffs,masses,radii = \
@@ -101,7 +102,9 @@ def find_wdmass(wdtemp,scaled_mass,rw_a,baseDir,model='hamada'):
         this routine finds the white dwarf mass where these estimates agree, if
         one exists.'''
 
-    assert model in ['hamada','wood','panei'], "Model %s not recognised" % model
+    if not model in ['hamada','wood','panei']:
+        raise NotImplementedError("Model {} not recognised".format(model))
+
     limits = { 'hamada':[0.14,1.44], \
         'wood':[0.4,1.0], \
         'panei':[0.4,1.2] }

@@ -47,7 +47,9 @@ class Prior(object):
     set p0=noise level
     '''
     def __init__(self, prior_distribution, p1, p2):
-        assert prior_distribution in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']
+        if not prior_distribution in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']:
+            raise NotImplementedError("Prior distribution {} not implimented!".format(prior_distribution))
+
         self.type = prior_distribution
         self.p1 = p1
         self.p2 = p2
@@ -223,7 +225,9 @@ class Node:
         parameter_objects = list(parameter_objects)
 
         # Make sure our label is valid
-        assert isinstance(label, str), "Label must be a string!"
+        if not isinstance(label, str):
+            raise TypeError("Label must be a string, not {}".format(type(label)))
+
         self.label = label
 
         # Check that the user defined their parameter names!
