@@ -19,6 +19,7 @@ import emcee
 import numpy as np
 
 import mcmc_utils as utils
+import plot_lc_model as plotCV
 from CVModel import construct_model, extract_par_and_key
 
 
@@ -64,11 +65,17 @@ if __name__ in '__main__':
         help='Enable the debugging flag in the model',
         action='store_true'
     )
+    parser.add_argument(
+        "--quiet",
+        help="Do not plot the initial conditions",
+        action="store_true"
+    )
 
     args = parser.parse_args()
     input_fname = args.input
     dest = args.notify
     debug = args.debug
+    quiet = args.quiet
 
     if debug:
         if os.path.isdir("DEBUGGING"):
@@ -156,14 +163,9 @@ if __name__ in '__main__':
         exit()
 
     # If we're not running the fit, plot our stuff.
-    if not to_fit:
-        import plot_lc_model as plotCV
-
+    if not quiet:
         plotCV.nxdraw(model)
-
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
-
-        exit()
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #
@@ -177,6 +179,9 @@ if __name__ in '__main__':
         npars, nwalkers))
     print("(It should have at least 2*npars, {:d} walkers)".format(2*npars))
     if nwalkers < 2*npars:
+        exit()
+
+    if not to_fit:
         exit()
 
     # p_0 is the initial position vector of the MCMC walker
