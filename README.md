@@ -120,3 +120,6 @@ This branch also has a notifier, which will email the resulting lightcurve figur
 ## TODO 
 - AIES samplers are [likely not suitable for parameter spaces with N > ~5](https://statmodeling.stat.columbia.edu/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/). Should we move to a different algorithm?
 - The `emcee` implimentation of parallel tempering is deprecated in the latest version. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
+
+
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/e32287a32e864c278f1a06beeeb8e7fb)](https://www.codacy.com/manual/wildjames/lfit_python?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=wildjames/lfit_python&amp;utm_campaign=Badge_Grade)
