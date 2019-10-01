@@ -124,7 +124,7 @@ if __name__ == "__main__":
     for i in range(npars):
         par = chain[:,i]
         lolim,best,uplim = np.percentile(par,[16,50,84])
-        print "%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim)
+        print("%s = %f +%f -%f" % (nameList[i],best,uplim-best,best-lolim))
         bestPars.append(best)
     fig = thumbPlot(chain,nameList)
     fig.savefig('cornerPlot.pdf')

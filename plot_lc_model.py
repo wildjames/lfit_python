@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import yagmail as yag
+from random import choice
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
@@ -75,8 +76,7 @@ def hierarchy_pos(G,
             # Allows back compatibility with nx version 1.11
             root = next(iter(nx.topological_sort(G)))
         else:
-            import random
-            root = random.choice(list(G.nodes))
+            root = choice(list(G.nodes))
 
     return _hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
 
@@ -165,7 +165,10 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                     zorder=0)
 
     # Labelling. Top one gets title, bottom one gets x label
-    axs[0].set_title(ecl_node.lc.name)
+    title_text = "{} --- chisq: {:.1f} --- ln_prob: {:.1f}".format(
+        ecl_node.lc.name, ecl_node.chisq(), ecl_node.ln_prob()
+    )
+    axs[0].set_title(title_text)
     axs[0].set_ylabel('Flux, mJy')
 
     axs[1].set_xlabel('Phase')
@@ -182,7 +185,7 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
         # If we didnt get told to use a certain fname, use this node's name
         if fname is None:
-            fname = ecl_node.lc.name.replace('.calib', ext)
+            fname = ecl_node.lc.name.replace('.calib', ext).replace('.txt', ext)
 
         # Make the filename
         fname = '/'.join([save_dir, fname])
@@ -239,7 +242,9 @@ def plot_GP_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
         # If we didnt get told to use a certain fname, use this node's name
         if fname is None:
-            fname = ecl_node.lc.name.replace('.calib', ext)
+            fname = ecl_node.lc.name.replace('.calib', '')
+            fname = fname.replace('.txt', '')
+            fname += ext
 
         # Make the filename
         fname = '/'.join([save_dir, fname])
@@ -325,7 +330,9 @@ def notipy(send_to, fnames, body):
         print("Please set up the bot email in {} to enable email reporting!".format(details_loc))
         return
 
-    subject = "Model plotting output."
+    whoami = os.uname().nodename
+    whereami = os.getcwd()
+    subject = "Machine {}, Ran at: '{}'".format(whoami, whereami)
 
     # Construct the email contents
     contents = [body]
@@ -400,9 +407,14 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     # plt.show()
 
     # Plot the mean likelihood evolution
+    std = np.std(likes, axis=0)
     likes = np.mean(likes, axis=0)
-    steps = np.arange(nskip, nskip+len(likes))
-    std = np.std(likes)
+
+    steps = np.arange(likes.shape[0])
+
+    likes = likes[nskip::thin]
+    std = std[nskip::thin]
+    steps = steps[nskip::thin]
 
     # Make the likelihood plot
     fig, ax = plt.subplots(figsize=(11, 8))
@@ -526,6 +538,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+    model_report += "\n\nThe final fits of this chain are attached below."
 
     if not automated:
         print("Final conditions being plotted now...")
@@ -536,7 +549,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         print("Sending a summary email. Corner plots are omitted due to filesize.")
         # Gather the files
         fnames = list(glob.iglob('Final_figs/*.pdf', recursive=True))
-        fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
+        fnames += list(glob.iglob('Final_figs/*.png', recursive=True))
+
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
         notipy(destination, fnames, model_preport+model_report)
@@ -575,6 +589,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 for col in colKeys:
                     if par in col:
                         labels.append(par)
+            par_labels = labels
 
             print("\nMy corner plot labels are:")
             print(labels)
@@ -609,7 +624,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             del chain_slice
             try:
                 del fig
-            except:
+            except NameError:
                 pass
 
 

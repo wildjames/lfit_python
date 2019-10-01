@@ -1,22 +1,18 @@
-#!/usr/bin/env python
 import argparse
 import os
-import sys
 from functools import partial
 
 import numpy as np
 import seaborn as sns
 from astropy import constants as const
 from astropy import units
-from astropy.table import Column, Table
+from astropy.table import Table
 from astropy.utils.console import ProgressBar as PB
+from scipy import interpolate as interp
+from scipy.optimize import brentq
 
-# see if our astropy version supports quantities or not
-quantitySupport = True
-try:
-    from astropy.table import QTable
-except:
-    quantitySupport = False
+import mcmc_utils as utils
+from trm import roche
 
 
 def read_wood_file(filename):
@@ -51,8 +47,9 @@ def panei_mr(targetTemp,baseDir):
     '''given a target temp, returns a function giving
     radius as a function of mass.
     function is derived from cubic interpolation of Panei models'''
-    assert np.all((targetTemp>=5000*units.K)&(targetTemp<45000*units.K)), \
-        "Model invalid at temps less than 4000 or greater than 45,000 K"
+    if not np.all((targetTemp>=5000*units.K)&(targetTemp<45000*units.K)):
+        N_invalid = np.sum((targetTemp>=5000*units.K)&(targetTemp<45000*units.K))
+        raise ValueError("Model invalid at temps less than 4000 or greater than 45,000 K ({} data are invalid)".format(N_invalid))
 
     # read panei model grid in
     teffs,masses,radii = \
@@ -105,7 +102,9 @@ def find_wdmass(wdtemp,scaled_mass,rw_a,baseDir,model='hamada'):
         this routine finds the white dwarf mass where these estimates agree, if
         one exists.'''
 
-    assert model in ['hamada','wood','panei'], "Model %s not recognised" % model
+    if not model in ['hamada','wood','panei']:
+        raise NotImplementedError("Model {} not recognised".format(model))
+
     limits = { 'hamada':[0.14,1.44], \
         'wood':[0.4,1.0], \
         'panei':[0.4,1.2] }
@@ -131,7 +130,7 @@ def find_wdmass(wdtemp,scaled_mass,rw_a,baseDir,model='hamada'):
     valAtHiLimit = funcToSolve(mhi)
     if np.sign(valAtLoLimit * valAtHiLimit) > 0:
         # get here only when they are the same sign
-        raise Exception('No valid solution for this model')
+        raise ValueError('No valid solution for this model')
 
     # OK, there should be a solution: return it
     return brentq(funcToSolve,mlo,mhi)*units.M_sun
@@ -150,16 +149,25 @@ def solve(input_data,baseDir):
     solved = True
     try:
         # try wood models
-        mw = find_wdmass(twd,scaled_mass,rw_a,baseDir,model='wood')
-    except:
+        mw = find_wdmass(
+            twd, scaled_mass, rw_a, baseDir,
+            model='wood'
+        )
+    except ValueError:
         # try panei models (usually for masses above 1 Msun)
         try:
-            mw = find_wdmass(twd,scaled_mass,rw_a,baseDir,model='panei')
-        except:
+            mw = find_wdmass(
+                twd, scaled_mass, rw_a, baseDir,
+                model='panei'
+            )
+        except ValueError:
             # try hamada models (for masses less than 0.4 or more than 1.2 Msun)
             try:
-                mw=find_wdmass(twd,scaled_mass,rw_a,baseDir,model='hamada')
-            except:
+                mw = find_wdmass(
+                    twd, scaled_mass, rw_a, baseDir,
+                    model='hamada'
+                )
+            except ValueError:
                 solved = False
 
     # do nothing if none of the models yielded a solution
@@ -200,17 +208,57 @@ def solve(input_data,baseDir):
 if __name__ == "__main__":
 
     sns.set()
-    parser = argparse.ArgumentParser(description='Calculate physical parameters from MCMC chain of LFIT parameters')
-    parser.add_argument('file',action='store',help='input file from MCMC run')
-    parser.add_argument('twd',action='store',type=float,help='white dwarf temperature (K)')
-    parser.add_argument('e_twd',action='store',type=float,help='error on wd temp')
-    parser.add_argument('p',action='store',type=float,help='orbital period (days)')
-    parser.add_argument('e_p',action='store',type=float,help='error on period')
-    parser.add_argument('--thin','-t',type=int,help='amount to thin MCMC chain by',default=1)
-    parser.add_argument('--nthreads','-n',type=int,help='number of threads to run',default=6)
-    parser.add_argument('--flat','-f',type=int,help='Factor of thinning if flattened chain used',default=0)
+    parser = argparse.ArgumentParser(
+        description='Calculate physical parameters from MCMC chain of LFIT parameters'
+    )
+    parser.add_argument(
+        'file',
+        action='store',
+        help='Output chain file from MCMC run with wdparams.py'
+    )
+    parser.add_argument(
+        'twd', action='store',
+        type=float,
+        help='white dwarf temperature (K)'
+    )
+    parser.add_argument(
+        'e_twd', action='store',
+        type=float,
+        help='error on wd temp'
+    )
+    parser.add_argument(
+        'p', action='store',
+        type=float,
+        help='orbital period (days)'
+    )
+    parser.add_argument(
+        'e_p', action='store',
+        type=float,
+        help='error on period'
+    )
+    parser.add_argument(
+        '--thin', '-t',
+        type=int,
+        help='amount to thin MCMC chain by',
+        default=1
+    )
+    parser.add_argument(
+        '--nthreads', '-n',
+        type=int,
+        help='number of threads to run',
+        default=6
+    )
+    parser.add_argument(
+        '--flat', '-f',
+        type=int,
+        help='Factor of thinning if flattened chain used',
+    default=0)
+    parser.add_argument(
+        '--dir', '-d',
+        help='directory with WD models',
+        default=None
+    )
 
-    parser.add_argument('--dir','-d',help='directory with WD models',default='/Users/mmc/lfit/params')
     args = parser.parse_args()
     file = args.file
     thin = args.thin
@@ -218,30 +266,58 @@ if __name__ == "__main__":
     flat = args.flat
     baseDir = args.dir
 
+    if baseDir is None:
+        print("Using the script location as the WD model files location")
+        baseDir = os.path.split(__file__)[0]
+    print("baseDir: {}".format(baseDir))
+
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = readflatchain(file)
+        fchain = utils.readflatchain(file)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
         #chain = readchain(file)
-        chain = readchain_dask(file)
+        chain = utils.readchain_dask(file)
         nwalkers, nsteps, npars = chain.shape
-        fchain = flatchain(chain,npars,thin=thin)
+        fchain = utils.flatchain(chain,npars,thin=thin)
     print("Done!")
 
     # this is the order of the params in the chain
-    nameList = ['fwd','fdisc','fbs','fd','q','dphi','rdisc','ulimb','rwd','scale', \
-            'az','frac','rexp','off','exp1','exp2','tilt','yaw','amp_gp','tau_gp','lnprob']
+    with open(file, 'r') as f:
+        # First in the namelist is 'walker_no', but we care about the flatchain
+        nameList = f.readline().split()[1:]
     # we need q, dphi, rw from the chain
-    qVals = fchain[:,4]
-    dphiVals = fchain[:,5]
-    rwVals  = fchain[:,8]
+    qIndex = nameList.index('q_core')
+    dphiIndex = nameList.index('dphi_core')
+    rwIndex = nameList.index('rwd_core')
+
+    print("In the chain file, {};".format(file))
+    print("   q is at index, {}".format(qIndex))
+    print("   dphi is at index, {}".format(dphiIndex))
+    print("   rw is at index, {}".format(rwIndex))
+
+
+    qVals = fchain[:, qIndex]
+    dphiVals = fchain[:, dphiIndex]
+    rwVals  = fchain[:, rwIndex]
+
     chainLength = len(qVals)
+    print("The chain contains {} samples".format(chainLength))
+
+    print("Means; ")
+    print("  q: {:.3f}".format(np.mean(qVals)))
+    print("  dphi: {:.3f}".format(np.mean(dphiVals)))
+    print("  rwd: {:.3f}".format(np.mean(rwVals)))
 
     # white dwarf temp
-    twdVals = np.random.normal(loc=args.twd,scale=args.e_twd,size=chainLength)*units.K
+    twdVals = np.random.normal(
+        loc=args.twd,
+        scale=args.e_twd,
+        size=chainLength
+    )
+    twdVals *= units.K
     # period
     pVals = np.random.normal(loc=args.p,scale=args.e_p,size=chainLength)*units.d
 
@@ -254,6 +330,7 @@ if __name__ == "__main__":
     # function below extracts value from quantity and floats alike
     getval = lambda el: getattr(el,'value',el)
 
+    print("Running MCMC...")
     psolve = partial(solve,baseDir=baseDir)
     data = zip(qVals,dphiVals,rwVals,twdVals,pVals)
     solvedParams = PB.map(psolve,data,multiprocess=True)
@@ -265,5 +342,13 @@ if __name__ == "__main__":
         if thisResult is not None:
             results.add_row(thisResult)
 
-    print('Found solutions for %d percent of samples in MCMC chain' % (100*float(len(results))/float(chainLength)))
-    results.write('physicalparams.log',format='ascii.commented_header')
+    print(
+        'Found solutions for {:.2f} percent of samples in MCMC chain'.format(
+        100 * float(len(results))/float(chainLength)
+        )
+    )
+    results.write(
+        'physicalparams.log',
+        format='ascii.commented_header',
+        overwrite=True
+    )

@@ -2,16 +2,12 @@
 Helper functions to aid the MCMC nuts and bolts.
 '''
 
-
-import time
 import warnings
 
 import dask.dataframe as dd
 import emcee
 import numpy as np
 import pandas as pd
-import scipy.integrate as intg
-import scipy.stats as stats
 import seaborn
 from matplotlib import pyplot as plt
 # lightweight progress bar
@@ -42,14 +38,6 @@ def thumbPlot(chain, labels, **kwargs):
     fig = triangle.corner(chain, labels=labels, bins=50,
                           label_kwargs=dict(fontsize=18), **kwargs)
     return fig
-
-
-def scatterWalkers(pos0, percentScatter):
-    warnings.warn('scatterWalkers decprecated: use emcee.utils.sample_ball instead')
-    nwalkers = pos0.shape[0]
-    npars = pos0.shape[1]
-    scatter = np.array([np.random.normal(size=npars) for i in range(nwalkers)])
-    return pos0 + percentScatter*pos0*scatter/100.0
 
 
 def initialise_walkers(p, scatter, nwalkers, ln_prior, model):
@@ -308,43 +296,6 @@ def GR_diagnostic(sampler_chain):
         # Calculate convergence criterion (potential scale reduction factor)
         R_hats[i] = (m + 1)*sigma2/(m*W) - (n-1)/(m*n)
     return R_hats
-
-
-def ln_marginal_likelihood(params, lnp):
-    '''given a flattened chain which consists of a series
-    of samples from the parameter posterior distributions,
-    and another array which is ln_prob (posterior) for these
-    parameters, estimate the marginal likelihood of this model,
-    allowing for model selection.
-
-    Such a chain is created by reading in the output file of
-    an MCMC run, and running flatchain on it.
-
-    Uses the method of Chib & Jeliazkov (2001) as outlined
-    by Haywood et al 2014
-
-    '''
-    raise Exception("""This routine is incorrect and should not be used until fixed.
-    See the emcee docs for the Parallel Tempering sampler instead""")
-    # maximum likelihood estimate
-    loc_best = lnp.argmin()
-    log_max_likelihood = lnp[loc_best]
-    best = params[loc_best]
-    # standard deviations
-    sigmas = params.std(axis=0)
-
-    # now for the magic
-    # at each step, add up 0.5*((val-best)/sigma)**2 for all params
-    term = 0.5*((params-best)/sigmas)**2
-    term = term.sum(axis=1)
-
-    # top term in posterior_ordinate
-    numerator = np.sum(np.exp(term))
-    denominator = np.sum(lnp/log_max_likelihood)
-    posterior_ordinate = numerator/denominator
-
-    log_marginal_likelihood = log_max_likelihood - np.log(posterior_ordinate)
-    return log_marginal_likelihood
 
 
 def rebin(xbins, x, y, e=None, weighted=True, errors_from_rms=False):
