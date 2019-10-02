@@ -321,6 +321,5 @@ if __name__ in '__main__':
             f.write(s)
         f.write('\n')
 
-    from plotCV import fit_summary
-    fit_summary('chain_prod.txt', input_fname, destination=dest,
+    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
                 automated=True)
