@@ -197,8 +197,8 @@ def solve(input_data,baseDir):
 
         # need to be a little careful here for different versions of astropy
         data = (q,mw,rw_a*a,mr,r2,a,kw,kr,inc)
-        if not quantitySupport:
-            data = [getval(datum) for datum in data]
+        # if not quantitySupport:
+        #     data = [getval(datum) for datum in data]
 
         return data
     else:

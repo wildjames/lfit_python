@@ -297,7 +297,7 @@ class Node:
             The node that was requested.
         '''
         self.log('base.search_Node', "Searching for a Node of class type {}, with a label {}".format(class_type, label))
-        if self.name == "{}:{}".format(class_type, label):
+        if self.name == "{}_{}".format(class_type, label):
             self.log('base.search_Node', "I am that node. Returning self")
             return self
         else:

@@ -313,7 +313,15 @@ class SimpleEclipse(Node):
 
         param_dict = self.ancestor_param_dict
 
-        parlist = [param_dict[key].currVal for key in par_name_list]
+        try:
+            parlist = [param_dict[key].currVal for key in par_name_list]
+        except KeyError as error:
+            print("Parameter dict:")
+            print("{")
+            for key, val in param_dict.items():
+                print("    {}: {}".format(key, val))
+            print("}")
+            raise error
 
         self.log("SimpleEclipse.cv_parlist", "Constructed a cv_parlist of:\n{}".format(parlist))
 
@@ -720,6 +728,13 @@ def construct_model(input_file, debug=False):
         # Read in all the available eclipses
         neclipses = 9999
 
+    if debug:
+        print("Input Dict yielded the following immediately interesting params:")
+        print("is_complex: ", is_complex)
+        print("use_gp: ", use_gp)
+        print("neclipses: ", neclipses)
+        print()
+
     # # # # # # # # # # # # # # # # #
     # Get the initial model setup # #
     # # # # # # # # # # # # # # # # #
@@ -729,6 +744,9 @@ def construct_model(input_file, debug=False):
         core_par_names = GPLCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
+        if debug:
+            print("Using the GP!")
+            print("Core params: {}".format(core_par_names))
 
         # and make the model object with no children
         model = GPLCModel('core', core_pars, DEBUG=debug)
@@ -736,6 +754,8 @@ def construct_model(input_file, debug=False):
         core_par_names = LCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
+        print("Not using the GP!")
+        print("Core params: {}".format(core_par_names))
 
         # and make the model object with no children
         model = LCModel('core', core_pars, DEBUG=debug)
@@ -746,12 +766,18 @@ def construct_model(input_file, debug=False):
 
     # Collect the bands and their params. Add them total model.
     band_par_names = Band.node_par_names
+    if debug:
+        print("\nThe bands have these parameters: {}".format(band_par_names))
 
     # Use the Eclipse class to find the parameters we're interested in
     if is_complex:
         ecl_pars = ComplexEclipse.node_par_names
+        if debug:
+            print("Using the complex BS model")
     else:
         ecl_pars = SimpleEclipse.node_par_names
+        if debug:
+            print("Using the simple BS model")
 
     # I care about the order in which eclipses and bands are defined.
     # Collect that order here.
@@ -777,6 +803,11 @@ def construct_model(input_file, debug=False):
                     _, key = extract_par_and_key(key)
                     if key not in defined_eclipses:
                         defined_eclipses.append(key)
+    if debug:
+        print("\nI found the following bands defined in the input dict:")
+        print(defined_bands)
+        print("\nI found the following eclipses defined in the input dict:")
+        print(defined_eclipses)
 
     # Collect the band params into their Band objects.
     for label in defined_bands:
@@ -793,6 +824,13 @@ def construct_model(input_file, debug=False):
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
+        if debug:
+            print("Added the band labelled {} to the model".format(label))
+
+    if debug:
+        print("The model has the following bands:")
+        for band in model.children:
+            print("  -> {}".format(band.name))
 
     # # # # # # # # # # # # # # # # #
     # # Finally, get the eclipses # #
@@ -816,8 +854,13 @@ def construct_model(input_file, debug=False):
         lc.trim(lo, hi)
 
         # Get the band object that this eclipse belongs to
-        my_band = input_dict['band_{}'.format(label)]
-        my_band = model.search_Node('Band', my_band)
+        my_band_label = input_dict['band_{}'.format(label)]
+        my_band = model.search_Node('Band', my_band_label)
+
+        if debug:
+            print("\nThe eclipse labelled {}:".format(label))
+            print("  -> Lightcurve file: {}".format(lc_fname))
+            print("  -> Band: {}".format(my_band.name))
 
         if use_gp:
             if is_complex:
