@@ -348,7 +348,7 @@ class ComplexEclipse(SimpleEclipse):
         The children of this node. Single Node is also accepted
     '''
     node_par_names = (
-                'dFlux', 'sFlux', 'ulimb', 'rdisc',
+                'dFlux', 'sFlux', 'rdisc',
                 'scale', 'az', 'fis', 'dexp', 'phi0',
                 'exp1', 'exp2', 'yaw', 'tilt'
             )
@@ -382,7 +382,7 @@ class Band(Node):
     '''
 
     # What kind of parameters are we storing here?
-    node_par_names = ('wdFlux', 'rsFlux')
+    node_par_names = ('wdFlux', 'rsFlux', 'ulimb')
 
 
 class LCModel(Node):
@@ -746,7 +746,9 @@ def construct_model(input_file, debug=False):
                      for name in core_par_names]
         if debug:
             print("Using the GP!")
-            print("Core params: {}".format(core_par_names))
+            print("Core params:")
+            for par, val in zip(core_par_names, core_pars):
+                print("  -> par: {:<10s}  --  value: {:.3f}".format(par, val.currVal))
 
         # and make the model object with no children
         model = GPLCModel('core', core_pars, DEBUG=debug)
@@ -754,8 +756,11 @@ def construct_model(input_file, debug=False):
         core_par_names = LCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
-        print("Not using the GP!")
-        print("Core params: {}".format(core_par_names))
+        if debug:
+            print("Not using the GP!")
+            print("Core params:")
+            for par, val in zip(core_par_names, core_pars):
+                print("  -> par: {:<10s}  --  value: {:.3f}".format(par, val.currVal))
 
         # and make the model object with no children
         model = LCModel('core', core_pars, DEBUG=debug)
@@ -826,6 +831,9 @@ def construct_model(input_file, debug=False):
         Band(label, band_pars, parent=model)
         if debug:
             print("Added the band labelled {} to the model".format(label))
+            print("Band params:")
+            for par, val in zip(band_par_names, band_pars):
+                print("  -> Par: {:>10s}  --- value: {:.3f}".format(par, val.currVal))
 
     if debug:
         print("The model has the following bands:")
@@ -861,6 +869,9 @@ def construct_model(input_file, debug=False):
             print("\nThe eclipse labelled {}:".format(label))
             print("  -> Lightcurve file: {}".format(lc_fname))
             print("  -> Band: {}".format(my_band.name))
+            print("Band params:")
+            for par in params:
+                print("  -> Par: {:>10s}  --- value: {:.3f}".format(par.name, par.currVal))
 
         if use_gp:
             if is_complex:
@@ -872,6 +883,8 @@ def construct_model(input_file, debug=False):
                 ComplexEclipse(lc, label, params, parent=my_band)
             else:
                 SimpleEclipse(lc, label, params, parent=my_band)
+
+
 
     # Make sure that all the model's Band have eclipses. Otherwise, prune them
     model.children = [band for band in model.children if len(band.children)]
