@@ -248,7 +248,8 @@ class SimpleEclipse(Node):
                 print("Scale: {:.3f}".format(scale))
                 print("Range: {:.3f} - {:.3f}".format(rmin, rmax))
 
-            self.log("SimpleEclipse.ln_prior", "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior",
+                     "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
             return -np.inf
 
         ##############################################
@@ -285,7 +286,8 @@ class SimpleEclipse(Node):
         except:
             if verbose:
                 print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
-            self.log("SimpleEclipse.ln_prior", "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior",
+                     "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
             return -np.inf
 
         self.log("SimpleEclipse.ln_prior", "Passed validity checks at {}.".format(self.name))
@@ -498,8 +500,8 @@ class SimpleGPEclipse(SimpleEclipse):
         pardict = self.ancestor_param_dict
 
         dphi = pardict['dphi']
-        q    = pardict['q']
-        rwd  = pardict['rwd']
+        q = pardict['q']
+        rwd = pardict['rwd']
         phi0 = pardict['phi0']
 
         # Have they changed significantly?
@@ -511,7 +513,8 @@ class SimpleGPEclipse(SimpleEclipse):
         # Check to see if our model parameters have changed enough to
         # significantly change the location of the changepoints.
         if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
-            self.log('SimpleGPEclipse.calcChangepoints', "The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
+            self.log('SimpleGPEclipse.calcChangepoints',
+                     "The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
 
             # Calculate inclination
             inc = roche.findi(q.currVal, dphi.currVal)
@@ -571,13 +574,13 @@ class SimpleGPEclipse(SimpleEclipse):
         # of their current values
         pardict = self.ancestor_param_dict
 
-        ln_ampin   = pardict['ln_ampin_gp']
-        ln_ampout  = pardict['ln_ampout_gp']
-        ln_tau     = pardict['ln_tau_gp']
+        ln_ampin = pardict['ln_ampin_gp']
+        ln_ampout = pardict['ln_ampout_gp']
+        ln_tau = pardict['ln_tau_gp']
 
-        ampin_gp   = np.exp(ln_ampin.currVal)
-        ampout_gp  = np.exp(ln_ampout.currVal)
-        tau_gp     = np.exp(ln_tau.currVal)
+        ampin_gp = np.exp(ln_ampin.currVal)
+        ampout_gp = np.exp(ln_ampout.currVal)
+        tau_gp = np.exp(ln_tau.currVal)
 
         # Calculate kernels for both out of and in eclipse WD eclipse
         # Kernel inside of WD has smaller amplitude than that of outside
@@ -633,7 +636,8 @@ class SimpleGPEclipse(SimpleEclipse):
         # Did the model turn out ok?
         if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
             if self.DEBUG:
-                self.log('SimpleGPEclipse.ln_like', "GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood.")
+                msg = "GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood."
+                self.log('SimpleGPEclipse.ln_like', msg)
             return -np.inf
 
         # Create the GP of this eclipse
@@ -784,12 +788,12 @@ def construct_model(input_file, debug=False):
 
         # Build the Param objects for this band
         for par in band_par_names:
-                # Construct the parameter key and retrieve the string
-                key = "{}_{}".format(par, label)
-                string = input_dict[key]
+            # Construct the parameter key and retrieve the string
+            key = "{}_{}".format(par, label)
+            string = input_dict[key]
 
-                # Make the Param object, and save it
-                band_pars.append(Param.fromString(par, string))
+            # Make the Param object, and save it
+            band_pars.append(Param.fromString(par, string))
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
