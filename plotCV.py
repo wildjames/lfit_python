@@ -11,7 +11,11 @@ import configobj
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import yagmail as yag
+try:
+    mailer = True
+    import yagmail as yag
+except ModuleNotFoundError:
+    mailer = False
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
@@ -36,6 +40,7 @@ def nxdraw(model):
         node_color='grey', font_weight='heavy')
 
     plt.show()
+
 
 def hierarchy_pos(G,
                   root=None, width=1.,
@@ -80,6 +85,7 @@ def hierarchy_pos(G,
 
     return _hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
 
+
 def _hierarchy_pos(G, root,
                    width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5,
                    pos=None, parent=None):
@@ -114,6 +120,7 @@ def _hierarchy_pos(G, root,
             )
 
     return pos
+
 
 def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                  save_dir='.', ext='.png'):
@@ -162,7 +169,7 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
     # 0 residuals line, to guide the eye
     axs[1].axhline(0.0, linestyle='--', color='black', alpha=0.7,
-                    zorder=0)
+                   zorder=0)
 
     # Labelling. Top one gets title, bottom one gets x label
     axs[0].set_title(ecl_node.lc.name)
@@ -196,6 +203,7 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
 
     return fig, axs
 
+
 def plot_GP_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
                     save_dir='.', ext='.png'):
     '''Plot my data. Returns fig, ax
@@ -205,8 +213,7 @@ def plot_GP_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
     '''
 
     # Get the figure and axes from the eclipse
-    fig, ax = plot_eclipse(ecl_node, False, figsize, fname, save_dir,
-                ext)
+    fig, ax = plot_eclipse(ecl_node, False, figsize, fname, save_dir, ext)
 
     # Get the residuals of the model
     residuals = ecl_node.lc.y - ecl_node.calcFlux()
@@ -252,6 +259,7 @@ def plot_GP_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
         plt.savefig(fname)
 
     return fig, ax
+
 
 def plot_model(model, show, *args, **kwargs):
     '''Calls the relevant plotter for each eclipse contained in the model.
@@ -303,7 +311,6 @@ def notipy(send_to, fnames, body):
     print("fnames: ")
     for name in fnames:
         print("-> '{}'".format(name))
-
 
     # Who do we send the email to?
     # Also contains email bot login
@@ -446,13 +453,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
     print("After thinning and skipping: {}".format(data.shape))
 
-
     # Create the flattened version of the chain
     chain = data.reshape((-1, npars))
     print("The flattened chain has the shape: {}".format(chain.shape))
 
-    # Analyse the chain. Take the mean as the result, and 2 sigma as the error
-    result = np.mean(chain, axis=0)
+    # Analyse the chain. Take the median as the result, and 2 sigma as the error
     lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
 
     print("Result has the shape: {}".format(result.shape))
@@ -462,9 +467,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     resultDict = {}
     print("Result of the chain:")
     for n, r, lo, up in zip(colKeys, result, lolim, uplim):
-        print("{:>20s} = {:.3f}   +{:.3f}   -{:.3f}".format(n, r, r-lo, up-r))
+        print("{:>20s} = {:.5f}   +{:.5f}   -{:.5f}".format(n, r, r-lo, up-r))
         resultDict[n] = r
-
 
     # # # # # # # # # # # # # # # # # # # # # # # #
     # Use the input file to reconstruct the model #
@@ -508,13 +512,10 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     # Set the parameters of the model to the results of the chain
     for key, value in resultDict.items():
         if key in model.dynasty_par_names:
-            # msg = "Setting parameter {} to the result value of {:.3f}".format(key, value)
-            # print(msg)
-
+            msg = "Setting parameter {} to the result value of {:.3f}".format(key, value)
+            print(msg)
             name, label = extract_par_and_key(key)
-
             model.search_par(label, name).currVal = value
-
 
     # # # # # # # # # # # # # # # # #
     # The model is now fully built. #
@@ -526,23 +527,23 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
+    print(model_report)
 
     if not automated:
         print("Final conditions being plotted now...")
 
     plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
-    if emailme:
+    if emailme and mailer:
         print("Sending a summary email. Corner plots are omitted due to filesize.")
         # Gather the files
         fnames = list(glob.iglob('Final_figs/*.pdf', recursive=True))
         fnames = list(glob.iglob('Final_figs/*.png', recursive=True))
-        fnames = [name for name in fnames if not "corner" in name.lower()]
+        fnames = [name for name in fnames not in "corner" in name.lower()]
 
         notipy(destination, fnames, model_preport+model_report)
 
-
-    print("The chain file has the folloing variables:")
+    print("The chain file has the following variables:")
     for p in colKeys:
         print("-> {}".format(p))
 
@@ -580,7 +581,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             print(labels)
 
             # Get the indexes in the chain file, and gather those columns
-            keys = [colKeys.index(par) for par in par_labels]
+            keys = [colKeys.index(par) for par in labels]
             chain_slice = chain[:, keys]
             print("chain_slice has the shape:", chain_slice.shape)
 
@@ -592,14 +593,13 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             dev[np.where(dev == 0)] = np.nan
             print(dev)
             chain_slice = chain_slice[:, ~np.isnan(dev)]
-            par_labels = [p for p, d in zip(par_labels, dev) if d != np.nan]
-
+            labels = [p for p, d in zip(labels, dev) if d != np.nan]
 
             print("\nAfter checking for immobile variables,My corner plot labels are:")
             print(labels)
             print("chain_slice has the shape:", chain_slice.shape)
 
-            fig = utils.thumbPlot(chain_slice, par_labels)
+            fig = utils.thumbPlot(chain_slice, labels)
 
             oname = "Final_figs/" + eclipse.name + '_corners.png'
             print("Saving to {}...".format(oname))
@@ -672,7 +672,7 @@ if __name__ == "__main__":
     thin = args.thin
 
     destination = args.notify
-    automated=bool(args.quiet)
+    automated = bool(args.quiet)
     corners = args.corners
 
     fit_summary(chain_fname, input_fname, nskip, thin, destination, automated=automated, corners=corners)
