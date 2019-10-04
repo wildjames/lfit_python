@@ -168,27 +168,28 @@ class Watcher():
             self.par_sliders.append(slider)
 
         self.par_sliders_complex = []
-        for name, title in complex_parDesc.items():
-            title = complex_parDesc[name]
-            param = self.parDict[name]
-            print("Slider: {}".format(title))
-            print(" -> value, lower limit, upper limit: {}\n".format(param))
+        if self.complex:
+            for name, title in complex_parDesc.items():
+                title = complex_parDesc[name]
+                param = self.parDict[name]
+                print("Slider: {}".format(title))
+                print(" -> value, lower limit, upper limit: {}\n".format(param))
 
-            slider = Slider(
-                name  = name,
-                title = title,
-                start = param[1],
-                end   = param[2],
-                value_throttled = param[0],
-                value = param[0],
-                step  = (param[2] - param[1]) / 100,
-                width = 200,
-                format='0.0000',
-                callback_throttle=50,
-                callback_policy='mouseup'
-            )
+                slider = Slider(
+                    name  = name,
+                    title = title,
+                    start = param[1],
+                    end   = param[2],
+                    value_throttled = param[0],
+                    value = param[0],
+                    step  = (param[2] - param[1]) / 100,
+                    width = 200,
+                    format='0.0000',
+                    callback_throttle=50,
+                    callback_policy='mouseup'
+                )
 
-            self.par_sliders_complex.append(slider)
+                self.par_sliders_complex.append(slider)
 
         self.par_sliders_GP = []
         for name, title in GP_parDesc.items():
