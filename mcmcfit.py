@@ -30,19 +30,20 @@ def ln_prior(param_vector, model):
     val = model.ln_prior()
     return val
 
+
 def ln_prob(param_vector, model):
     model.dynasty_par_vals = param_vector
     val = model.ln_prob()
     return val
+
 
 def ln_like(param_vector, model):
     model.dynasty_par_vals = param_vector
     val = model.ln_like()
     return val
 
-if __name__ in '__main__':
 
-    np.random.seed = 432
+if __name__ in '__main__':
 
     # Set up the parser.
     parser = argparse.ArgumentParser(
@@ -76,7 +77,7 @@ if __name__ in '__main__':
             rmtree("DEBUGGING")
 
     # I want to pre-check that the details have been supplied.
-    if dest is not '':
+    if dest != '':
         location = __file__.split('/')[:-1] + ["email_details.json"]
         details_loc = '/'.join(location)
         if not os.path.isfile(details_loc):
@@ -96,35 +97,33 @@ if __name__ in '__main__':
             print("Don't panic, just complete the JSON file here:")
             print("{}".format(details_loc))
 
-
     # Build the model from the input file
     model = construct_model(input_fname, debug)
 
     print("\nStructure:")
     pprint(model.structure)
 
-
     input_dict = configobj.ConfigObj(input_fname)
 
     # Read in information about mcmc
-    nburn          = int(input_dict['nburn'])
-    nprod          = int(input_dict['nprod'])
-    nthreads       = int(input_dict['nthread'])
-    nwalkers       = int(input_dict['nwalkers'])
-    ntemps         = int(input_dict['ntemps'])
-    scatter_1      = float(input_dict['first_scatter'])
-    scatter_2      = float(input_dict['second_scatter'])
-    to_fit         = int(input_dict['fit'])
-    use_pt         = bool(int(input_dict['usePT']))
-    double_burnin  = bool(int(input_dict['double_burnin']))
-    comp_scat      = bool(int(input_dict['comp_scat']))
+    nburn = int(input_dict['nburn'])
+    nprod = int(input_dict['nprod'])
+    nthreads = int(input_dict['nthread'])
+    nwalkers = int(input_dict['nwalkers'])
+    ntemps = int(input_dict['ntemps'])
+    scatter_1 = float(input_dict['first_scatter'])
+    scatter_2 = float(input_dict['second_scatter'])
+    to_fit = int(input_dict['fit'])
+    use_pt = bool(int(input_dict['usePT']))
+    double_burnin = bool(int(input_dict['double_burnin']))
+    comp_scat = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
     try:
         neclipses = int(input_dict['neclipses'])
     except KeyError:
-        neclipses = len(model.search_node_type("Eclipses"))
+        neclipses = len(model.search_node_type("Eclipse"))
         print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
@@ -230,7 +229,6 @@ if __name__ in '__main__':
         # Create another array for second burn-in
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
 
-
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
     mp.set_start_method("forkserver")
@@ -249,7 +247,6 @@ if __name__ in '__main__':
                                   loglargs=(model,),
                                   logpargs=(model,),
                                   pool=pool)
-                                #   threads=nthreads)
     else:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
@@ -259,8 +256,6 @@ if __name__ in '__main__':
                                         ln_prob,
                                         args=(model,),
                                         pool=pool)
-                                        # threads=nthreads)
-
 
     # Run the burnin phase
     print("\n\nExecuting the burn-in phase...")
@@ -280,7 +275,6 @@ if __name__ in '__main__':
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
-
 
     # Now, reset the sampler. We'll use the result of the burn-in phase to
     # re-initialise it.
