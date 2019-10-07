@@ -214,7 +214,26 @@ if __name__ in '__main__':
             'yaw':    10,
             'tilt':   2,
         }
-
+        scat_fract = {
+            'q':      1,
+            'rwd':    1,
+            'dphi':   0.2,
+            'dFlux':  1,
+            'sFlux':  1,
+            'wdFlux': 1,
+            'rsFlux': 1,
+            'rdisc':  1,
+            'ulimb':  1e-6,
+            'scale':  1,
+            'fis':    1,
+            'dexp':   1,
+            'phi0':   1,
+            'az':     1,
+            'exp1':   1,
+            'exp2':   1,
+            'yaw':    1,
+            'tilt':   1,
+        }
         for par_i, name in enumerate(model.dynasty_par_names):
             # Get the parameter of this parName, striping off the node encoding
             key, _ = extract_par_and_key(name)
