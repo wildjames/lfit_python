@@ -217,7 +217,7 @@ if __name__ == "__main__":
     parser.add_argument('file', action='store', help='input file from MCMC run')
     parser.add_argument('twd', action='store', type=float, help='white dwarf temperature (K)')
     parser.add_argument('e_twd', action='store', type=float, help='error on wd temp')
-    parser.add_argument('p', action='store', ype=float, help='orbital period (days)')
+    parser.add_argument('p', action='store', type=float, help='orbital period (days)')
     parser.add_argument('e_p', action='store', type=float, help='error on period')
     parser.add_argument('--thin', '-t', type=int, help='amount to thin MCMC chain by', default=1)
     parser.add_argument('--nthreads', '-n', type=int, help='number of threads to run', default=6)
