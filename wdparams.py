@@ -9,6 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate as interp
 import seaborn
+from past.utils import old_div
+
+from mcmc_utils import (flatchain, readchain_dask, readflatchain,
+                        run_burnin, run_mcmc_save, thumbPlot)
+from model import Param
+
 
 from mcmc_utils import (flatchain, readchain_dask, readflatchain,
                         run_burnin, run_mcmc_save, thumbPlot)
@@ -61,7 +67,6 @@ class wdModel(MutableSequence):
         else:
             return 1000./self.plax.currVal
 
-
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
     # Reads in input file and splits it into lines
@@ -72,7 +77,6 @@ def parseInput(file):
         k, v = line.split('=')
         input_dict[k.strip()] = v.strip()
     return input_dict
-
 
 def model(thisModel, mask):
     t, g, p, ebv = thisModel
@@ -132,7 +136,7 @@ def ln_prior(thisModel):
     param = thisModel.ebv
     lnp += param.prior.ln_prob(param.currVal)
     return lnp
-
+  
 
 def chisq(thisModel, y, e, mask):
     m = model(thisModel, mask)
@@ -149,7 +153,6 @@ def ln_likelihood(thisModel, y, e, mask):
 
 
 def ln_prob(pars, thisModel, y, e, mask):
-
     # first we update the model to use the pars suggested by the MCMC chain
     for i in range(thisModel.npars):
         thisModel[i] = pars[i]
@@ -160,7 +163,6 @@ def ln_prob(pars, thisModel, y, e, mask):
         return lnp + ln_likelihood(thisModel, y, e, mask)
     else:
         return lnp
-
 
 class Flux(object):
     def __init__(self, val, err, band):
@@ -197,7 +199,6 @@ def plotFluxes(fluxes, fluxes_err, mask, model):
 
     # A_x/E(B-V) extinction from Cardelli (1989)
     # Where are these values from?? (KG5 estimated)
-
     ext = ebv*np.array([5.155, 3.793, 2.751, 2.086, 1.479, 3.5])
     dmod = 5.0*np.log10(d/10)
     app_red_mags = abs_mags + ext + dmod
@@ -342,6 +343,7 @@ if __name__ == "__main__":
     parser.add_argument('file', action='store', help="input file")
     parser.add_argument('--summarise', dest='summarise', action='store_true',
                         help='Summarise existing chain file without running a new fit.')
+    parser.add_argument('--no-chain', dest='nochain', action='store_true', help='No chain file is being used')
 
     args = parser.parse_args()
 
@@ -350,6 +352,7 @@ if __name__ == "__main__":
     summarise = args.summarise
     if summarise:
         print("I will NOT run a fit, but just re-create the output figures!")
+    nochain = args.nochain
 
     # Read information about mcmc, priors, neclipses, sys err
     nburn = int(input_dict['nburn'])
@@ -366,30 +369,35 @@ if __name__ == "__main__":
     ebv = Param.fromString('ebv', input_dict['ebv'])
 
     syserr = float(input_dict['syserr'])
-
-    chain_file = input_dict['chain']
+    if not nochain:
+        chain_file = input_dict['chain']
     flat = int(input_dict['flat'])
 
     # # # # # # # # # # # #
     # Load in chain file  #
     # # # # # # # # # # # #
-    print("Reading in the chain file,", chain_file)
-    if flat:
-        with open(chain_file, 'r') as f:
-            colKeys = f.readline().strip().split()[1:]
-        fchain = readflatchain(chain_file)
+    if nochain:
+        colKeys = []
+        fchain = []
+        filters = []
     else:
-        with open(chain_file, 'r') as f:
-            colKeys = f.readline().strip().split()[1:]
-        chain = readchain_dask(chain_file)
-        print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
-        fchain = flatchain(chain, thin=thin)
-    print("Done!")
+        print("Reading in the chain file,", chain_file)
+        if flat:
+            with open(chain_file, 'r') as f:
+                colKeys = f.readline().strip().split()[1:]
+            fchain = readflatchain(chain_file)
+        else:
+            with open(chain_file, 'r') as f:
+                colKeys = f.readline().strip().split()[1:]
+            chain = readchain_dask(chain_file)
+            print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
+            fchain = flatchain(chain, thin=thin)
+        print("Done!")
 
-    # Get the filters used from the column headers
-    filters = [key.lower() for key in colKeys if key.startswith("wdFlux_")]
-    filters = np.array(filters)
-    print("I have the following filters:\n", filters)
+        # Get the filters used from the column headers
+        filters = [key.lower() for key in colKeys if key.startswith("wdFlux_")]
+        filters = np.array(filters)
+        print("I have the following filters:\n", filters)
 
     # Create arrays to be filled with all wd fluxes and mags
     fluxes = [0, 0, 0, 0, 0, 0]
@@ -403,29 +411,7 @@ if __name__ == "__main__":
     # e.g. when it is of poor quality
     # For this reason, a uband wd flux and error can be input manually
     uband_used = False
-    if "wdFlux_u" not in colKeys:
-        while True:
-            mode = input('Add seperate u band wd flux and error? (Y/N): ')
-            if mode.upper() == 'Y' or mode.upper() == 'N':
-                break
-            else:
-                print("Please answer Y or N ")
-
-        if mode.upper() == "Y":
-            uflux_in, uflux_err_in = input('Enter uband wd flux and error: ').split()
-            uflux_in = float(uflux_in)
-            uflux_err_in = float(uflux_err_in)
-            uflux = uflux_in
-            uflux_err = np.sqrt(uflux_err_in**2 + (uflux*syserr)**2)
-            fluxes[0] = uflux
-            fluxes_err[0] = uflux_err
-            umag = Flux(uflux, uflux_err, 'u')
-            mags[0] = umag
-            print((uflux, uflux_err))
-            uband_used = True
-
-    # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
-    else:
+    if "wdFlux_u" in colKeys:
         index = colKeys.index('wdFlux_u')
         uband = fchain[:, index]
         uband = np.array([uband])
@@ -437,6 +423,21 @@ if __name__ == "__main__":
         umag = Flux(uflux, uflux_err, 'u')
         mags[0] = umag
         uband_used = True
+    else:
+        uband_used = False
+        print("Manually enter u' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            uflux = float(input("Enter u' flux: "))
+            uflux_err = float(input("Enter u' err: "))
+            uflux_err = np.sqrt(uflux_err**2 + (uflux*syserr)**2)
+
+            fluxes[0] = uflux
+            fluxes_err[0] = uflux_err
+
+            umag = Flux(uflux,uflux_err,'u')
+            mags[0] = umag
+            uband_used = True
 
     if 'wdFlux_g' in colKeys:
         index = colKeys.index('wdFlux_g')
@@ -446,13 +447,26 @@ if __name__ == "__main__":
         gflux_err = np.sqrt((np.std(gband))**2 + (gflux*syserr)**2)
         fluxes[1] = gflux
         fluxes_err[1] = gflux_err
-
         gmag = Flux(gflux, gflux_err, 'g')
         mags[1] = gmag
 
         gband_used = True
     else:
         gband_used = False
+        print("Manually enter g' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            gflux = float(input("Enter g' flux: "))
+            gflux_err = float(input("Enter g' err: "))
+            gflux_err = np.sqrt(gflux_err**2 + (gflux*syserr)**2)
+            fluxes[1] = gflux
+            fluxes_err[1] = gflux_err
+
+            gmag = Flux(gflux,gflux_err,'g')
+            mags[1] = gmag
+
+            gband_used = True
+
 
     if 'wdFlux_r' in colKeys:
         index = colKeys.index('wdFlux_r')
@@ -463,13 +477,26 @@ if __name__ == "__main__":
         rflux_err = np.sqrt((np.std(rband))**2 + (rflux*syserr)**2)
         fluxes[2] = rflux
         fluxes_err[2] = rflux_err
-
         rmag = Flux(rflux, rflux_err, 'r')
         mags[2] = rmag
 
         rband_used = True
     else:
         rband_used = False
+        print("Manually enter r' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            rflux = float(input("Enter r' flux: "))
+            rflux_err = float(input("Enter r' err: "))
+            rflux_err = np.sqrt(rflux_err**2 + (rflux*syserr)**2)
+            fluxes[2] = rflux
+            fluxes_err[2] = rflux_err
+
+            rmag = Flux(rflux,rflux_err,'r')
+            mags[2] = rmag
+
+            rband_used = True
+
 
     if 'wdFlux_i' in colKeys:
         index = colKeys.index('wdFlux_i')
@@ -487,6 +514,20 @@ if __name__ == "__main__":
         iband_used = True
     else:
         iband_used = False
+        print("Manually enter i' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            iflux = float(input("Enter i' flux: "))
+            iflux_err = float(input("Enter i' err: "))
+            iflux_err = np.sqrt(iflux_err**2 + (iflux*syserr)**2)
+            fluxes[3] = iflux
+            fluxes_err[3] = iflux_err
+
+            imag = Flux(iflux,iflux_err,'i')
+            mags[3] = imag
+
+            iband_used = True
+
 
     if 'wdFlux_z' in colKeys:
         index = colKeys.index('wdFlux_z')
@@ -497,14 +538,26 @@ if __name__ == "__main__":
         zflux_err = np.sqrt((np.std(zband))**2 + (zflux*syserr)**2)
         fluxes[4] = zflux
         fluxes_err[4] = zflux_err
-
         zmag = Flux(zflux, zflux_err, 'z')
         mags[4] = zmag
 
         zband_used = True
     else:
         zband_used = False
+        print("Manually enter z' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            zflux = float(input("Enter z' flux: "))
+            zflux_err = float(input("Enter z' err: "))
+            zflux_err = np.sqrt(zflux_err**2 + (zflux*syserr)**2)
+            fluxes[4] = zflux
+            fluxes_err[4] = zflux_err
 
+            zmag = Flux(zflux,zflux_err,'z')
+            mags[4] = zmag
+
+            zband_used = True
+            
     if 'wdFlux_kg5' in colKeys:
         index = colKeys.index('wdFlux_kg5')
         kg5band = fchain[:, index]
@@ -514,13 +567,26 @@ if __name__ == "__main__":
         kg5flux_err = np.sqrt((np.std(kg5band))**2 + (kg5flux*syserr)**2)
         fluxes[5] = kg5flux
         fluxes_err[5] = kg5flux_err
-
         kg5mag = Flux(kg5flux, kg5flux_err, 'kg5')
         mags[5] = kg5mag
 
         kg5band_used = True
     else:
         kg5band_used = False
+
+        print("Manually enter kg5' band? y/n")
+        cont = input("> ")
+        if 'y' in cont.lower():
+            kg5flux = float(input("Enter kg5' flux: "))
+            kg5flux_err = float(input("Enter kg5' err: "))
+            kg5flux_err = np.sqrt(kg5flux_err**2 + (kg5flux*syserr)**2)
+            fluxes[5] = kg5flux
+            fluxes_err[5] = kg5flux_err
+
+            kg5mag = Flux(kg5flux,kg5flux_err,'kg5')
+            mags[5] = kg5mag
+
+            kg5band_used = True
 
     # Arrays containing all fluxes and errors
     fluxes = np.array(fluxes)
@@ -594,7 +660,6 @@ if __name__ == "__main__":
     if toFit:
         guessP = np.array(myModel)
         nameList = ['Teff', 'log_g', 'Parallax', 'E(B-V)']
-
         p0 = emcee.utils.sample_ball(guessP, scatter*guessP, size=nwalkers)
         sampler = emcee.EnsembleSampler(
             nwalkers,

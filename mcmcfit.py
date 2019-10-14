@@ -21,7 +21,7 @@ import numpy as np
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
-
+import plotCV
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -67,10 +67,17 @@ if __name__ in '__main__':
         action='store_true'
     )
 
+    parser.add_argument(
+        "--quiet",
+        help="Do not plot the initial conditions",
+        action="store_true"
+    )
+
     args = parser.parse_args()
     input_fname = args.input
     dest = args.notify
     debug = args.debug
+    quiet = args.quiet
 
     if debug:
         if os.path.isdir("DEBUGGING"):
@@ -159,15 +166,12 @@ if __name__ in '__main__':
         exit()
 
     # If we're not running the fit, plot our stuff.
-    if not to_fit:
-        import plotCV
-
+    if not quiet:
         plotCV.nxdraw(model)
-
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
-
-        exit()
-
+    if not to_fit:
+      exit()
+      
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #
     #  The below plugs the above into emcee's relevant functions  #
@@ -195,26 +199,6 @@ if __name__ in '__main__':
     if comp_scat:
         # scatter factors. p0_scatter_1 will be multiplied by these:
         scat_fract = {
-            'q':      2,
-            'rwd':    1,
-            'dphi':   0.2,
-            'dFlux':  2,
-            'sFlux':  2,
-            'wdFlux': 2,
-            'rsFlux': 2,
-            'rdisc':  2,
-            'ulimb':  1e-6,
-            'scale':  3,
-            'fis':    3,
-            'dexp':   3,
-            'phi0':   20,
-            'az':     2,
-            'exp1':   5,
-            'exp2':   5,
-            'yaw':    10,
-            'tilt':   2,
-        }
-        scat_fract = {
             'q':      1,
             'rwd':    1,
             'dphi':   0.2,
@@ -234,6 +218,7 @@ if __name__ in '__main__':
             'yaw':    1,
             'tilt':   1,
         }
+
         for par_i, name in enumerate(model.dynasty_par_names):
             # Get the parameter of this parName, striping off the node encoding
             key, _ = extract_par_and_key(name)
@@ -333,6 +318,5 @@ if __name__ in '__main__':
             f.write(s)
         f.write('\n')
 
-    from plotCV import fit_summary
-    fit_summary('chain_prod.txt', input_fname, destination=dest,
-                automated=True)
+    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
+                       automated=True)

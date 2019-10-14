@@ -3,7 +3,6 @@ Base classes for the MCMC fitting routine. Allows the creation of a
 hierarchical model structure, that can also track the prior knowledge of the
 parameters of that model.
 '''
-
 import sys
 import os
 import warnings
@@ -226,7 +225,9 @@ class Node:
         parameter_objects = list(parameter_objects)
 
         # Make sure our label is valid
-        assert isinstance(label, str), "Label must be a string!"
+        if not isinstance(label, str):
+            raise TypeError("Label must be a string, not {}".format(type(label)))
+
         self.label = label
 
         # Check that the user defined their parameter names!
@@ -296,7 +297,7 @@ class Node:
             The node that was requested.
         '''
         self.log('base.search_Node', "Searching for a Node of class type {}, with a label {}".format(class_type, label))
-        if self.name == "{}:{}".format(class_type, label):
+        if self.name == "{}_{}".format(class_type, label):
             self.log('base.search_Node', "I am that node. Returning self")
             return self
         else:
@@ -602,7 +603,7 @@ class Node:
     @property
     def name(self):
         '''The name of this object, of the form <class name>_<label>'''
-        return "{}:{}".format(self.__class__.__name__, self.label)
+        return "{}_{}".format(self.__class__.__name__, self.label)
 
     @property
     def parent(self):
@@ -754,7 +755,7 @@ class Node:
         print("Reporting family tree of {}:".format(self.name))
         try:
             parent = self.parent.name
-        except:
+        except AttributeError:
             parent = 'None'
         print("    Parent: {}".format(parent))
         print("    Children:")

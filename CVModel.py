@@ -140,8 +140,7 @@ class SimpleEclipse(Node):
           (tot_flx, wdFlux, sFlux, rsFlux, dFlux)
         '''
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
-
-        return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.ywd
+        return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.yd
 
     def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''
@@ -179,7 +178,7 @@ class SimpleEclipse(Node):
         self.log("SimpleEclipse.ln_like", "Returning a ln_like of {}".format(-0.5*chisq))
         return -0.5 * chisq
 
-    def ln_prior(self, verbose, *args, **kwargs):
+    def ln_prior(self, verbose=False, *args, **kwargs):
         '''At the eclipse level, three constrains must be validated for each
         leaf of the tree.
 
@@ -250,6 +249,7 @@ class SimpleEclipse(Node):
 
             self.log("SimpleEclipse.ln_prior",
                      "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
+
             return -np.inf
 
         ##############################################
@@ -286,6 +286,7 @@ class SimpleEclipse(Node):
         except:
             if verbose:
                 print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
+
             self.log("SimpleEclipse.ln_prior",
                      "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
             return -np.inf
@@ -314,8 +315,15 @@ class SimpleEclipse(Node):
         par_name_list = self.cv_parnames
 
         param_dict = self.ancestor_param_dict
-
-        parlist = [param_dict[key].currVal for key in par_name_list]
+        try:
+            parlist = [param_dict[key].currVal for key in par_name_list]
+        except KeyError as error:
+            print("Parameter dict:")
+            print("{")
+            for key, val in param_dict.items():
+                print("    {}: {}".format(key, val))
+            print("}")
+            raise error
 
         self.log("SimpleEclipse.cv_parlist", "Constructed a cv_parlist of:\n{}".format(parlist))
 
@@ -342,7 +350,7 @@ class ComplexEclipse(SimpleEclipse):
         The children of this node. Single Node is also accepted
     '''
     node_par_names = (
-                'dFlux', 'sFlux', 'ulimb', 'rdisc',
+                'dFlux', 'sFlux', 'rdisc',
                 'scale', 'az', 'fis', 'dexp', 'phi0',
                 'exp1', 'exp2', 'yaw', 'tilt'
             )
@@ -376,7 +384,7 @@ class Band(Node):
     '''
 
     # What kind of parameters are we storing here?
-    node_par_names = ('wdFlux', 'rsFlux')
+    node_par_names = ('wdFlux', 'rsFlux', 'ulimb')
 
 
 class LCModel(Node):
@@ -431,8 +439,7 @@ class LCModel(Node):
                     print(msg)
                 self.log('LCModel.ln_prior', "dphi is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
-
-        except:
+        except roche.RocheError:
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
@@ -724,6 +731,13 @@ def construct_model(input_file, debug=False):
         # Read in all the available eclipses
         neclipses = 9999
 
+    if debug:
+        print("Input Dict yielded the following immediately interesting params:")
+        print("is_complex: ", is_complex)
+        print("use_gp: ", use_gp)
+        print("neclipses: ", neclipses)
+        print()
+
     # # # # # # # # # # # # # # # # #
     # Get the initial model setup # #
     # # # # # # # # # # # # # # # # #
@@ -733,6 +747,11 @@ def construct_model(input_file, debug=False):
         core_par_names = GPLCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
+        if debug:
+            print("Using the GP!")
+            print("Core params:")
+            for par, val in zip(core_par_names, core_pars):
+                print("  -> par: {:<10s}  --  value: {:.3f}".format(par, val.currVal))
 
         # and make the model object with no children
         model = GPLCModel('core', core_pars, DEBUG=debug)
@@ -740,6 +759,12 @@ def construct_model(input_file, debug=False):
         core_par_names = LCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
+
+        if debug:
+            print("Not using the GP!")
+            print("Core params:")
+            for par, val in zip(core_par_names, core_pars):
+                print("  -> par: {:<10s}  --  value: {:.3f}".format(par, val.currVal))
 
         # and make the model object with no children
         model = LCModel('core', core_pars, DEBUG=debug)
@@ -750,12 +775,18 @@ def construct_model(input_file, debug=False):
 
     # Collect the bands and their params. Add them total model.
     band_par_names = Band.node_par_names
+    if debug:
+        print("\nThe bands have these parameters: {}".format(band_par_names))
 
     # Use the Eclipse class to find the parameters we're interested in
     if is_complex:
         ecl_pars = ComplexEclipse.node_par_names
+        if debug:
+            print("Using the complex BS model")
     else:
         ecl_pars = SimpleEclipse.node_par_names
+        if debug:
+            print("Using the simple BS model")
 
     # I care about the order in which eclipses and bands are defined.
     # Collect that order here.
@@ -781,6 +812,12 @@ def construct_model(input_file, debug=False):
                     _, key = extract_par_and_key(key)
                     if key not in defined_eclipses:
                         defined_eclipses.append(key)
+                        
+    if debug:
+        print("\nI found the following bands defined in the input dict:")
+        print(defined_bands)
+        print("\nI found the following eclipses defined in the input dict:")
+        print(defined_eclipses)
 
     # Collect the band params into their Band objects.
     for label in defined_bands:
@@ -797,6 +834,17 @@ def construct_model(input_file, debug=False):
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
+
+        if debug:
+            print("Added the band labelled {} to the model".format(label))
+            print("Band params:")
+            for par, val in zip(band_par_names, band_pars):
+                print("  -> Par: {:>10s}  --- value: {:.3f}".format(par, val.currVal))
+
+    if debug:
+        print("The model has the following bands:")
+        for band in model.children:
+            print("  -> {}".format(band.name))
 
     # # # # # # # # # # # # # # # # #
     # # Finally, get the eclipses # #
@@ -820,8 +868,16 @@ def construct_model(input_file, debug=False):
         lc.trim(lo, hi)
 
         # Get the band object that this eclipse belongs to
-        my_band = input_dict['band_{}'.format(label)]
-        my_band = model.search_Node('Band', my_band)
+        my_band_label = input_dict['band_{}'.format(label)]
+        my_band = model.search_Node('Band', my_band_label)
+
+        if debug:
+            print("\nThe eclipse labelled {}:".format(label))
+            print("  -> Lightcurve file: {}".format(lc_fname))
+            print("  -> Band: {}".format(my_band.name))
+            print("Band params:")
+            for par in params:
+                print("  -> Par: {:>10s}  --- value: {:.3f}".format(par.name, par.currVal))
 
         if use_gp:
             if is_complex:

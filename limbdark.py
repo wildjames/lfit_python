@@ -18,6 +18,7 @@ from scipy.interpolate import (RectBivariateSpline, SmoothBivariateSpline,
 def ld (band,logg,teff,law='linear'):
     assert band in ['u','g','r','i','z']
     assert law in ['linear','quad','sqr']
+
     filename = '/'.join(__file__.split('/')[:-1])
     filename += '/Gianninas13/ld_coeffs_%s.txt' % band
     data=np.loadtxt(filename)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import argparse
 import os
 from functools import partial
@@ -13,13 +12,6 @@ from scipy import interpolate as interp
 from scipy.optimize import brentq
 from trm import roche
 from mcmc_utils import readchain_dask, readflatchain, flatchain
-
-# see if our astropy version supports quantities or not
-quantitySupport = True
-try:
-    from astropy.table import QTable
-except:
-    quantitySupport = False
 
 
 def read_wood_file(filename):
@@ -71,7 +63,7 @@ def panei_mr(targetTemp, baseDir):
     f2 = lambda x: func(targetTemp, x)[0]
     return f2
 
-
+  
 def wood_mr(targetTemp, baseDir):
     '''given a target temp, returns a function giving
         radius as a function of mass.
@@ -110,11 +102,11 @@ def find_wdmass(wdtemp, scaled_mass, rw_a, baseDir, model='hamada'):
 
         this routine finds the white dwarf mass where these estimates agree, if
         one exists.'''
-
     assert model in ['hamada', 'wood', 'panei'], "Model %s not recognised" % model
     limits = {'hamada': [0.14, 1.44],
               'wood': [0.4, 1.0],
               'panei': [0.4, 1.2]}
+
     mlo, mhi = limits[model]
 
     if model == 'hamada':
@@ -204,7 +196,6 @@ def solve(input_data, baseDir):
         data = (q, mw, rw_a*a, mr, r2, a, kw, kr, inc)
         if not quantitySupport:
             data = [getval(datum) for datum in data]
-
         return data
     else:
         return None
@@ -230,10 +221,15 @@ if __name__ == "__main__":
     flat = args.flat
     baseDir = args.dir
 
+    if baseDir is None:
+        print("Using the script location as the WD model files location")
+        baseDir = os.path.split(__file__)[0]
+    print("baseDir: {}".format(baseDir))
+
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = readflatchain(file)
+        fchain = utils.readflatchain(file)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
@@ -250,9 +246,16 @@ if __name__ == "__main__":
     dphiVals = fchain[:, nameList.index('dphi_core')]
     rwVals = fchain[:, nameList.index('rwd_core')]
     chainLength = len(qVals)
+    print("The chain contains {} samples".format(chainLength))
+
+    print("Means; ")
+    print("  q: {:.3f}".format(np.mean(qVals)))
+    print("  dphi: {:.3f}".format(np.mean(dphiVals)))
+    print("  rwd: {:.3f}".format(np.mean(rwVals)))
 
     # white dwarf temp
     twdVals = np.random.normal(loc=args.twd, scale=args.e_twd, size=chainLength)*units.K
+
     # period
     pVals = np.random.normal(loc=args.p, scale=args.e_p, size=chainLength)*units.d
 
@@ -277,4 +280,4 @@ if __name__ == "__main__":
             results.add_row(thisResult)
 
     print('Found solutions for %d percent of samples in MCMC chain' % (100*float(len(results))/float(chainLength)))
-    results.write('physicalparams.log', format='ascii.commented_header')
+    results.write('physicalparams.log', format='ascii.commented_header', overwrite=True)

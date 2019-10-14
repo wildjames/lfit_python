@@ -1,30 +1,20 @@
-import json
-import sys
-import time
-from os import getcwd, path
+from os import getcwd
 
-import bokeh as bk
 import configobj
-import george as g
 import numpy as np
-from bokeh.layouts import Spacer, column, gridplot, layout, row
-from bokeh.models import Band, ColumnDataSource, Span, Whisker
-from bokeh.models.annotations import Title
-from bokeh.models.widgets import (DataTable, Dropdown, Panel, Slider,
-                                  TableColumn, Tabs, TextInput, inputs,
-                                  markups, tables)
+from bokeh.layouts import Spacer, column, gridplot, row
+from bokeh.models import ColumnDataSource, Span, Band
+from bokeh.models.widgets import Dropdown, Panel, Slider, Tabs, markups
 from bokeh.models.widgets.buttons import Button, Toggle
 from bokeh.plotting import curdoc, figure
-from bokeh.server.callbacks import NextTickCallback
-from pandas import DataFrame, read_csv
+from pandas import DataFrame
 
+import george as g
 from CVModel import construct_model
 
 try:
     from lfit import CV
     print("Successfully imported CV class from lfit!")
-    import mcmc_utils as u
-    print("Successfully imported mcmc_utils")
     from trm import roche
     print("Successfully imported trm.roche!")
 except ImportError:
@@ -66,8 +56,8 @@ class Watcher():
             - Start watching for the creation of the chain file
         '''
         #TODO:
-        # - Make a parameter tweaker, based on the new model
-        # -
+        # - Parameter reporting table
+        # - Physcial params corresponding to params?
 
         #####################################################
         ############### Information Gathering ###############
@@ -81,6 +71,7 @@ class Watcher():
 
         # Parse the mcmc_input file
         self.parse_mcmc_input()
+        self.init_data_storage()
 
         # Create the model inspector tab
         self.create_model_inspector_tab()
@@ -168,28 +159,27 @@ class Watcher():
             self.par_sliders.append(slider)
 
         self.par_sliders_complex = []
-        if self.complex:
-            for name, title in complex_parDesc.items():
-                title = complex_parDesc[name]
-                param = self.parDict[name]
-                print("Slider: {}".format(title))
-                print(" -> value, lower limit, upper limit: {}\n".format(param))
+        for name, title in complex_parDesc.items():
+            title = complex_parDesc[name]
+            param = self.parDict[name]
+            print("Slider: {}".format(title))
+            print(" -> value, lower limit, upper limit: {}\n".format(param))
 
-                slider = Slider(
-                    name  = name,
-                    title = title,
-                    start = param[1],
-                    end   = param[2],
-                    value_throttled = param[0],
-                    value = param[0],
-                    step  = (param[2] - param[1]) / 100,
-                    width = 200,
-                    format='0.0000',
-                    callback_throttle=50,
-                    callback_policy='mouseup'
-                )
+            slider = Slider(
+                name  = name,
+                title = title,
+                start = param[1],
+                end   = param[2],
+                value_throttled = param[0],
+                value = param[0],
+                step  = (param[2] - param[1]) / 100,
+                width = 200,
+                format='0.0000',
+                callback_throttle=50,
+                callback_policy='mouseup'
+            )
 
-                self.par_sliders_complex.append(slider)
+            self.par_sliders_complex.append(slider)
 
         self.par_sliders_GP = []
         for name, title in GP_parDesc.items():
@@ -248,38 +238,12 @@ class Watcher():
         self.GP_button.on_click(self.update_GP)
         print("Made the GP button...")
 
-        print("Grabbing the observations...")
-        # Grab the data from the file, to start with just use the first in the list
-        self.lc_obs = {}
-        self.lc_obs['phase'] = self.current_eclipse.lc.x
-        self.lc_obs['flux']  = self.current_eclipse.lc.y
-        self.lc_obs['err']  = self.current_eclipse.lc.ye
-
-        self.lc_obs = DataFrame(self.lc_obs)
-        self.lc_obs.dropna(inplace=True, axis='index', how='any')
-
-        # Total model lightcurve
-        self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['res']   = np.zeros_like(self.lc_obs['phase'])
-        # Components
-        self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['disc']  = np.zeros_like(self.lc_obs['phase'])
-        # GP
-        self.lc_obs['GP_up'] = np.zeros_like(self.lc_obs['phase'])
-        self.lc_obs['GP_lo'] = np.zeros_like(self.lc_obs['phase'])
-
-        print("Read in the observation, with the shape {}".format(self.lc_obs.shape))
-
-        # Whisker can only take the ColumnDataSource, not the pandas array
-        self.lc_obs = ColumnDataSource(self.lc_obs)
-
-
         print("Creating the LC plot...", end='')
         # Initialise the figure
-        title = menu[0][0]
-        self.lc_plot = bk.plotting.figure(title=title, plot_height=500, plot_width=1200,
+        fname = self.current_eclipse.lc.name
+        band_name = self.current_eclipse.parent.label
+        title_text = "{} --- Band: {}".format(fname, band_name)
+        self.lc_plot = figure(title=title_text, plot_height=500, plot_width=1200,
             toolbar_location='above', y_axis_location="left", x_axis_location=None)
 
         # Plot the lightcurve data
@@ -373,11 +337,39 @@ class Watcher():
         self.inspector_tab = Panel(child=inspector_layout, title="Lightcurve Inspector")
         print("Constructed the Lightcurve Inspector tab!")
 
+    def init_data_storage(self):
+        print("Grabbing the observations...")
+        # Grab the data from the file, to start with just use the first in the list
+        self.lc_obs = {}
+        self.lc_obs['phase'] = self.current_eclipse.lc.x
+        self.lc_obs['flux']  = self.current_eclipse.lc.y
+        self.lc_obs['err']  = self.current_eclipse.lc.ye
+
+        self.lc_obs = DataFrame(self.lc_obs)
+        self.lc_obs.dropna(inplace=True, axis='index', how='any')
+
+        # Total model lightcurve
+        self.lc_obs['calc']  = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['res']   = np.zeros_like(self.lc_obs['phase'])
+        # Components
+        self.lc_obs['sec']   = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['bspot'] = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['wd']    = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['disc']  = np.zeros_like(self.lc_obs['phase'])
+        # GP
+        self.lc_obs['GP_up'] = np.zeros_like(self.lc_obs['phase'])
+        self.lc_obs['GP_lo'] = np.zeros_like(self.lc_obs['phase'])
+
+        print("Read in the observation, with the shape {}".format(self.lc_obs.shape))
+
+        # Whisker can only take the ColumnDataSource, not the pandas array
+        self.lc_obs = ColumnDataSource(self.lc_obs)
+
     def make_header(self):
         '''Update the text at the top of the first tab to reflect mcmc_input, and the user defined stuff.'''
 
         header  = "I'm working from the directory: <b>{}</b></br>".format(getcwd())
-        header +=  'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
+        header += 'This chain has <b>{:,d}</b> burn steps, and <b>{:,d}</b> product steps.</br>'.format(
             self.nBurn, self.nProd)
         header += " We're using <b>{:,d}</b> walkers,".format(self.nWalkers)
 
@@ -729,10 +721,12 @@ class Watcher():
 
         print("\nSet the plotting area title")
         fname = self.current_eclipse.lc.name
+        band_name = self.current_eclipse.parent.label
+        title_text = "{} --- Band: {}".format(fname, band_name)
         print("Trying to change the title of the plot")
         print("Old title: {}".format(self.lc_plot.title.text))
-        self.lc_plot.title.text = fname
-        print("The title should now be {}".format(fname))
+        self.lc_plot.title.text = title_text
+        print("The title should now be {}".format(title_text))
 
         # self.update_like_header(gp=self.GP)
 
