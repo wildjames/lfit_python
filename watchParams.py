@@ -15,8 +15,6 @@ from CVModel import construct_model
 try:
     from lfit import CV
     print("Successfully imported CV class from lfit!")
-    # import mcmc_utils
-    # print("Successfully imported mcmc_utils")
     from trm import roche
     print("Successfully imported trm.roche!")
 except ImportError:
@@ -252,7 +250,7 @@ class Watcher():
         self.lc_plot.scatter(x='phase', y='flux', source=self.lc_obs, size=5, color='black')
 
         # also plot residuals
-        self.lc_res_plot = figure(plot_height=250, plot_width=1200,
+        self.lc_res_plot = bk.plotting.figure(plot_height=250, plot_width=1200,
             toolbar_location=None, y_axis_location="left",
             x_range=self.lc_plot.x_range)#, y_range=self.lc_plot.y_range)
 

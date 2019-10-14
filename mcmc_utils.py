@@ -1,7 +1,6 @@
 '''
 Helper functions to aid the MCMC nuts and bolts.
 '''
-
 import warnings
 
 import dask.dataframe as dd
