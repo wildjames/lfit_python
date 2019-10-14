@@ -136,7 +136,7 @@ def ln_prior(thisModel):
     param = thisModel.ebv
     lnp += param.prior.ln_prob(param.currVal)
     return lnp
-  
+
 
 def chisq(thisModel, y, e, mask):
     m = model(thisModel, mask)
@@ -415,6 +415,7 @@ if __name__ == "__main__":
         index = colKeys.index('wdFlux_u')
         uband = fchain[:, index]
         uband = np.array([uband])
+
         # Need to calculate median values and errors
         uflux = np.median(uband)
         uflux_err = np.sqrt((np.std(uband))**2 + (uflux*syserr)**2)
@@ -422,6 +423,7 @@ if __name__ == "__main__":
         fluxes_err[0] = uflux_err
         umag = Flux(uflux, uflux_err, 'u')
         mags[0] = umag
+
         uband_used = True
     else:
         uband_used = False
@@ -437,16 +439,20 @@ if __name__ == "__main__":
 
             umag = Flux(uflux,uflux_err,'u')
             mags[0] = umag
+
             uband_used = True
 
     if 'wdFlux_g' in colKeys:
         index = colKeys.index('wdFlux_g')
         gband = fchain[:, index]
+        gband = np.array([gband])
 
-        gflux = np.median([gband])
+        gflux = np.median(gband)
         gflux_err = np.sqrt((np.std(gband))**2 + (gflux*syserr)**2)
+
         fluxes[1] = gflux
         fluxes_err[1] = gflux_err
+
         gmag = Flux(gflux, gflux_err, 'g')
         mags[1] = gmag
 
@@ -459,6 +465,7 @@ if __name__ == "__main__":
             gflux = float(input("Enter g' flux: "))
             gflux_err = float(input("Enter g' err: "))
             gflux_err = np.sqrt(gflux_err**2 + (gflux*syserr)**2)
+
             fluxes[1] = gflux
             fluxes_err[1] = gflux_err
 
@@ -471,12 +478,14 @@ if __name__ == "__main__":
     if 'wdFlux_r' in colKeys:
         index = colKeys.index('wdFlux_r')
         rband = fchain[:, index]
-
         rband = np.array([rband])
+
         rflux = np.median(rband)
         rflux_err = np.sqrt((np.std(rband))**2 + (rflux*syserr)**2)
+
         fluxes[2] = rflux
         fluxes_err[2] = rflux_err
+
         rmag = Flux(rflux, rflux_err, 'r')
         mags[2] = rmag
 
@@ -489,6 +498,7 @@ if __name__ == "__main__":
             rflux = float(input("Enter r' flux: "))
             rflux_err = float(input("Enter r' err: "))
             rflux_err = np.sqrt(rflux_err**2 + (rflux*syserr)**2)
+
             fluxes[2] = rflux
             fluxes_err[2] = rflux_err
 
@@ -501,10 +511,11 @@ if __name__ == "__main__":
     if 'wdFlux_i' in colKeys:
         index = colKeys.index('wdFlux_i')
         iband = fchain[:, index]
-
         iband = np.array([iband])
+
         iflux = np.median(iband)
         iflux_err = np.sqrt((np.std(iband)**2 + (iflux*syserr)**2))
+
         fluxes[3] = iflux
         fluxes_err[3] = iflux_err
 
@@ -520,6 +531,7 @@ if __name__ == "__main__":
             iflux = float(input("Enter i' flux: "))
             iflux_err = float(input("Enter i' err: "))
             iflux_err = np.sqrt(iflux_err**2 + (iflux*syserr)**2)
+
             fluxes[3] = iflux
             fluxes_err[3] = iflux_err
 
@@ -532,10 +544,11 @@ if __name__ == "__main__":
     if 'wdFlux_z' in colKeys:
         index = colKeys.index('wdFlux_z')
         zband = fchain[:, index]
-
         zband = np.array([zband])
+
         zflux = np.median(zband)
         zflux_err = np.sqrt((np.std(zband))**2 + (zflux*syserr)**2)
+
         fluxes[4] = zflux
         fluxes_err[4] = zflux_err
         zmag = Flux(zflux, zflux_err, 'z')
@@ -550,6 +563,7 @@ if __name__ == "__main__":
             zflux = float(input("Enter z' flux: "))
             zflux_err = float(input("Enter z' err: "))
             zflux_err = np.sqrt(zflux_err**2 + (zflux*syserr)**2)
+
             fluxes[4] = zflux
             fluxes_err[4] = zflux_err
 
@@ -557,16 +571,18 @@ if __name__ == "__main__":
             mags[4] = zmag
 
             zband_used = True
-            
+
     if 'wdFlux_kg5' in colKeys:
         index = colKeys.index('wdFlux_kg5')
         kg5band = fchain[:, index]
-
         kg5band = np.array([kg5band])
+
         kg5flux = np.median(kg5band)
         kg5flux_err = np.sqrt((np.std(kg5band))**2 + (kg5flux*syserr)**2)
+
         fluxes[5] = kg5flux
         fluxes_err[5] = kg5flux_err
+
         kg5mag = Flux(kg5flux, kg5flux_err, 'kg5')
         mags[5] = kg5mag
 
@@ -580,6 +596,7 @@ if __name__ == "__main__":
             kg5flux = float(input("Enter kg5' flux: "))
             kg5flux_err = float(input("Enter kg5' err: "))
             kg5flux_err = np.sqrt(kg5flux_err**2 + (kg5flux*syserr)**2)
+
             fluxes[5] = kg5flux
             fluxes_err[5] = kg5flux_err
 
