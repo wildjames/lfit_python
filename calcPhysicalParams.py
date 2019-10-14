@@ -63,7 +63,7 @@ def panei_mr(targetTemp, baseDir):
     f2 = lambda x: func(targetTemp, x)[0]
     return f2
 
-  
+
 def wood_mr(targetTemp, baseDir):
     '''given a target temp, returns a function giving
         radius as a function of mass.
@@ -71,7 +71,7 @@ def wood_mr(targetTemp, baseDir):
         function is derived from cubic interpolation of wood models'''
     files = ['Wood95/co040.2.04dt1', 'Wood95/co050.2.04dt1',
              'Wood95/co060.2.04dt1', 'Wood95/co070.2.04dt1',
-             'Wood95/co080.2.04dt1',  'Wood95/co090.2.04dt1',
+             'Wood95/co080.2.04dt1', 'Wood95/co090.2.04dt1',
              'Wood95/co100.2.04dt1']
     m = np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]) * units.M_sun
     r = []
@@ -194,8 +194,6 @@ def solve(input_data, baseDir):
 
         # need to be a little careful here for different versions of astropy
         data = (q, mw, rw_a*a, mr, r2, a, kw, kr, inc)
-        if not quantitySupport:
-            data = [getval(datum) for datum in data]
         return data
     else:
         return None
@@ -224,7 +222,7 @@ if __name__ == "__main__":
     if baseDir is None:
         print("Using the script location as the WD model files location")
         baseDir = os.path.split(__file__)[0]
-    print("baseDir: {}".format(baseDir))
+    print("baseDir (must contain WD model directories): {}".format(baseDir))
 
     print("Reading chain file...")
     if flat > 0:
@@ -268,6 +266,7 @@ if __name__ == "__main__":
     # function below extracts value from quantity and floats alike
     getval = lambda el: getattr(el, 'value', el)
 
+    print("Running MCMC...")
     psolve = partial(solve, baseDir=baseDir)
     data = zip(qVals, dphiVals, rwVals, twdVals, pVals)
     solvedParams = PB.map(psolve, data, multiprocess=True)
