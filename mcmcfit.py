@@ -26,18 +26,27 @@ from CVModel import construct_model, extract_par_and_key
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
 def ln_prior(param_vector, model):
-    model.dynasty_par_vals = param_vector
-    val = model.ln_prior()
+    try:
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prior()
+    except:
+        val = -np.inf
     return val
 
 def ln_prob(param_vector, model):
-    model.dynasty_par_vals = param_vector
-    val = model.ln_prob()
+    try:
+        model.dynasty_par_vals = param_vector
+        val = model.ln_prob()
+    except:
+        val = -np.inf
     return val
 
 def ln_like(param_vector, model):
-    model.dynasty_par_vals = param_vector
-    val = model.ln_like()
+    try:
+        model.dynasty_par_vals = param_vector
+        val = model.ln_like()
+    except:
+        val = -np.inf
     return val
 
 if __name__ in '__main__':
