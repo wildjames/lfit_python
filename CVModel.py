@@ -96,7 +96,7 @@ class SimpleEclipse(Node):
 
     # Define this subclasses parameters
     node_par_names = (
-        'dFlux', 'sFlux', 'ulimb', 'rdisc',
+        'dFlux', 'sFlux', 'rdisc',
         'scale', 'az', 'fis', 'dexp', 'phi0'
     )
 
