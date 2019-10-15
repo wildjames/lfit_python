@@ -21,7 +21,7 @@ import numpy as np
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
-import plotCV
+import plot_lc_model as plotCV
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -171,7 +171,7 @@ if __name__ in '__main__':
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
     if not to_fit:
       exit()
-      
+
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #
     #  The below plugs the above into emcee's relevant functions  #
