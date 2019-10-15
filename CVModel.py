@@ -206,7 +206,12 @@ class SimpleEclipse(Node):
 
         # get the location of the L1 point from q
         q = ancestor_param_dict['q'].currVal
-        xl1 = roche.xl1(q)
+        try:
+            xl1 = roche.xl1(q)
+        except AssertionError as err:
+            print(err)
+            return -np.inf
+
 
         # Get the rdisc, scaled to the Roche Radius
         rdisc = ancestor_param_dict['rdisc'].currVal
@@ -283,8 +288,9 @@ class SimpleEclipse(Node):
                 self.log("SimpleEclipse.ln_prior", "Azimuth is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
-        except:
+        except Exception as err:
             if verbose:
+                print(err)
                 print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
 
             self.log("SimpleEclipse.ln_prior",
@@ -439,7 +445,9 @@ class LCModel(Node):
                     print(msg)
                 self.log('LCModel.ln_prior', "dphi is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
-        except roche.RocheError:
+
+        except Exception as error:
+            print(error)
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
@@ -812,7 +820,7 @@ def construct_model(input_file, debug=False):
                     _, key = extract_par_and_key(key)
                     if key not in defined_eclipses:
                         defined_eclipses.append(key)
-                        
+
     if debug:
         print("\nI found the following bands defined in the input dict:")
         print(defined_bands)

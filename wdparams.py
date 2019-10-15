@@ -590,11 +590,11 @@ if __name__ == "__main__":
     else:
         kg5band_used = False
 
-        print("Manually enter kg5' band? y/n")
+        print("Manually enter kg5 band? y/n")
         cont = input("> ")
         if 'y' in cont.lower():
-            kg5flux = float(input("Enter kg5' flux: "))
-            kg5flux_err = float(input("Enter kg5' err: "))
+            kg5flux = float(input("Enter kg5 flux: "))
+            kg5flux_err = float(input("Enter kg5 err: "))
             kg5flux_err = np.sqrt(kg5flux_err**2 + (kg5flux*syserr)**2)
 
             fluxes[5] = kg5flux
