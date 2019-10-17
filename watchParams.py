@@ -141,6 +141,15 @@ class Watcher():
         for name, title in simple_parDesc.items():
             title = simple_parDesc[name]
             param = self.parDict[name]
+
+            if param[-1].lower() == 'gauss':
+                new_param = [
+                    param[0],
+                    param[0] - 5*param[2],
+                    param[0] + 5*param[2],
+                ]
+                param = new_param
+
             print("Slider: {}".format(title))
             print(" -> value, lower limit, upper limit: {}\n".format(param))
 
@@ -151,7 +160,7 @@ class Watcher():
                 end   = param[2],
                 value_throttled = param[0],
                 value = param[0],
-                step  = (param[2] - param[1]) / 100,
+                step  = (param[2] - param[1]) / 200,
                 width = 200,
                 format='0.0000',
                 callback_throttle=50,
@@ -174,7 +183,7 @@ class Watcher():
                 end   = param[2],
                 value_throttled = param[0],
                 value = param[0],
-                step  = (param[2] - param[1]) / 100,
+                step  = (param[2] - param[1]) / 200,
                 width = 200,
                 format='0.0000',
                 callback_throttle=50,
@@ -197,7 +206,7 @@ class Watcher():
                 end   = param[2],
                 value_throttled = param[0],
                 value = param[0],
-                step  = (param[2] - param[1]) / 100,
+                step  = (param[2] - param[1]) / 200,
                 width = 200,
                 format='0.0000',
                 callback_throttle=50,
@@ -496,7 +505,7 @@ class Watcher():
         if self.GP:
             print("Using the GP!")
 
-        self.menu = [(ecl.name, ecl.lc.fname) for ecl in self.model.search_node_type('Eclipse')]
+        self.menu = [(ecl.lc.fname, ecl.lc.fname) for ecl in self.model.search_node_type('Eclipse')]
         print("The menu looks like this:")
         for m in self.menu:
             print(m)
@@ -521,7 +530,8 @@ class Watcher():
             currval = param.currVal
             lolim = param.prior.p1
             hilim = param.prior.p2
-            parDict[key] = [currval, lolim, hilim]
+            prior = param.prior.type
+            parDict[key] = [currval, lolim, hilim, prior]
 
         self.parDict = parDict
 
