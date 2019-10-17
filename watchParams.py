@@ -226,7 +226,10 @@ class Watcher():
 
         # Data file picker
         menu = self.menu
-        self.lc_change_fname_button = Dropdown(label="Choose Data", button_type="success", menu=menu, width=500)
+        self.lc_change_fname_button = Dropdown(
+            label="Choose Data", button_type="success",
+            menu=menu, width=500
+        )
         self.lc_obs_fname = self.current_eclipse.lc.fname
         self.lc_change_fname_button.on_change('value', self.update_lc_obs)
         print("Made the data picker...")
@@ -330,7 +333,7 @@ class Watcher():
             self.lc_plot, self.lc_res_plot,
             ]),
             column([
-                self.like_label,
+                # self.like_label,
                 gridplot(
                     self.par_sliders, ncols=2,
                     toolbar_options={'logo': None}),
