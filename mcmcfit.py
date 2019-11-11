@@ -13,15 +13,15 @@ import multiprocessing as mp
 import os
 from pprint import pprint
 from shutil import rmtree
+from sys import exit
 
 import configobj
 import emcee
 import numpy as np
 
 import mcmc_utils as utils
-import plot_lc_model as plotCV
 from CVModel import construct_model, extract_par_and_key
-
+import plot_lc_model as plotCV
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -33,6 +33,7 @@ def ln_prior(param_vector, model):
         val = -np.inf
     return val
 
+
 def ln_prob(param_vector, model):
     try:
         model.dynasty_par_vals = param_vector
@@ -40,6 +41,7 @@ def ln_prob(param_vector, model):
     except:
         val = -np.inf
     return val
+
 
 def ln_like(param_vector, model):
     try:
@@ -49,9 +51,8 @@ def ln_like(param_vector, model):
         val = -np.inf
     return val
 
-if __name__ in '__main__':
 
-    np.random.seed = 432
+if __name__ in '__main__':
 
     # Set up the parser.
     parser = argparse.ArgumentParser(
@@ -74,6 +75,7 @@ if __name__ in '__main__':
         help='Enable the debugging flag in the model',
         action='store_true'
     )
+
     parser.add_argument(
         "--quiet",
         help="Do not plot the initial conditions",
@@ -91,7 +93,7 @@ if __name__ in '__main__':
             rmtree("DEBUGGING")
 
     # I want to pre-check that the details have been supplied.
-    if dest is not '':
+    if dest != '':
         location = __file__.split('/')[:-1] + ["email_details.json"]
         details_loc = '/'.join(location)
         if not os.path.isfile(details_loc):
@@ -111,33 +113,34 @@ if __name__ in '__main__':
             print("Don't panic, just complete the JSON file here:")
             print("{}".format(details_loc))
 
-
     # Build the model from the input file
     model = construct_model(input_fname, debug)
 
     print("\nStructure:")
     pprint(model.structure)
 
-
     input_dict = configobj.ConfigObj(input_fname)
 
     # Read in information about mcmc
-    nburn          = int(input_dict['nburn'])
-    nprod          = int(input_dict['nprod'])
-    nthreads       = int(input_dict['nthread'])
-    nwalkers       = int(input_dict['nwalkers'])
-    ntemps         = int(input_dict['ntemps'])
-    scatter_1      = float(input_dict['first_scatter'])
-    scatter_2      = float(input_dict['second_scatter'])
-    to_fit         = bool(int(input_dict['fit']))
-    use_pt         = bool(int(input_dict['usePT']))
-    double_burnin  = bool(int(input_dict['double_burnin']))
-    comp_scat      = bool(int(input_dict['comp_scat']))
+    nburn = int(input_dict['nburn'])
+    nprod = int(input_dict['nprod'])
+    nthreads = int(input_dict['nthread'])
+    nwalkers = int(input_dict['nwalkers'])
+    ntemps = int(input_dict['ntemps'])
+    scatter_1 = float(input_dict['first_scatter'])
+    scatter_2 = float(input_dict['second_scatter'])
+    to_fit = int(input_dict['fit'])
+    use_pt = bool(int(input_dict['usePT']))
+    double_burnin = bool(int(input_dict['double_burnin']))
+    comp_scat = bool(int(input_dict['comp_scat']))
 
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
-    neclipses = len(model.search_node_type("Eclipse"))
-    print("The model has {} eclipses.".format(neclipses))
+    try:
+        neclipses = int(input_dict['neclipses'])
+    except KeyError:
+        neclipses = len(model.search_node_type("Eclipse"))
+        print("The model has {} eclipses.".format(neclipses))
 
     # Wok out how many degrees of freedom we have in the model
     # How many data points do we have?
@@ -175,6 +178,8 @@ if __name__ in '__main__':
     if not quiet:
         plotCV.nxdraw(model)
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
+    if not to_fit:
+      exit()
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #
@@ -190,9 +195,6 @@ if __name__ in '__main__':
     if nwalkers < 2*npars:
         exit()
 
-    if not to_fit:
-        exit()
-
     # p_0 is the initial position vector of the MCMC walker
     p_0 = model.dynasty_par_vals
 
@@ -206,24 +208,24 @@ if __name__ in '__main__':
     if comp_scat:
         # scatter factors. p0_scatter_1 will be multiplied by these:
         scat_fract = {
-            'q':      2,
+            'q':      1,
             'rwd':    1,
             'dphi':   0.2,
-            'dFlux':  2,
-            'sFlux':  2,
-            'wdFlux': 2,
-            'rsFlux': 2,
-            'rdisc':  2,
+            'dFlux':  1,
+            'sFlux':  1,
+            'wdFlux': 1,
+            'rsFlux': 1,
+            'rdisc':  1,
             'ulimb':  1e-6,
-            'scale':  3,
-            'fis':    3,
-            'dexp':   3,
-            'phi0':   20,
-            'az':     2,
-            'exp1':   5,
-            'exp2':   5,
-            'yaw':    10,
-            'tilt':   2,
+            'scale':  1,
+            'fis':    1,
+            'dexp':   1,
+            'phi0':   1,
+            'az':     1,
+            'exp1':   1,
+            'exp2':   1,
+            'yaw':    1,
+            'tilt':   1,
         }
 
         for par_i, name in enumerate(model.dynasty_par_names):
@@ -239,7 +241,6 @@ if __name__ in '__main__':
 
         # Create another array for second burn-in
         p0_scatter_2 = p0_scatter_1*(scatter_2/scatter_1)
-
 
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
@@ -259,7 +260,6 @@ if __name__ in '__main__':
                                   loglargs=(model,),
                                   logpargs=(model,),
                                   pool=pool)
-                                #   threads=nthreads)
     else:
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
@@ -269,8 +269,6 @@ if __name__ in '__main__':
                                         ln_prob,
                                         args=(model,),
                                         pool=pool)
-                                        # threads=nthreads)
-
 
     # Run the burnin phase
     print("\n\nExecuting the burn-in phase...")
@@ -290,7 +288,6 @@ if __name__ in '__main__':
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
-
 
     # Now, reset the sampler. We'll use the result of the burn-in phase to
     # re-initialise it.
@@ -331,4 +328,4 @@ if __name__ in '__main__':
         f.write('\n')
 
     plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
-                automated=True)
+                       automated=True)

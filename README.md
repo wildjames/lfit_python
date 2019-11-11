@@ -1,5 +1,4 @@
 # LFIT_PYTHON
-
 This project is the successor to `LFIT` - a `C++` code for fitting cataclysmic variable (CV) star's eclipse lightcurves. `LFIT` is fast but cannot be easily adapted to fit ligthcurves with lots of flickering or to fit individual eclipses whilst sharing certain parameters (e.g eclipse width) between eclipses. This software uses a tree structure, to group eclipses into branches that can share some parameters but not others.
 
 ## Setting up an MCMC run
@@ -138,4 +137,3 @@ This branch also has a notifier, which will email the resulting lightcurve figur
 
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e32287a32e864c278f1a06beeeb8e7fb)](https://www.codacy.com/manual/wildjames/lfit_python?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=wildjames/lfit_python&amp;utm_campaign=Badge_Grade)
-

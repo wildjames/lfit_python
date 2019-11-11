@@ -96,7 +96,7 @@ class SimpleEclipse(Node):
 
     # Define this subclasses parameters
     node_par_names = (
-        'dFlux', 'sFlux', 'ulimb', 'rdisc',
+        'dFlux', 'sFlux', 'rdisc',
         'scale', 'az', 'fis', 'dexp', 'phi0'
     )
 
@@ -140,10 +140,9 @@ class SimpleEclipse(Node):
           (tot_flx, wdFlux, sFlux, rsFlux, dFlux)
         '''
         flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
-
         return flx, self.cv.ywd, self.cv.ys, self.cv.yrs, self.cv.yd
 
-    def chisq(self, *args, **kwargs):
+    def chisq(self):
         '''Return the chisq of this eclipse, given current params.'''
         self.log('SimpleEclipse.chisq', "Doing chisq")
         flx = self.calcFlux()
@@ -166,7 +165,7 @@ class SimpleEclipse(Node):
         self.log('SimpleEclipse.chisq', "Computed a chisq of {}".format(chisq))
         return chisq
 
-    def ln_like(self, *args, **kwargs):
+    def ln_like(self):
         '''Calculate the chisq of this eclipse, against the data stored in its
         lightcurve object.
 
@@ -207,7 +206,12 @@ class SimpleEclipse(Node):
 
         # get the location of the L1 point from q
         q = ancestor_param_dict['q'].currVal
-        xl1 = roche.xl1(q)
+        try:
+            xl1 = roche.xl1(q)
+        except AssertionError as err:
+            print(err)
+            return -np.inf
+
 
         # Get the rdisc, scaled to the Roche Radius
         rdisc = ancestor_param_dict['rdisc'].currVal
@@ -248,7 +252,9 @@ class SimpleEclipse(Node):
                 print("Scale: {:.3f}".format(scale))
                 print("Range: {:.3f} - {:.3f}".format(rmin, rmax))
 
-            self.log("SimpleEclipse.ln_prior", "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
+            self.log("SimpleEclipse.ln_prior",
+                     "The BS is too large to be accurately modelled. Returning ln_prior = -np.inf")
+
             return -np.inf
 
         ##############################################
@@ -282,10 +288,13 @@ class SimpleEclipse(Node):
                 self.log("SimpleEclipse.ln_prior", "Azimuth is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
-        except:
+        except Exception as err:
             if verbose:
+                print(err)
                 print("The mass stream of leaf {} does not intersect the disc!".format(self.name))
-            self.log("SimpleEclipse.ln_prior", "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
+
+            self.log("SimpleEclipse.ln_prior",
+                     "The mass stream does not intersect the disc, returning ln_prior = -np.inf")
             return -np.inf
 
         self.log("SimpleEclipse.ln_prior", "Passed validity checks at {}.".format(self.name))
@@ -312,7 +321,6 @@ class SimpleEclipse(Node):
         par_name_list = self.cv_parnames
 
         param_dict = self.ancestor_param_dict
-
         try:
             parlist = [param_dict[key].currVal for key in par_name_list]
         except KeyError as error:
@@ -403,7 +411,7 @@ class LCModel(Node):
     # Set the parameter names for this layer
     node_par_names = ('q', 'dphi', 'rwd')
 
-    def ln_prior(self, verbose=False, *args, **kwargs):
+    def ln_prior(self, verbose=False):
         '''Before we calculate the ln_prior of myself or my children, I check
         that my parameters are valid. I check that dphi is not too large for
         the current value of q.
@@ -438,7 +446,8 @@ class LCModel(Node):
                 self.log('LCModel.ln_prior', "dphi is out of range. Returning ln_prior = -np.inf")
                 return -np.inf
 
-        except roche.RocheError:
+        except Exception as error:
+            print(error)
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
@@ -506,8 +515,8 @@ class SimpleGPEclipse(SimpleEclipse):
         pardict = self.ancestor_param_dict
 
         dphi = pardict['dphi']
-        q    = pardict['q']
-        rwd  = pardict['rwd']
+        q = pardict['q']
+        rwd = pardict['rwd']
         phi0 = pardict['phi0']
 
         # Have they changed significantly?
@@ -519,7 +528,8 @@ class SimpleGPEclipse(SimpleEclipse):
         # Check to see if our model parameters have changed enough to
         # significantly change the location of the changepoints.
         if (dphi_change > 1.2) or (q_change > 1.2) or (rwd_change > 1.2):
-            self.log('SimpleGPEclipse.calcChangepoints', "The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
+            self.log('SimpleGPEclipse.calcChangepoints',
+                     "The GP changepoint locations have chnged significantly enough to warrant a recalculation...")
 
             # Calculate inclination
             inc = roche.findi(q.currVal, dphi.currVal)
@@ -579,13 +589,13 @@ class SimpleGPEclipse(SimpleEclipse):
         # of their current values
         pardict = self.ancestor_param_dict
 
-        ln_ampin   = pardict['ln_ampin_gp']
-        ln_ampout  = pardict['ln_ampout_gp']
-        ln_tau     = pardict['ln_tau_gp']
+        ln_ampin = pardict['ln_ampin_gp']
+        ln_ampout = pardict['ln_ampout_gp']
+        ln_tau = pardict['ln_tau_gp']
 
-        ampin_gp   = np.exp(ln_ampin.currVal)
-        ampout_gp  = np.exp(ln_ampout.currVal)
-        tau_gp     = np.exp(ln_tau.currVal)
+        ampin_gp = np.exp(ln_ampin.currVal)
+        ampout_gp = np.exp(ln_ampout.currVal)
+        tau_gp = np.exp(ln_tau.currVal)
 
         # Calculate kernels for both out of and in eclipse WD eclipse
         # Kernel inside of WD has smaller amplitude than that of outside
@@ -611,7 +621,7 @@ class SimpleGPEclipse(SimpleEclipse):
         self.log('SimpleGPEclipse.create_GP', "Successfully created a new GP!")
         return georgeGP
 
-    def ln_like(self, *args, **kwargs):
+    def ln_like(self):
         '''The GP sits at the top of the tree. It replaces the LCModel
         class. When the evaluate function is called, this class should
         hijack it, calculate the residuals of all the eclipses in the tree,
@@ -641,7 +651,8 @@ class SimpleGPEclipse(SimpleEclipse):
         # Did the model turn out ok?
         if np.any(np.isinf(residuals)) or np.any(np.isnan(residuals)):
             if self.DEBUG:
-                self.log('SimpleGPEclipse.ln_like', "GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood.")
+                msg = "GP ln_like computed inf or nan residuals for the model. Returning -np.inf for the likelihood."
+                self.log('SimpleGPEclipse.ln_like', msg)
             return -np.inf
 
         # Create the GP of this eclipse
@@ -756,6 +767,7 @@ def construct_model(input_file, debug=False):
         core_par_names = LCModel.node_par_names
         core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
+
         if debug:
             print("Not using the GP!")
             print("Core params:")
@@ -808,6 +820,7 @@ def construct_model(input_file, debug=False):
                     _, key = extract_par_and_key(key)
                     if key not in defined_eclipses:
                         defined_eclipses.append(key)
+
     if debug:
         print("\nI found the following bands defined in the input dict:")
         print(defined_bands)
@@ -820,15 +833,16 @@ def construct_model(input_file, debug=False):
 
         # Build the Param objects for this band
         for par in band_par_names:
-                # Construct the parameter key and retrieve the string
-                key = "{}_{}".format(par, label)
-                string = input_dict[key]
+            # Construct the parameter key and retrieve the string
+            key = "{}_{}".format(par, label)
+            string = input_dict[key]
 
-                # Make the Param object, and save it
-                band_pars.append(Param.fromString(par, string))
+            # Make the Param object, and save it
+            band_pars.append(Param.fromString(par, string))
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
+
         if debug:
             print("Added the band labelled {} to the model".format(label))
             print("Band params:")
@@ -883,8 +897,6 @@ def construct_model(input_file, debug=False):
                 ComplexEclipse(lc, label, params, parent=my_band)
             else:
                 SimpleEclipse(lc, label, params, parent=my_band)
-
-
 
     # Make sure that all the model's Band have eclipses. Otherwise, prune them
     model.children = [band for band in model.children if len(band.children)]

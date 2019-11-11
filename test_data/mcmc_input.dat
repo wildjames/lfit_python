@@ -23,7 +23,7 @@ comp_scat      = 1      # vary scatter for different params (1), or add uniform 
 # if type = 'gauss', val1 and val2 represent mean and standard deviation of prior
 # if type = 'uniform' or 'log_uniform', val1 and val2 represent the limits of prior
 
-neclipses = 3
+# neclipses = 3
 
 # what phases to plot/fit
 phi_start = -0.2
@@ -140,7 +140,6 @@ rsFlux_KG5 =       0.0262      uniform       0.0010       0.2000      1
     exp2_3 =       0.9702      uniform       0.5000       5.0000      1
      yaw_3 =      -2.4394      uniform     -90.0000      90.0000      1
     tilt_3 =      52.2358      uniform       0.0010     180.0000      1
-
 
 ### r Data
     file_4 =  lightcurves/test_data_4.calib

@@ -3,14 +3,16 @@ Base classes for the MCMC fitting routine. Allows the creation of a
 hierarchical model structure, that can also track the prior knowledge of the
 parameters of that model.
 '''
-
+import sys
 import os
 import warnings
 
+import george
 import networkx as nx
 import numpy as np
 import scipy.integrate as intg
 import scipy.stats as stats
+from matplotlib import pyplot as plt
 
 import inspect
 
@@ -46,20 +48,18 @@ class Prior(object):
     they act as a jeffrey's prior about p0, and uniform below p0. typically
     set p0=noise level
     '''
-    def __init__(self, prior_distribution, p1, p2):
-        if not prior_distribution in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']:
-            raise NotImplementedError("Prior distribution {} not implimented!".format(prior_distribution))
-
-        self.type = prior_distribution
+    def __init__(self, type, p1, p2):
+        assert type in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']
+        self.type = type
         self.p1 = p1
         self.p2 = p2
-        if prior_distribution == 'log_uniform' and self.p1 < 1.0e-30:
+        if type == 'log_uniform' and self.p1 < 1.0e-30:
             warnings.warn('lower limit on log_uniform prior rescaled from %f to 1.0e-30' % self.p1)
             self.p1 = 1.0e-30
-        if prior_distribution == 'log_uniform':
+        if type == 'log_uniform':
             self.normalise = 1.0
             self.normalise = np.fabs(intg.quad(self.ln_prob, self.p1, self.p2)[0])
-        if prior_distribution == 'mod_jeff':
+        if type == 'mod_jeff':
             self.normalise = np.log((self.p1+self.p2)/self.p1)
 
     def ln_prob(self, val):
@@ -406,7 +406,7 @@ class Node:
         '''Calculate the log likelihood'''
         return self.__call_recursive_func__('ln_like', *args, **kwargs)
 
-    def ln_prior(self, verbose=False, *args, **kwargs):
+    def ln_prior(self, verbose=False):
         """Return the natural log of the prior probability of the Param objects
         below this node.
 
@@ -456,7 +456,7 @@ class Node:
         self.log('base.ln_prior', "I computed a total ln_prior at and below me of {}".format(lnp))
         return lnp
 
-    def ln_prob(self, verbose=False, *args, **kwargs):
+    def ln_prob(self, verbose=False):
         """Calculates the natural log of the posterior probability
         (ln_prior + ln_like)"""
 

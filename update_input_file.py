@@ -10,6 +10,7 @@ import numpy as np
 from mcmc_utils import flatchain, readchain_dask as readchain
 
 
+
 def update_entry(name, input_dict, newval):
     fields = input_dict[name].split(' ')
     fields = [v for v in fields if v != '']

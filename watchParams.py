@@ -15,8 +15,6 @@ from CVModel import construct_model
 try:
     from lfit import CV
     print("Successfully imported CV class from lfit!")
-    # import mcmc_utils
-    # print("Successfully imported mcmc_utils")
     from trm import roche
     print("Successfully imported trm.roche!")
 except ImportError:
