@@ -7,13 +7,18 @@ from collections.abc import MutableSequence
 import emcee
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import scipy.interpolate as interp
 import seaborn
 from past.utils import old_div
 
-from mcmc_utils import (flatchain, readchain_dask, readflatchain,
-                        run_burnin, run_mcmc_save, thumbPlot)
+from mcmc_utils import (flatchain, readchain_dask, readflatchain, run_burnin,
+                        run_mcmc_save, thumbPlot)
 from model import Param
+
+# Load bergeron tables into global namespace
+root, _ = os.path.split(__file__)
+DA = pd.read_csv(os.path.join(root, 'Bergeron/Table_DA'), delim_whitespace=True, skiprows=0, header=1)
 
 
 class wdModel(MutableSequence):
@@ -58,6 +63,12 @@ class wdModel(MutableSequence):
         else:
             return 1000./self.plax.currVal
 
+def sdss2kg5(g, r):
+    KG5 = g  - 0.2240*(g-r)**2 - 0.3590*(g-r) + 0.0460
+    return KG5
+
+sdss2kg5_vect = np.vectorize(sdss2kg5)
+
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
     # Reads in input file and splits it into lines
@@ -73,30 +84,41 @@ def model(thisModel,mask):
     t, g, p, ebv = thisModel
     d = thisModel.dist
 
-    # load bergeron models
-    root, _ = os.path.split(__file__)
-    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
+    # Model table teffs
+    teffs = np.unique(DA['Teff'])
+    loggs = np.unique(DA['log_g'])
 
-    teffs = np.unique(data[:,0])
-    loggs = np.unique(data[:,1])
-
-    nteff = len(teffs)
-    nlogg = len(loggs)
     if t >= teffs.max() or t <= teffs.min():
         return -np.inf
     if g <= loggs.min() or g >= loggs.max():
         return -np.inf
 
+    nteff = len(teffs)
+    nlogg = len(loggs)
+
     abs_mags = []
-    # u data in col 4, g in 5, r in 6, i in 7, z in 8, kg5 in 9
-    for col_indx in range(4,10):
-        z = data[:,col_indx]
+    # get the magnitudes from the file...
+    for band in ['u', 'g', 'r', 'i', 'z']:
+        z = np.asarray(DA[band])
         z = z.reshape((nlogg,nteff))
         # cubic bivariate spline interpolation
         func = interp.RectBivariateSpline(loggs,teffs,z,kx=3,ky=3)
         abs_mags.append(func(g,t)[0,0])
+
+    # KG5 mags must be inferred
+    gmags = np.asarray(DA['g'])
+    rmags = np.asarray(DA['r'])
+
+    kg5 = sdss2kg5_vect(gmags, rmags)
+    kg5 = kg5.reshape((nlogg,nteff))
+
+    #Interpolate magnitude
+    func = interp.RectBivariateSpline(loggs,teffs,kg5,kx=3,ky=3)
+    abs_mags.append(func(g,t)[0,0])
+
     abs_mags = np.array(abs_mags)
 
+    #TODO: Fix this horrid bit!!!
     # A_x/E(B-V) extinction from Cardelli (1989)
     # Where are these values from?? (KG5 estimated)
 
@@ -165,31 +187,39 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
     teff, logg, plax, ebv = model
     d = 1000. / plax
 
-    # load bergeron models
-    root, fn = os.path.split(__file__)
-    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
-
-    teffs = np.unique(data[:,0])
-    loggs = np.unique(data[:,1])
+    teffs = np.unique(DA['Teff'])
+    loggs = np.unique(DA['log_g'])
 
     nteff = len(teffs)
     nlogg = len(loggs)
 
     abs_mags = []
     # u data in col 4, g in 5, r in 6, i in 7, z in 8, kg5 in 9
-    for col_indx in range(4,10):
-        z = data[:,col_indx]
+    for col_indx in ['u', 'g', 'r', 'i', 'z']:
+        z = np.asarray(DA[col_indx])
         z = z.reshape((nlogg,nteff))
         # cubic bivariate spline interpolation
         func = interp.RectBivariateSpline(loggs,teffs,z,kx=3,ky=3)
         abs_mags.append(func(logg,teff)[0,0])
+
+    # KG5 mags must be inferred
+    gmags = np.asarray(DA['g'])
+    rmags = np.asarray(DA['r'])
+
+    kg5 = sdss2kg5_vect(gmags, rmags)
+    kg5 = kg5.reshape((nlogg,nteff))
+
+    #Interpolate magnitude
+    func = interp.RectBivariateSpline(loggs,teffs,kg5,kx=3,ky=3)
+    abs_mags.append(func(g,t)[0,0])
+
     abs_mags = np.array(abs_mags)
 
+    #TODO: Fix this mess!
     # A_x/E(B-V) extinction from Cardelli (1989)
     # Where are these values from?? (KG5 estimated)
-
-    ext       = ebv*np.array([5.155,3.793,2.751,2.086,1.479,3.5])
-    dmod      = 5.0*np.log10(old_div(d,10.0))
+    ext = ebv*np.array([5.155,3.793,2.751,2.086,1.479,3.5])
+    dmod = 5.0*np.log10(old_div(d,10.0))
     app_red_mags = abs_mags + ext + dmod
 
     # calculate fluxes from model magnitudes
@@ -216,26 +246,21 @@ def plotFluxes(fluxes,fluxes_err,mask,model):
     plt.show()
 
 def plotColors(mags):
-
-    # load bergeron models
-    root, fn = os.path.split(__file__)
-    data = np.loadtxt(os.path.join(root, 'Bergeron/da_ugrizkg5.txt'))
-
     # bergeron model magnitudes
-    umags = data[:,4]
-    gmags = data[:,5]
-    rmags = data[:,6]
-    # imags = data[:,7]
-    # zmags = data[:,8]
-    # kg5mags = data[:,9]
+    umags = DA['u']
+    gmags = DA['g']
+    rmags = DA['r']
+    imags = DA['i']
+    zmags = DA['z']
+    kg5mags = sdss2kg5(gmags, rmags)
 
     # calculate colours
     ug = umags-gmags
     gr = gmags-rmags
 
     # make grid of teff, logg and colours
-    teff = np.unique(data[:,0])
-    logg = np.unique(data[:,1])
+    teff = np.unique(DA['Teff'])
+    logg = np.unique(DA['log_g'])
     nteff = len(teff)
     nlogg = len(logg)
     # reshape colours onto 2D grid of (logg, teff)
@@ -392,36 +417,6 @@ if __name__ == "__main__":
     # # # # # # # # # # # # # # # # # # # # # #
     # Collect the fluxes from the fit result. #
     # # # # # # # # # # # # # # # # # # # # # #
-
-    # In some circumstances, the uband eclipse has to be fit separately
-    # e.g. when it is of poor quality
-    # For this reason, a uband wd flux and error can be input manually
-
-    # if "wdFlux_u" not in colKeys:
-    #     while True:
-    #         mode = input('Add seperate u band wd flux and error? (Y/N): ')
-    #         if mode.upper() == 'Y' or mode.upper() == 'N':
-    #             break
-    #         else:
-    #             print("Please answer Y or N ")
-
-    #     if mode.upper() == "Y":
-    #         uflux_in,uflux_err_in = input('Enter uband wd flux and error: ').split()
-    #         uflux_in = float(uflux_in)
-    #         uflux_err_in = float(uflux_err_in)
-
-    #         uflux = uflux_in
-    #         uflux_err = np.sqrt(uflux_err_in**2 + (uflux*syserr)**2)
-
-    #         fluxes[0] = uflux
-    #         fluxes_err[0] = uflux_err
-
-    #         umag = Flux(uflux,uflux_err,'u')
-    #         mags[0] = umag
-
-    #         print((uflux,uflux_err))
-    #         uband_used = True
-
 
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
     if 'wdFlux_u' in colKeys:
