@@ -85,7 +85,11 @@ def parseInput(file):
     input_dict = {}
     for line in blob:
         # Each line is then split at the equals sign
-        k, v = line.split('=')
+        try:
+            k, v = line.split('=')
+        except Exception as e:
+            print(line)
+            raise e
         input_dict[k.strip()] = v.strip()
     return input_dict
 
@@ -223,11 +227,10 @@ def plotFluxes(fluxes, fluxes_err, mask, model):
 
     #Interpolate magnitude
     func = interp.RectBivariateSpline(loggs,teffs,kg5,kx=3,ky=3)
-    abs_mags.append(func(g,t)[0,0])
+    abs_mags.append(func(logg,teff)[0,0])
 
     abs_mags = np.array(abs_mags)
 
-    #TODO: Fix this mess!
     # A_x/E(B-V) extinction from Cardelli (1989)
     # Where are these values from?? (KG5 estimated)
     ext = ebv*np.array([5.155,3.793,2.751,2.086,1.479,3.5])
@@ -258,12 +261,12 @@ def plotFluxes(fluxes, fluxes_err, mask, model):
 
 def plotColors(mags):
     # bergeron model magnitudes
-    umags = DA['u']
-    gmags = DA['g']
-    rmags = DA['r']
-    imags = DA['i']
-    zmags = DA['z']
-    kg5mags = sdss2kg5(gmags, rmags)
+    umags = np.asarray(DA['u'])
+    gmags = np.asarray(DA['g'])
+    rmags = np.asarray(DA['r'])
+    imags = np.asarray(DA['i'])
+    zmags = np.asarray(DA['z'])
+    kg5mags = sdss2kg5_vect(gmags, rmags)
 
 
     # calculate colours
@@ -659,8 +662,6 @@ if __name__ == "__main__":
         chain = readchain_dask('chain_wd.txt')
         nameList = ['Teff', 'log g', 'Parallax', 'E(B-V)']
 
-        # Plot the likelihoods
-        fig, ax = plt.subplots()
         likes = chain[:, :, -1]
 
         # Plot the mean likelihood evolution
@@ -677,9 +678,8 @@ if __name__ == "__main__":
         ax.set_ylabel("ln_like")
 
         plt.tight_layout()
-        plt.show()
         plt.savefig('likelihoods.png')
-        plt.close()
+        plt.show()
 
         # Flatten the chain for the thumbplot. Strip off the ln_prob, too
         flat = flatchain(chain[:, :, :-1])
