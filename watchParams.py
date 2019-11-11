@@ -518,10 +518,10 @@ class Watcher():
 
         # Default values for the complex BS, as simple mcmc_input files may not have them:
         parDict = {
-            'exp1_0':    [ 1.00, 0.001,  5.0],
-            'exp2_0':    [ 2.00, 0.001,  5.0],
-            'tilt_0':    [45.00, 0.001,  180],
-            'yaw_0':     [ 0.00, -90.0, 90.0],
+            'exp1':    [ 1.00, 0.001,  5.0],
+            'exp2':    [ 2.00, 0.001,  5.0],
+            'tilt':    [45.00, 0.001,  180],
+            'yaw':     [ 0.00, -90.0, 90.0],
             'ln_ampin_gp':  [-9.99, -25.0, -1.0],
             'ln_ampout_gp': [-9.99, -25.0, -1.0],
             'ln_tau_gp':    [-5.00, -20.0, -1.0]
