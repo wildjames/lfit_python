@@ -28,18 +28,21 @@ import plot_lc_model as plotCV
 def ln_prior(param_vector, model):
     model.dynasty_par_vals = param_vector
     val = model.ln_prior()
+
     return val
 
 
 def ln_prob(param_vector, model):
     model.dynasty_par_vals = param_vector
     val = model.ln_prob()
+
     return val
 
 
 def ln_like(param_vector, model):
     model.dynasty_par_vals = param_vector
     val = model.ln_like()
+
     return val
 
 

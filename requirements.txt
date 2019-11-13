@@ -19,7 +19,7 @@ networkx==2.3
 numpy==1.17.1
 packaging==19.1
 pandas==0.25.1
-Pillow==6.1.0
+Pillow>6.2.0
 pprint==0.1
 pybind11==2.3.0
 pyparsing==2.4.2

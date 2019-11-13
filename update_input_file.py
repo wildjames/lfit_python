@@ -7,7 +7,8 @@ import argparse
 import configobj
 import numpy as np
 
-from mcmc_utils import flatchain, readchain
+from mcmc_utils import flatchain, readchain_dask as readchain
+
 
 
 def update_entry(name, input_dict, newval):
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     input_dict = configobj.ConfigObj(args.input_file)
+    print("Reading in the chain")
     chain = readchain(args.chain_file)
     nwalkers, nsteps, npars = chain.shape
     fchain = flatchain(chain, npars, thin=args.thin)
@@ -46,6 +48,9 @@ if __name__ == "__main__":
     # update
     for n, v in zip(fields, vals):
         if n in input_dict:
+            print("\nUpdating the entry:")
+            print("n: {}".format(n))
+            print("v: {}".format(v))
             update_entry(n, input_dict, v)
 
     input_dict.write()
