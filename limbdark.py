@@ -9,7 +9,7 @@ science.
 from __future__ import print_function
 
 from builtins import input, zip
-
+import os
 import numpy as np
 from scipy.interpolate import (RectBivariateSpline, SmoothBivariateSpline,
                                interp2d)
@@ -19,7 +19,7 @@ def ld (band,logg,teff,law='linear'):
     assert band in ['u','g','r','i','z']
     assert law in ['linear','quad','sqr']
 
-    filename = '/'.join(__file__.split('/')[:-1])
+    filename = os.path.split(os.path.abspath(__file__))[0]
     filename += '/Gianninas13/ld_coeffs_%s.txt' % band
     data=np.loadtxt(filename)
     x=data[:,0] #logg (grid increments through all teffs at a single logg, then +logg)
