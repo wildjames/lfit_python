@@ -14,17 +14,20 @@ import lfit
 import numpy as np
 from trm import roche
 
-from model import Node, Param
+from model import Node, Param, extract_par_and_key
 
 
 class Lightcurve:
     '''This object keeps track of the observational data.
     Can be generated from a file, with Lightcurve.from_calib(file).'''
-    def __init__(self, name, x, y, ye, w, fname=''):
+    def __init__(self, name, x, y, ye, w=None):
         '''Here, hold this.'''
         self.name = name
 
-        self.fname = fname
+        self.fname = None
+
+        if w is None:
+            w = np.mean(np.diff(x))*np.ones_like(x)/2.
 
         self.x = x
         self.y = y
@@ -42,8 +45,13 @@ class Lightcurve:
 
         and treat lines with # as commented out.
         '''
-
-        data = np.loadtxt(fname, delimiter=' ', comments='#')
+        delimiters = ' ,|'
+        for delimiter in delimiters:
+            try:
+                data = np.loadtxt(fname, delimiter=delimiter, comments='#')
+                break
+            except ValueError as exception:
+                print("Couldn't split the calib file with '{}', trying next delimiter...".format(delimiter))
         phase, flux, error = data.T
 
         # Filter out nans.
@@ -59,7 +67,9 @@ class Lightcurve:
         if name is None:
             _, name = os.path.split(fname)
 
-        return cls(name, phase, flux, error, width, fname=fname)
+        lc = cls(name, phase, flux, error, width)
+        lc.fname = fname
+        return lc
 
     def trim(self, lo, hi):
         '''Trim the data, so that all points are in the x range lo > xi > hi'''
@@ -127,8 +137,10 @@ class SimpleEclipse(Node):
         try:
             flx = self.cv.calcFlux(self.cv_parlist, self.lc.x, self.lc.w)
         except Exception as e:
-            print(e)
-            self.log("SimpleEclipse.calcFlux", str(e))
+            print(repr(e))
+            msg = "Error: {}; parlist: {}".format(str(e), repr(self.cv_parlist))
+            print(msg)
+            self.log("SimpleEclipse.calcFlux", msg)
             flx = np.nan
 
         self.log('SimpleEclipse.calcFlux', "Computed a lightcurve flux: \n{}\n\n\n".format(flx))
@@ -209,7 +221,6 @@ class SimpleEclipse(Node):
         try:
             xl1 = roche.xl1(q)
         except AssertionError as err:
-            print(err)
             return -np.inf
 
 
@@ -447,7 +458,6 @@ class LCModel(Node):
                 return -np.inf
 
         except Exception as error:
-            print(error)
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
@@ -684,26 +694,7 @@ class ComplexGPEclipse(SimpleGPEclipse):
 
         return names
 
-
-def extract_par_and_key(key):
-    '''As stated. For example,
-    extract_par_and_key("wdFlux_long_complex_key_label)
-    >>> ("wdFlux", "long_complex_key_label")
-    '''
-
-    if key.startswith("ln_"):
-        key = key.split("_")
-
-        par = "_".join(key[:3])
-        label = "_".join(key[3:])
-
-    else:
-        par, label = key.split('_')[0], '_'.join(key.split('_')[1:])
-
-    return par, label
-
-
-def construct_model(input_file, debug=False):
+def construct_model(input_file, debug=False, nodata=False):
     '''Takes an input filename, and parses it into a model tree.
 
     Inputs:
@@ -870,10 +861,23 @@ def construct_model(input_file, debug=False):
 
             params.append(param)
 
-        # Get the observational data
-        lc_fname = input_dict['file_{}'.format(label)]
-        lc = Lightcurve.from_calib(lc_fname)
-        lc.trim(lo, hi)
+        if nodata:
+            print("Using a roughly blank data dummy.")
+            x = np.linspace(-0.5, 0.5, 100)
+            y = np.zeros_like(x)
+            yerr = np.ones_like(y)
+
+            lc = Lightcurve(
+                "Dummy_Data_{}".format(label),
+                x, y, yerr
+            )
+
+        else:
+            # Get the observational data
+            lc_fname = input_dict['file_{}'.format(label)]
+            lc = Lightcurve.from_calib(lc_fname)
+            lc.trim(lo, hi)
+
 
         # Get the band object that this eclipse belongs to
         my_band_label = input_dict['band_{}'.format(label)]

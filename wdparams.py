@@ -722,7 +722,6 @@ if __name__ == "__main__":
         chain = flatchain(sampler.chain, npars, thin=thin)
 
         # Plot the likelihoods
-        fig, ax = plt.subplots()
         likes = sampler.chain[:, :, -1]
 
         # Plot the mean likelihood evolution
