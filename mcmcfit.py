@@ -125,7 +125,6 @@ if __name__ in '__main__':
     scatter_2 = float(input_dict['second_scatter'])
     to_fit = int(input_dict['fit'])
     use_pt = bool(int(input_dict['usePT']))
-    use_BH = bool(int(input_dict['useBH']))
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
@@ -240,30 +239,7 @@ if __name__ in '__main__':
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
 
-    if use_BH:
-        print("Using simulated annealing to model the data")
-        import scipy.optimize as opt
-
-        # Basinhopping parameters:
-        T = 1.0
-        niter = 10
-        stepsize = 0.5
-        niter_success = 10
-
-        def print_fun(x, f, accepted):
-                print("at minimum %.4f accepted %d" % (f, int(accepted)))
-
-        print("Initial position has likelihood: {}".format(ln_like(p_0, model)))
-
-        result = opt.basinhopping(
-            ln_prob, p_0, T=T, niter=niter, stepsize=stepsize,
-            niter_success=niter_success, minimizer_kwargs={'args': (model,)},
-            callback=print_fun, disp=True
-        )
-        print(result)
-        input("> ")
-
-    elif use_pt:
+    if use_pt:
         mp.set_start_method("forkserver")
         pool = mp.Pool(nthreads)
         print("MCMC using parallel tempering at {} levels, for {} total walkers.".format(ntemps, nwalkers*ntemps))
