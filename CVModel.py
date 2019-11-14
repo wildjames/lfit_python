@@ -403,6 +403,10 @@ class Band(Node):
     # What kind of parameters are we storing here?
     node_par_names = ('wdFlux', 'rsFlux', 'ulimb')
 
+    @property
+    def eclipses(self):
+        return list(self.search_node_type("Eclipse"))
+
 
 class LCModel(Node):
     '''Top layer Node class. Contains Bands, which contain Eclipses.
@@ -421,6 +425,10 @@ class LCModel(Node):
 
     # Set the parameter names for this layer
     node_par_names = ('q', 'dphi', 'rwd')
+
+    @property
+    def eclipses(self):
+        return list(self.search_node_type("Eclipse"))
 
     def ln_prior(self, verbose=False):
         '''Before we calculate the ln_prior of myself or my children, I check
