@@ -11,12 +11,15 @@ import configobj
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import yagmail as yag
 from random import choice
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
 
+try:
+    import yagmail as yag
+except ImportError:
+    pass
 
 def nxdraw(model):
     '''Draw a hierarchical node map of a model.'''
@@ -553,7 +556,13 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
-        notipy(destination, fnames, model_preport+model_report)
+        # Add the input file to the email
+        with open(input_fname) as input_file:
+            input_text = input_file.readlines()
+            input_text = '\n'.join(input_text)
+        input_text = "\n\n\n\nInput file to the model fit:\n"
+
+        notipy(destination, fnames, model_preport+model_report+input_text)
 
 
     print("The chain file has the folloing variables:")
