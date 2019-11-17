@@ -559,8 +559,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         # Add the input file to the email
         with open(input_fname) as input_file:
             input_text = input_file.readlines()
-            input_text = '\n'.join(input_text)
-        input_text = "\n\n\n\nInput file to the model fit:\n"
+        input_text = ''.join(input_text)
+        input_text = "\n\n\n\nInput file to the model fit:\n"+input_text
 
         notipy(destination, fnames, model_preport+model_report+input_text)
 
