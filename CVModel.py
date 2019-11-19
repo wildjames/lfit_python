@@ -871,7 +871,7 @@ def construct_model(input_file, debug=False, nodata=False):
 
         if nodata:
             print("Using a roughly blank data dummy.")
-            x = np.linspace(-0.5, 0.5, 100)
+            x = np.linspace(-0.5, 0.5, 1000)
             y = np.zeros_like(x)
             yerr = np.ones_like(y)
 
