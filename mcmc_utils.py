@@ -3,7 +3,6 @@ Helper functions to aid the MCMC nuts and bolts.
 '''
 import warnings
 
-import dask.dataframe as dd
 import emcee
 import numpy as np
 import pandas as pd
@@ -22,6 +21,11 @@ except (AttributeError, ImportError):
     # print("Could not import package, `triangle`, falling back on `corner.triangle`")
     import corner as triangle
 
+try:
+    import dask.dataframe as dd
+    use_dask = True
+except ImportError:
+    use_dask = False
 
 TINY = -np.inf
 
@@ -229,6 +233,10 @@ def readchain(file, **kwargs):
 def readchain_dask(file, **kwargs):
     '''Reads in the chain file using threading.
     Returns the chain in the shape (nwalkers, nprod, npars).'''
+
+    if not use_dask:
+        return readchain(file, **kwargs)
+
     data = dd.io.read_csv(file, engine='c', header=0, compression=None,
                           na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
