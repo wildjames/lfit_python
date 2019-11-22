@@ -48,52 +48,149 @@ class Prior(object):
     they act as a jeffrey's prior about p0, and uniform below p0. typically
     set p0=noise level
     '''
-    def __init__(self, type, p1, p2):
-        assert type in ['gauss', 'gaussPos', 'uniform', 'log_uniform', 'mod_jeff']
+    def __init__(self, type, p1, p2, cube_prior=False):
+        assert type in dir(self)
         self.type = type
+
         self.p1 = p1
         self.p2 = p2
+
+        if type in ['log_uniform', 'uniform', 'mod_jeff']:
+            if not p1 < p2:
+                raise ValueError("Uniform-like priors cannot start after they finish!")
+
         if type == 'log_uniform' and self.p1 < 1.0e-30:
             warnings.warn('lower limit on log_uniform prior rescaled from %f to 1.0e-30' % self.p1)
             self.p1 = 1.0e-30
+
         if type == 'log_uniform':
             self.normalise = 1.0
             self.normalise = np.fabs(intg.quad(self.ln_prob, self.p1, self.p2)[0])
+
         if type == 'mod_jeff':
             self.normalise = np.log((self.p1+self.p2)/self.p1)
 
     def ln_prob(self, val):
-        if self.type == 'gauss':
-            prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
-            if prob > 0:
-                return np.log(prob)
-            else:
-                return TINY
-        elif self.type == 'gaussPos':
-            if val <= 0.0:
-                return TINY
-            else:
-                prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
-                if prob > 0:
-                    return np.log(prob)
-                else:
-                    return TINY
-        elif self.type == 'uniform':
-            if (val > self.p1) and (val < self.p2):
-                return np.log(1.0/np.abs(self.p1-self.p2))
-            else:
-                return TINY
-        elif self.type == 'log_uniform':
-            if (val > self.p1) and (val < self.p2):
-                return np.log(1.0 / self.normalise / val)
-            else:
-                return TINY
-        elif self.type == 'mod_jeff':
-            if (val > 0) and (val < self.p2):
-                return np.log(1.0 / self.normalise / (val+self.p1))
+        '''Call the method associated with my prior type.
+        Pass it <val>
+
+        Returns the output of that method'''
+        prob_func = getattr(self, self.type)
+        prob = prob_func(val)
+
+        if prob == TINY:
+            ln_prob = TINY
+        else:
+            ln_prob = np.log(prob)
+
+        return ln_prob
+
+    def gauss(self, val):
+        prob = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
+        if prob > 0:
+            return prob
+        else:
+            return TINY
+
+    def gaussPos(self, val):
+        if val <= 0.0:
+            return TINY
+        else:
+            draw = stats.norm(scale=self.p2, loc=self.p1).pdf(val)
+            if draw > 0:
+                return draw
             else:
                 return TINY
 
+    def uniform(self, val):
+        if (val > self.p1) and (val < self.p2):
+            draw = 1.0/np.abs(self.p1-self.p2)
+            return draw
+        else:
+            return TINY
+
+    def log_uniform(self, val):
+        if (val > self.p1) and (val < self.p2):
+            draw = 1.0 / self.normalise / val
+            return draw
+        else:
+            return TINY
+
+    def mod_jeff(self, val):
+        if (val > 0) and (val < self.p2):
+            draw = 1.0 / self.normalise / (val+self.p1)
+            return draw
+        else:
+            return TINY
+
+
+class CubePrior(Prior):
+    '''
+    For each prior function in the Prior class, there must be
+    a corresponding <from_unit_cube_{}> function on this one for it to be
+    usable with simulated annealing.
+
+    The <from_unit_cube_{}> function must take a value, u, between 0:1, and
+    transform it according to this equation:
+
+    ln_prob(\theta) d(theta) = d(u)
+
+    for a parameter theta.
+
+    Ideally, solve this analytically. Failing that, numerical integration
+    is likely the best way to go.
+    '''
+    def ln_prob(self, u):
+        '''This class takes a value, u, between 0:1, and transforms it into
+        the actual, desired value, theta.
+
+        Returns the ln_prob of that value as usual'''
+
+        from_unit_cube_func = getattr(self, "from_unit_cube_{}".format(self.type))
+        theta = from_unit_cube_func(u)
+        return super().ln_prob(theta)
+
+    def error_function(self, x):
+        '''Handbook of Mathematical Functions, formula 7.1.26.
+
+        error is less than 1.5e-7 for all inputs.
+        '''
+        # save the sign of x
+        sign = 1 if x >= 0 else -1
+        x = abs(x)
+
+        # constants
+        a1 = 0.254829592
+        a2 = -0.284496736
+        a3 = 1.421413741
+        a4 = -1.453152027
+        a5 = 1.061405429
+        p = 0.3275911
+
+        # A&S formula 7.1.26
+        t = 1.0/(1.0 + p*x)
+        y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*np.exp(-x*x)
+        return sign*y
+
+    def from_unit_cube_gauss(self, u):
+        theta = u
+        return theta
+
+    def from_unit_cube_gaussPos(self, u):
+        theta = u
+        return theta
+
+    def from_unit_cube_uniform(self, u):
+        theta = u
+        return theta
+
+    def from_unit_cube_log_uniform(self, u):
+        theta = u
+        return theta
+
+    def from_unit_cube_mod_jeff(self, u):
+        theta = u
+        return theta
 
 class Param(object):
     '''A Param needs a starting value, a current value, and a prior

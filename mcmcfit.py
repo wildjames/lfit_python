@@ -18,10 +18,12 @@ from sys import exit
 import configobj
 import emcee
 import numpy as np
+import pymultinest
 
 import mcmc_utils as utils
-from CVModel import construct_model, extract_par_and_key
 import plot_lc_model as plotCV
+from CVModel import construct_model, extract_par_and_key
+
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -128,6 +130,8 @@ if __name__ in '__main__':
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
+    use_sa = bool(int(input_dict['useSA']))
+
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
     try:
@@ -174,6 +178,15 @@ if __name__ in '__main__':
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
     if not to_fit:
       exit()
+
+    if use_sa:
+        print("Using simulated annealing")
+        # We need a function that maps our priors to the interval 0:1
+
+
+
+        exit()
+
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #

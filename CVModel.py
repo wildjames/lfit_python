@@ -43,7 +43,12 @@ class Lightcurve:
         and treat lines with # as commented out.
         '''
 
-        data = np.loadtxt(fname, delimiter=' ', comments='#')
+        for delimiter in ' ,|':
+            try:
+                data = np.loadtxt(fname, delimiter=delimiter, comments='#')
+                break
+            except:
+                print("Failed to get the data using the delimiter {}...".format(delimiter))
         phase, flux, error = data.T
 
         # Filter out nans.
