@@ -585,9 +585,11 @@ class Node:
         par_vector = []
         for par_name, u_i in zip(self.dynasty_par_names, cube):
             par = par_dict[par_name]
-            prior = par.prior
 
-            val = self.cube_converter.convert(u_i, prior)
+            if not par.isVar:
+                continue
+
+            val = self.cube_converter.convert(u_i, par.prior)
             par_vector.append(val)
 
         self.dynasty_par_vals = par_vector
