@@ -49,7 +49,7 @@ class Prior(object):
     they act as a jeffrey's prior about p0, and uniform below p0. typically
     set p0=noise level
     '''
-    def __init__(self, type, p1, p2, cube_prior=False):
+    def __init__(self, type, p1, p2):
         assert type in dir(self)
         self.type = type
 
@@ -125,13 +125,13 @@ class Prior(object):
             return TINY
 
 
-class CubePrior(Prior):
+class CubeConverter(object):
     '''
     For each prior function in the Prior class, there must be
-    a corresponding <from_unit_cube_{}> function on this one for it to be
+    a corresponding <cube2func> function on this one for it to be
     usable with simulated annealing.
 
-    The <from_unit_cube_{}> function must take a value, u, between 0:1, and
+    The <cube2func> function must take a value, u, between 0:1, and
     transform it according to this equation:
 
     ln_prob(\theta) d(theta) = d(u)
@@ -141,35 +141,31 @@ class CubePrior(Prior):
     Ideally, solve this analytically. Failing that, numerical integration
     is likely the best way to go.
     '''
-    def ln_prob(self, u):
-        '''This class takes a value, u, between 0:1, and transforms it into
-        the actual, desired value, theta.
-
-        Returns the ln_prob of that value as usual'''
-
-        from_unit_cube_func = getattr(self, "from_unit_cube_{}".format(self.type))
-        theta = from_unit_cube_func(u)
-        return super().ln_prob(theta)
-
-    def from_unit_cube_gauss(self, u_i):
-        '''Gaussian has a mean, mu, and a deviation of sigma.'''
-        theta_i = self.p2 * np.sqrt(2) * erfinv(2*u_i - 1) + self.p1
+    def convert(self, u_i, prior):
+        func = getattr(self, "cube2{}".format(prior.type))
+        theta_i = func(u_i, prior.p1, prior.p2)
         return theta_i
 
-    def from_unit_cube_uniform(self, u):
-        theta = self.p1 + (u*np.abs(self.p2 - self.p1))
+    def cube2gauss(self, u_i, p1, p2):
+        '''Gaussian has a mean, mu, and a deviation of sigma.'''
+        theta_i = p2 * np.sqrt(2) * erfinv(2*u_i - 1) + p1
+        return theta_i
+
+    def cube2uniform(self, u, p1, p2):
+        theta = p1 + (u*np.abs(p2 - p1))
         return theta
 
-    def from_unit_cube_log_uniform(self, u):
-        ln_theta = np.log(self.p1) + (u * (np.log(self.p2) - np.log(self.p1)))
+    def cube2log_uniform(self, u, p1, p2):
+        ln_theta = np.log(p1) + (u * (np.log(p2) - np.log(p1)))
         theta = np.exp(ln_theta)
         return theta
 
-    def from_unit_cube_gaussPos(self, u):
+    def cube2gaussPos(self, u, p1, p2):
         raise NotImplementedError("GaussPos has not been implimented with MultiNest!")
 
-    def from_unit_cube_mod_jeff(self, u):
+    def cube2mod_jeff(self, u, p1, p2):
         raise NotImplementedError("Modified Jefferies prior not implemented with MultiNest!")
+
 
 class Param(object):
     '''A Param needs a starting value, a current value, and a prior
@@ -182,7 +178,7 @@ class Param(object):
         self.isVar = isVar
 
     @classmethod
-    def fromString(cls, name, parString):
+    def fromString(cls, name, parString, cubePrior=False):
         fields = parString.split()
         val = float(fields[0])
         priorType = fields[1].strip()
@@ -192,7 +188,12 @@ class Param(object):
             isVar = bool(int(fields[4]))
         else:
             isVar = True
-        return cls(name, val, Prior(priorType, priorP1, priorP2), isVar)
+
+        if cubePrior:
+            return cls(name, val, CubePrior(priorType, priorP1, priorP2), isVar)
+        else:
+            return cls(name, val, Prior(priorType, priorP1, priorP2), isVar)
+
 
     @property
     def isValid(self):
@@ -318,6 +319,10 @@ class Node:
         # Add the parameters to the self.XXX.
         for par in parameter_objects:
             setattr(self, par.name, par)
+
+        # Sometimes, I'll need to convert values from the range 0:1, into
+        # a corresponding prior distribution. This object does that
+        self.cube_converter = CubeConverter()
 
         self.log('base.__init__', "Successfully did the base Node init")
 
@@ -555,6 +560,18 @@ class Node:
                 print("{} ln_prior returned infinite!".format(self.name))
             self.log('base.ln_prob', "{} ln_prior returned infinite!".format(self.name))
             return lnp
+
+    def set_cube(self, cube):
+        '''Takes a vector within a unit hypercube (0:1 on each side, one side per parameter), and transforms it to the corresponding values for the parameters in accordance with their priors.'''
+
+        par_vector = []
+        for par, u_i in zip(self.__get_descendant_params__(), cube):
+            prior = par.prior
+            val = self.cube_converter.convert(u_i, prior)
+
+            par_vector.append(val)
+
+        self.dynasty_par_vals = par_vector
 
     # Dunder methods that are generally hidden from the user.
     def __get_inherited_parameter_names__(self):

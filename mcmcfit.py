@@ -130,8 +130,6 @@ if __name__ in '__main__':
     double_burnin = bool(int(input_dict['double_burnin']))
     comp_scat = bool(int(input_dict['comp_scat']))
 
-    use_sa = bool(int(input_dict['useSA']))
-
     # neclipses no longer strictly necessary, but can be used to limit the
     # maximum number of fitted eclipses
     try:
@@ -178,15 +176,6 @@ if __name__ in '__main__':
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
     if not to_fit:
       exit()
-
-    if use_sa:
-        print("Using simulated annealing")
-        # We need a function that maps our priors to the interval 0:1
-
-
-
-        exit()
-
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     #  MCMC Chain sampler, handled by emcee.                      #

@@ -708,7 +708,7 @@ def extract_par_and_key(key):
     return par, label
 
 
-def construct_model(input_file, debug=False):
+def construct_model(input_file, debug=False, cube_prior=False):
     '''Takes an input filename, and parses it into a model tree.
 
     Inputs:
@@ -758,7 +758,7 @@ def construct_model(input_file, debug=False):
     # Start by creating the overall Node. Gather the parameters:
     if use_gp:
         core_par_names = GPLCModel.node_par_names
-        core_pars = [Param.fromString(name, input_dict[name])
+        core_pars = [Param.fromString(name, input_dict[name], cubePrior=cube_prior)
                      for name in core_par_names]
         if debug:
             print("Using the GP!")
@@ -770,7 +770,7 @@ def construct_model(input_file, debug=False):
         model = GPLCModel('core', core_pars, DEBUG=debug)
     else:
         core_par_names = LCModel.node_par_names
-        core_pars = [Param.fromString(name, input_dict[name])
+        core_pars = [Param.fromString(name, input_dict[name], cubePrior=cube_prior)
                      for name in core_par_names]
 
         if debug:
@@ -843,7 +843,7 @@ def construct_model(input_file, debug=False):
             string = input_dict[key]
 
             # Make the Param object, and save it
-            band_pars.append(Param.fromString(par, string))
+            band_pars.append(Param.fromString(par, string, cubePrior=cube_prior))
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
@@ -871,7 +871,7 @@ def construct_model(input_file, debug=False):
         params = []
         for par in ecl_pars:
             key = "{}_{}".format(par, label)
-            param = Param.fromString(par, input_dict[key])
+            param = Param.fromString(par, input_dict[key], cubePrior=cube_prior)
 
             params.append(param)
 
