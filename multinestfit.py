@@ -18,22 +18,22 @@ from CVModel import construct_model, extract_par_and_key
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
-def ln_prior(param_vector, model):
-    model.dynasty_par_vals = param_vector
+def ln_prior(cube, model):
+    model.set_cube(cube)
     val = model.ln_prior()
 
     return val
 
 
-def ln_prob(param_vector, model):
-    model.dynasty_par_vals = param_vector
+def ln_prob(cube, model):
+    model.set_cube(cube)
     val = model.ln_prob()
 
     return val
 
 
-def ln_like(param_vector, model):
-    model.dynasty_par_vals = param_vector
+def ln_like(cube, model):
+    model.set_cube(cube)
     val = model.ln_like()
 
     return val
@@ -160,6 +160,6 @@ if __name__ in '__main__':
         plotCV.nxdraw(model)
         plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
     if not to_fit:
-      exit()
+        exit()
 
 

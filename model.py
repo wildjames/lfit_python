@@ -581,11 +581,13 @@ class Node:
     def set_cube(self, cube):
         '''Takes a vector within a unit hypercube (0:1 on each side, one side per parameter), and transforms it to the corresponding values for the parameters in accordance with their priors.'''
 
+        par_dict = self.dynasty_par_dict
         par_vector = []
-        for par, u_i in zip(self.__get_descendant_params__(), cube):
+        for par_name, u_i in zip(self.dynasty_par_names, cube):
+            par = par_dict[par_name]
             prior = par.prior
-            val = self.cube_converter.convert(u_i, prior)
 
+            val = self.cube_converter.convert(u_i, prior)
             par_vector.append(val)
 
         self.dynasty_par_vals = par_vector
@@ -788,7 +790,7 @@ class Node:
 
     @property
     def dynasty_par_dict(self):
-        return {k:v for k,v in zip(self.dynasty_par_names, self.dynasty_par_vals)}
+        return {k:self[k] for k in self.dynasty_par_names}
 
     @property
     def ancestor_param_dict(self):
