@@ -11,6 +11,7 @@ import george
 import networkx as nx
 import numpy as np
 import scipy.integrate as intg
+from scipy.special import erfinv, erf
 import scipy.stats as stats
 from matplotlib import pyplot as plt
 
@@ -150,47 +151,25 @@ class CubePrior(Prior):
         theta = from_unit_cube_func(u)
         return super().ln_prob(theta)
 
-    def error_function(self, x):
-        '''Handbook of Mathematical Functions, formula 7.1.26.
-
-        error is less than 1.5e-7 for all inputs.
-        '''
-        # save the sign of x
-        sign = 1 if x >= 0 else -1
-        x = abs(x)
-
-        # constants
-        a1 = 0.254829592
-        a2 = -0.284496736
-        a3 = 1.421413741
-        a4 = -1.453152027
-        a5 = 1.061405429
-        p = 0.3275911
-
-        # A&S formula 7.1.26
-        t = 1.0/(1.0 + p*x)
-        y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*np.exp(-x*x)
-        return sign*y
-
-    def from_unit_cube_gauss(self, u):
-        theta = u
-        return theta
-
-    def from_unit_cube_gaussPos(self, u):
-        theta = u
-        return theta
+    def from_unit_cube_gauss(self, u_i):
+        '''Gaussian has a mean, mu, and a deviation of sigma.'''
+        theta_i = self.p2 * np.sqrt(2) * erfinv(2*u_i - 1) + self.p1
+        return theta_i
 
     def from_unit_cube_uniform(self, u):
-        theta = u
+        theta = self.p1 + (u*np.abs(self.p2 - self.p1))
         return theta
 
     def from_unit_cube_log_uniform(self, u):
-        theta = u
+        ln_theta = np.log(self.p1) + (u * (np.log(self.p2) - np.log(self.p1)))
+        theta = np.exp(ln_theta)
         return theta
 
+    def from_unit_cube_gaussPos(self, u):
+        raise NotImplementedError("GaussPos has not been implimented with MultiNest!")
+
     def from_unit_cube_mod_jeff(self, u):
-        theta = u
-        return theta
+        raise NotImplementedError("Modified Jefferies prior not implemented with MultiNest!")
 
 class Param(object):
     '''A Param needs a starting value, a current value, and a prior
