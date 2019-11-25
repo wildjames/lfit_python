@@ -420,8 +420,11 @@ if __name__ == "__main__":
             fchain = flatchain(chain, thin=thin)
         print("Done!")
 
+        # Force colkeys to be lowercase
+        colKeys = [key.lower() for key in colKeys]
+
         # Get the filters used from the column headers
-        filters = [key.lower() for key in colKeys if key.startswith("wdFlux_")]
+        filters = [key.lower() for key in colKeys if key.startswith("wdflux_")]
         filters = np.array(filters)
         print("I have the following filters:\n", filters)
 
@@ -435,9 +438,9 @@ if __name__ == "__main__":
     # # # # # # # # # # # # # # # # # # # # # #
 
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
-    if 'wdFlux_u' in colKeys:
+    if 'wdflux_u' in colKeys:
 
-        index = colKeys.index('wdFlux_u')
+        index = colKeys.index('wdflux_u')
         uband = fchain[:, index]
         uband = np.array([uband])
 
@@ -467,8 +470,8 @@ if __name__ == "__main__":
 
             uband_used = True
 
-    if 'wdFlux_g' in colKeys:
-        index = colKeys.index('wdFlux_g')
+    if 'wdflux_g' in colKeys:
+        index = colKeys.index('wdflux_g')
         gband = fchain[:, index]
         gband = np.array([gband])
 
@@ -500,8 +503,8 @@ if __name__ == "__main__":
             gband_used = True
 
 
-    if 'wdFlux_r' in colKeys:
-        index = colKeys.index('wdFlux_r')
+    if 'wdflux_r' in colKeys:
+        index = colKeys.index('wdflux_r')
         rband = fchain[:, index]
         rband = np.array([rband])
 
@@ -533,8 +536,8 @@ if __name__ == "__main__":
             rband_used = True
 
 
-    if 'wdFlux_i' in colKeys:
-        index = colKeys.index('wdFlux_i')
+    if 'wdflux_i' in colKeys:
+        index = colKeys.index('wdflux_i')
         iband = fchain[:, index]
         iband = np.array([iband])
 
@@ -566,8 +569,8 @@ if __name__ == "__main__":
             iband_used = True
 
 
-    if 'wdFlux_z' in colKeys:
-        index = colKeys.index('wdFlux_z')
+    if 'wdflux_z' in colKeys:
+        index = colKeys.index('wdflux_z')
         zband = fchain[:, index]
         zband = np.array([zband])
 
@@ -597,8 +600,8 @@ if __name__ == "__main__":
 
             zband_used = True
 
-    if 'wdFlux_kg5' in colKeys:
-        index = colKeys.index('wdFlux_kg5')
+    if 'wdflux_kg5' in colKeys:
+        index = colKeys.index('wdflux_kg5')
         kg5band = fchain[:, index]
         kg5band = np.array([kg5band])
 
@@ -722,7 +725,6 @@ if __name__ == "__main__":
         chain = flatchain(sampler.chain, npars, thin=thin)
 
         # Plot the likelihoods
-        fig, ax = plt.subplots()
         likes = sampler.chain[:, :, -1]
 
         # Plot the mean likelihood evolution

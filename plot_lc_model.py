@@ -11,12 +11,17 @@ import configobj
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import yagmail as yag
 from random import choice
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
 
+try:
+    import yagmail as yag
+    no_yag = False
+except ImportError:
+    print("Couldn't import yagmail, emailing is disabled!")
+    no_yag = True
 
 def nxdraw(model):
     '''Draw a hierarchical node map of a model.'''
@@ -292,7 +297,7 @@ def plot_model(model, show, *args, **kwargs):
         del ax
 
 
-def notipy(send_to, fnames, body):
+def notify(send_to, fnames, body):
     '''Handle the actual sending an email. A pre-defined bot (login details
     in email_details.json) will send an email.
 
@@ -305,6 +310,8 @@ def notipy(send_to, fnames, body):
       body: str
         The main text of the email
     '''
+    if no_yag:
+        return
     print("fnames: ")
     for name in fnames:
         print("-> '{}'".format(name))
@@ -553,7 +560,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
-        notipy(destination, fnames, model_preport+model_report)
+        notify(destination, fnames, model_preport+model_report)
 
 
     print("The chain file has the folloing variables:")
