@@ -102,7 +102,7 @@ class WaveSolver(Solver):
 
 # Dumb toy model. Literally just a sine wave
 def model(x, vect):
-    a,b,c = vect
+    a,b,c,d = vect
 
     value = a * np.sin(b*x) + c
     return value
@@ -121,7 +121,7 @@ def chisq(vect, data, func):
 # # Generate some toy data here # #
 # # # # # # # # # # # # # # # # # #
 
-actual_vect = (5, 10, 3)
+actual_vect = (5, 10, 3, 5)
 err = 0.5
 N_data = 10
 # How many dimensions have we got?
@@ -135,18 +135,19 @@ yerr = np.ones_like(y) * err
 # This is my observational data '''lightcurve'''
 observations = (x, y, yerr)
 
-# Two uniform priors, the first from 2:8, the second from 6:14
+# uniform priors
 p1 = Prior('uniform', 0, 10)
 p2 = Prior('uniform', 0, 20)
 p3 = Prior('uniform', 0, 10)
-plist = [p1, p2, p3]
+dummy_param = Prior('uniform', 0, 10)
+
+plist = [p1, p2, p3, dummy_param]
 
 
 # Run the solver
 solution = WaveSolver(
     func=model, data=observations, prior_list=plist,
-    n_dims=dims, verbose=True, outputfiles_basename='./out/',
-
+    n_dims=dims, verbose=True, outputfiles_basename='./out/'
 )
 
 
@@ -176,8 +177,10 @@ print("A.K.A, ")
 print("y = {:.3f} * sin({:.3f}*x) + {:.3f}".format(*pos))
 print("A model at this vector has chisq = {:.3f}".format(chisq(pos, observations, model)))
 print("Actual solution: y = {:.3f} * sin({:.3f}*x) + {:.3f}".format(*actual_vect))
+print("i.e., discrepancies of:")
+for found, actual in zip(pos, actual_vect):
+    print("  -> {:.1f}%".format(100*(found - actual)/actual))
 
-print("Best fit parameters:\n{}".format(bestfit_params['parameters']))
 
 ## Plot results
 MN_x = np.linspace(x.min(), x.max(), 1000)
@@ -196,7 +199,7 @@ ax.legend()
 
 # "posterior chain" kinda but not really, this is actually the
 chain = a.get_equal_weighted_posterior()[:, :dims]
-thumb_fig = thumbPlot(chain, ['a', 'b', 'c'])
+thumb_fig = thumbPlot(chain, ['a', 'b', 'c', 'd'])
 
 
 plt.tight_layout()
