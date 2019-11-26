@@ -139,7 +139,7 @@ observations = (x, y, yerr)
 p1 = Prior('uniform', 0, 10)
 p2 = Prior('uniform', 0, 20)
 p3 = Prior('uniform', 0, 10)
-dummy_param = Prior('uniform', 0, 10)
+dummy_param = Prior('gauss', 5, 1)
 
 plist = [p1, p2, p3, dummy_param]
 
@@ -170,6 +170,8 @@ pos = bestfit_params['parameters']
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("  -> The model is y = a*sin(b*x) + c")
+print("  -> It also has a dummy parameter, 'd', which has no effect. This should have its prior ({}({}:{})) reproduced.".format(dummy_param.type, dummy_param.p1, dummy_param.p2))
 print(solution)
 print("Multinest best fit parameters:")
 print(pos)
