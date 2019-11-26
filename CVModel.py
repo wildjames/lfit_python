@@ -752,7 +752,7 @@ def construct_model(input_file, debug=False, nodata=False):
     # Start by creating the overall Node. Gather the parameters:
     if use_gp:
         core_par_names = GPLCModel.node_par_names
-        core_pars = [Param.fromString(name, input_dict[name], cubePrior=cube_prior)
+        core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
         if debug:
             print("Using the GP!")
@@ -764,7 +764,7 @@ def construct_model(input_file, debug=False, nodata=False):
         model = GPLCModel('core', core_pars, DEBUG=debug)
     else:
         core_par_names = LCModel.node_par_names
-        core_pars = [Param.fromString(name, input_dict[name], cubePrior=cube_prior)
+        core_pars = [Param.fromString(name, input_dict[name])
                      for name in core_par_names]
 
         if debug:
@@ -837,7 +837,7 @@ def construct_model(input_file, debug=False, nodata=False):
             string = input_dict[key]
 
             # Make the Param object, and save it
-            band_pars.append(Param.fromString(par, string, cubePrior=cube_prior))
+            band_pars.append(Param.fromString(par, string))
 
         # Define the band as a child of the model.
         Band(label, band_pars, parent=model)
@@ -865,15 +865,15 @@ def construct_model(input_file, debug=False, nodata=False):
         params = []
         for par in ecl_pars:
             key = "{}_{}".format(par, label)
-            param = Param.fromString(par, input_dict[key], cubePrior=cube_prior)
+            param = Param.fromString(par, input_dict[key])
 
             params.append(param)
 
         if nodata:
             print("Using a roughly blank data dummy.")
-            x = np.linspace(-0.5, 0.5, 1000)
-            y = np.zeros_like(x)
-            yerr = np.ones_like(y)
+            x = np.random.uniform(-0.5, 0.5, 250)
+            yerr = np.ones_like(x) * 0.05
+            y = np.zeros_like(x) + np.random.normal(0, 0.05, x.shape)
 
             lc = Lightcurve(
                 "Dummy_Data_{}".format(label),

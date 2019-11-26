@@ -75,7 +75,7 @@ class Prior(object):
         self.p2 = p2
 
         if type in ['log_uniform', 'uniform', 'mod_jeff']:
-            if not p1 < p2:
+            if p1 > p2:
                 raise ValueError("Uniform-like priors cannot start after they finish!")
 
         if type == 'log_uniform' and self.p1 < 1.0e-30:
@@ -767,6 +767,16 @@ class Node:
         # Make sure my children know who's in charge
         for child in self.__children:
             child.__parent = self
+
+    @property
+    def n_params(self):
+        '''How many parameters does the model at and below this node consist of?'''
+        return len(self.__get_descendant_params__()[0])
+
+    @property
+    def n_dim(self):
+        '''How many of the model parameters, at or below this node, are variable?'''
+        return len(self.__get_descendant_parameter_names__())
 
     @property
     def dynasty_par_names(self):
