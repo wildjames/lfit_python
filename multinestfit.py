@@ -61,7 +61,7 @@ class CubeConverter(object):
 
 
 class HierarchicalModelSolver(Solver):
-    DEBUG = True
+    DEBUG = False
     def __init__(self, model, *args, **kwargs):
         print("args passed to me:")
         print(args)
@@ -101,8 +101,8 @@ class HierarchicalModelSolver(Solver):
                 print("  theta = {:.2f}".format(theta))
                 print("  lnp = {:.2f}".format(prior.ln_prob(theta)))
 
-        if self.DEBUG:
-            input("> ")
+        # if self.DEBUG:
+        #     input("> ")
 
         return vect
 
@@ -258,13 +258,19 @@ if __name__ in '__main__':
 
     print("ndim: {}\nnparams: {}".format(ndim, nparams))
 
+    print(model.dynasty_par_vals)
+
+    input("Hit enter to start the solver: ")
     solution = HierarchicalModelSolver(
         model,
         outputfiles_basename='./out/',
         n_dims=ndim, n_params=nparams,
         n_live_points=nlive,
+        init_MPI=True,
         verbose=True
     )
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Done!")
 
     ## Analysis
     # create analyzer object
@@ -282,7 +288,6 @@ if __name__ in '__main__':
     pos = bestfit_params['parameters']
 
 
-    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print(solution)
