@@ -2,11 +2,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pymultinest.solve import Solver
+from pymultinest.analyse import Analyzer
 
 import sys
 sys.path.append("./lfit_TESTING/")
 from model import CubeConverter, Prior
-
+from mcmc_utils import thumbPlot
 
 class WaveSolver(Solver):
     DEBUG = False
@@ -119,10 +120,9 @@ def chisq(vect, data, func):
 # # # # # # # # # # # # # # # # # #
 # # Generate some toy data here # #
 # # # # # # # # # # # # # # # # # #
-# np.random.seed(0)
 
 actual_vect = (5, 10, 3)
-err = 0.2
+err = 0.5
 N_data = 10
 # How many dimensions have we got?
 dims = len(actual_vect)
@@ -136,9 +136,9 @@ yerr = np.ones_like(y) * err
 observations = (x, y, yerr)
 
 # Two uniform priors, the first from 2:8, the second from 6:14
-p1 = Prior('gauss', 5, 2)
-p2 = Prior('gauss', 10, 2)
-p3 = Prior('gauss', 3, 2)
+p1 = Prior('uniform', 0, 10)
+p2 = Prior('uniform', 0, 20)
+p3 = Prior('uniform', 0, 10)
 plist = [p1, p2, p3]
 
 
@@ -149,16 +149,37 @@ solution = WaveSolver(
 
 )
 
+
+## Analysis
+# create analyzer object
+a = Analyzer(dims, outputfiles_basename="./out/")
+
+# get a dictionary containing information about
+#   the logZ and its errors
+#   the individual modes and their parameters
+#   quantiles of the parameter posteriors
+stats = a.get_stats()
+
+# get the best fit (highest likelihood) point
+bestfit_params = a.get_best_fit()
+
+pos = bestfit_params['parameters']
+
+
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print(solution)
-print("Samples means:")
-pos = solution.samples.mean(axis=0)
+print("Multinest best fit parameters:")
 print(pos)
+print("A.K.A, ")
+print("y = {:.3f} * sin({:.3f}*x) + {:.3f}".format(*pos))
 print("A model at this vector has chisq = {:.3f}".format(chisq(pos, observations, model)))
 print("Actual solution: y = {:.3f} * sin({:.3f}*x) + {:.3f}".format(*actual_vect))
 
+print("Best fit parameters:\n{}".format(bestfit_params['parameters']))
+
+## Plot results
 MN_x = np.linspace(x.min(), x.max(), 1000)
 MN_y = model(MN_x, pos)
 ideal_y = model(MN_x, actual_vect)
@@ -170,10 +191,15 @@ ax.set_title(
 ax.errorbar(x, y, yerr, fmt='x ', color='black', label='Observations')
 ax.plot(MN_x, MN_y, color='red', linestyle='--', zorder=10, label='Multinest fit')
 ax.plot(MN_x, ideal_y, color='blue', linestyle='--', zorder=0, label='Actual values')
-
 ax.legend()
-plt.tight_layout()
 
+
+# "posterior chain" kinda but not really, this is actually the
+chain = a.get_equal_weighted_posterior()[:, :dims]
+thumb_fig = thumbPlot(chain, ['a', 'b', 'c'])
+
+
+plt.tight_layout()
 plt.show()
 
 
