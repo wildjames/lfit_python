@@ -1,165 +1,180 @@
 
-import argparse
-import multiprocessing as mp
-import os
-from pprint import pprint
-from shutil import rmtree
-from sys import exit
-
-import configobj
-import emcee
 import numpy as np
-import pymultinest
+import matplotlib.pyplot as plt
+from pymultinest.solve import Solver
 
-import mcmc_utils as utils
-import plot_lc_model as plotCV
-from CVModel import construct_model, extract_par_and_key
-
-
-# I need to wrap the model's ln_like, ln_prior, and ln_prob functions
-# in order to pickle them :(
-def ln_prior(cube, model):
-    model.set_cube(cube)
-    val = model.ln_prior()
-
-    return val
+import sys
+sys.path.append("./lfit_TESTING/")
+from model import CubeConverter, Prior
 
 
-def ln_prob(cube, model):
-    model.set_cube(cube)
-    val = model.ln_prob()
+class WaveSolver(Solver):
+    DEBUG = False
+    def __init__(self, func, data, prior_list, *args, **kwargs):
+        print("args passed to me:")
+        print(args)
+        print("Kwargs passed to me:")
+        for k, v in kwargs.items():
+            print("{}: {}".format(k, v))
 
-    return val
+        self.func = func
+        self.data = data
+        self.priors = prior_list
+        self.convert = CubeConverter().convert
+
+        super().__init__(*args, **kwargs)
+
+    def chisq(self, vect, cube=False):
+        '''Calculate the chisq of my function for a parameter vector'''
+        if cube:
+            thetas = []
+            for u, prior in zip(vect, self.priors):
+                theta = self.convert(u, prior)
+                thetas.append(theta)
+            vect = thetas
+
+        obs_x, obs_y, obs_yerr = self.data
+        mod_y = self.func(obs_x, vect)
+
+        chisq = ((obs_y - mod_y)/obs_yerr)**2
+        chisq = np.sum(chisq)
+        return chisq
+
+    def plot_model(self, vect, cube=False):
+        x, y, yerr = self.data
+
+        if cube:
+            thetas = []
+            for u, prior in zip(vect, self.priors):
+                theta = self.convert(u, prior)
+                thetas.append(theta)
+            vect = thetas
+
+        fig, ax = plt.subplots()
+        ax.set_title("Toy data: $y = {:.1f} * sin({:.1f}*x)$".format(*vect))
+        ax.errorbar(x, y, yerr, fmt='x ', color='black')
+        ax.plot(x, model(x, vect), color='red')
+        plt.show()
+
+    def Prior(self, cube):
+        '''Take a cube vector, and return the correct thetas'''
+        vect = []
+
+        if self.DEBUG:
+            print("Entered prior with this cube:")
+            print(cube)
+        for u, prior in zip(cube, self.priors):
+            if self.DEBUG:
+                print("--------")
+                print("  u = {:.2f}".format(u))
+            theta = self.convert(u, prior)
+
+            vect.append(theta)
+
+            if self.DEBUG:
+                print("  theta = {:.2f}".format(theta))
+                print("  lnp = {:.2f}".format(prior.ln_prob(theta)))
+
+        if self.DEBUG:
+            print("")
+
+        return vect
+
+    def LogLikelihood(self, vect):
+        '''Take a parameter vector, convert to desired parameters, and calculate the ln(like) of that vector
+
+        This will be maximized
+        '''
+        if self.DEBUG:
+            print("~~~~~~~~~~~")
+            print("Entered the LogLikelihood with this vector:")
+            print(vect)
+
+        chisq = self.chisq(vect)
+
+        if self.DEBUG:
+            print("Got chisq = {:.3f}".format(chisq))
+            print("~~~~~~~~~~~")
+
+        return -0.5*chisq
 
 
-def ln_like(cube, model):
-    model.set_cube(cube)
-    val = model.ln_like()
+# Dumb toy model. Literally just a sine wave
+def model(x, vect):
+    a,b,c = vect
 
-    return val
+    value = a * np.sin(b*x) + c
+    return value
+
+def chisq(vect, data, func):
+    x, y, err = data
+
+    model = func(x, vect)
+    chisq = ((y-model)/err)**2
+    chisq = np.sum(chisq)
+
+    return chisq
 
 
-if __name__ in '__main__':
+# # # # # # # # # # # # # # # # # #
+# # Generate some toy data here # #
+# # # # # # # # # # # # # # # # # #
+# np.random.seed(0)
 
-    # Set up the parser.
-    parser = argparse.ArgumentParser(
-        description='''Execute an MCMC fit to a dataset.'''
-    )
+actual_vect = (5, 10, 3)
+err = 0.2
+N_data = 10
+# How many dimensions have we got?
+dims = len(actual_vect)
 
-    parser.add_argument(
-        "input",
-        help="The filename for the MCMC parameters' input file.",
-        type=str,
-    )
-    parser.add_argument(
-        '--notify',
-        help="The script will email a summary results of the MCMC to this address",
-        type=str,
-        default=''
-    )
-    parser.add_argument(
-        '--debug',
-        help='Enable the debugging flag in the model',
-        action='store_true'
-    )
 
-    parser.add_argument(
-        "--quiet",
-        help="Do not plot the initial conditions",
-        action="store_true"
-    )
+x = np.random.uniform(0, 2, N_data)
+y = model(x, actual_vect) + np.random.normal(0.0, err, N_data)
+yerr = np.ones_like(y) * err
 
-    args = parser.parse_args()
-    input_fname = args.input
-    dest = args.notify
-    debug = args.debug
-    quiet = args.quiet
+# This is my observational data '''lightcurve'''
+observations = (x, y, yerr)
 
-    if debug:
-        if os.path.isdir("DEBUGGING"):
-            rmtree("DEBUGGING")
+# Two uniform priors, the first from 2:8, the second from 6:14
+p1 = Prior('gauss', 5, 2)
+p2 = Prior('gauss', 10, 2)
+p3 = Prior('gauss', 3, 2)
+plist = [p1, p2, p3]
 
-    # I want to pre-check that the details have been supplied.
-    if dest != '':
-        location = __file__.split('/')[:-1] + ["email_details.json"]
-        details_loc = '/'.join(location)
-        if not os.path.isfile(details_loc):
-            print("Couldn't find the file {}! Creating it now.")
-            with open(details_loc, 'w') as f:
-                s = '{\n  "user": "Bot email address",\n  "pass": "Bot email password"\n}'
-                f.write(s)
 
-        # Check that the details file has been filled in.
-        # If it hasn't, ask the user to get it done.
-        with open(details_loc, 'r') as f:
-            details = f.read()
-        if "Bot email address" in details:
-            print("The model will continue for now, but there are no")
-            print("email credentials supplied and the code will fail")
-            print("when it tries to send it.")
-            print("Don't panic, just complete the JSON file here:")
-            print("{}".format(details_loc))
+# Run the solver
+solution = WaveSolver(
+    func=model, data=observations, prior_list=plist,
+    n_dims=dims, verbose=True, outputfiles_basename='./out/',
 
-    # Build the model from the input file
-    model = construct_model(input_fname, debug, True)
+)
 
-    print("\nStructure:")
-    pprint(model.structure)
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print(solution)
+print("Samples means:")
+pos = solution.samples.mean(axis=0)
+print(pos)
+print("A model at this vector has chisq = {:.3f}".format(chisq(pos, observations, model)))
+print("Actual solution: y = {:.3f} * sin({:.3f}*x) + {:.3f}".format(*actual_vect))
 
-    input_dict = configobj.ConfigObj(input_fname)
+MN_x = np.linspace(x.min(), x.max(), 1000)
+MN_y = model(MN_x, pos)
+ideal_y = model(MN_x, actual_vect)
 
-    # Read in information about mcmc
-    nthreads = int(input_dict['nthread'])
-    nwalkers = int(input_dict['nwalkers'])
-    scatter_1 = float(input_dict['first_scatter'])
-    to_fit = int(input_dict['fit'])
-    comp_scat = bool(int(input_dict['comp_scat']))
+fig, ax = plt.subplots(figsize=(10,5))
 
-    # neclipses no longer strictly necessary, but can be used to limit the
-    # maximum number of fitted eclipses
-    try:
-        neclipses = int(input_dict['neclipses'])
-    except KeyError:
-        neclipses = len(model.search_node_type("Eclipse"))
-        print("The model has {} eclipses.".format(neclipses))
+ax.set_title(
+    "MultiNest solution: $y = {:.3f} * sin({:.3f}*x) + {:.3f}$".format(*pos))
+ax.errorbar(x, y, yerr, fmt='x ', color='black', label='Observations')
+ax.plot(MN_x, MN_y, color='red', linestyle='--', zorder=10, label='Multinest fit')
+ax.plot(MN_x, ideal_y, color='blue', linestyle='--', zorder=0, label='Actual values')
 
-    # Wok out how many degrees of freedom we have in the model
-    # How many data points do we have?
-    dof = np.sum([ecl.lc.n_data for ecl in model.search_node_type('Eclipse')])
-    # Subtract a DoF for each variable
-    dof -= len(model.dynasty_par_names)
-    # Subtract one DoF for the fit
-    dof -= 1
-    dof = int(dof)
+ax.legend()
+plt.tight_layout()
 
-    print("\n\nInitial guess has a chisq of {:.3f} ({:d} D.o.F.).".format(model.chisq(), dof))
-    print("\nFrom the wrapper functions with the above parameters, we get;")
-    pars = model.dynasty_par_vals
-    print("a ln_prior of {:.3f}".format(ln_prior(pars, model)))
-    print("a ln_like of {:.3f}".format(ln_like(pars, model)))
-    print("a ln_prob of {:.3f}".format(ln_prob(pars, model)))
-    print()
-    if np.isinf(model.ln_prior()):
-        print("ERROR: Starting position violates priors!")
-        print("Offending parameters are:")
+plt.show()
 
-        pars, names = model.__get_descendant_params__()
-        for par, name in zip(pars, names):
-            print("{:>15s}_{:<5s}: Valid?: {}".format(
-                par.name, name, par.isValid))
-
-            if not par.isValid:
-                print("  -> {}_{}".format(par.name, name))
-
-        # Calculate ln_prior verbosely, for the user's benefit
-        model.ln_prior(verbose=True)
-        exit()
-
-    # If we're not running the fit, plot our stuff.
-    if not quiet:
-        plotCV.nxdraw(model)
-        plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
-    if not to_fit:
-        exit()
 
 
