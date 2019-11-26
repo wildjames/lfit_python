@@ -146,7 +146,7 @@ def plot_eclipse(ecl_node, save=False, figsize=(11., 8.), fname=None,
         ecl_node.lc.x, ecl_node.lc.y,
         yerr=ecl_node.lc.ye,
         linestyle='none', ecolor='grey', zorder=1
-        )
+    )
     axs[0].step(ecl_node.lc.x, ecl_node.lc.y, where='mid', color='black')
 
     # Plot the model over the data

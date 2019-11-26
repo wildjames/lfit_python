@@ -871,7 +871,7 @@ def construct_model(input_file, debug=False, nodata=False):
 
         if nodata:
             print("Using a roughly blank data dummy.")
-            x = np.random.uniform(-0.5, 0.5, 250)
+            x = np.sort(np.random.uniform(-0.5, 0.5, 250))
             yerr = np.ones_like(x) * 0.05
             y = np.zeros_like(x) + np.random.normal(0, 0.05, x.shape)
 

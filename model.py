@@ -143,48 +143,6 @@ class Prior(object):
             return TINY
 
 
-class CubeConverter(object):
-    '''
-    For each prior function in the Prior class, there must be
-    a corresponding <cube2func> function on this one for it to be
-    usable with simulated annealing.
-
-    The <cube2func> function must take a value, u, between 0:1, and
-    transform it according to this equation:
-
-    ln_prob(\theta) d(theta) = d(u)
-
-    for a parameter theta.
-
-    Ideally, solve this analytically. Failing that, numerical integration
-    is likely the best way to go.
-    '''
-    def convert(self, u_i, prior):
-        func = getattr(self, "cube2{}".format(prior.type))
-        theta_i = func(u_i, prior.p1, prior.p2)
-        return theta_i
-
-    def cube2gauss(self, u_i, p1, p2):
-        '''Gaussian has a mean, mu, and a deviation of sigma.'''
-        theta_i = p2 * np.sqrt(2) * erfinv(2*u_i - 1) + p1
-        return theta_i
-
-    def cube2uniform(self, u, p1, p2):
-        theta = p1 + (u*np.abs(p2 - p1))
-        return theta
-
-    def cube2log_uniform(self, u, p1, p2):
-        ln_theta = np.log(p1) + (u * (np.log(p2) - np.log(p1)))
-        theta = np.exp(ln_theta)
-        return theta
-
-    def cube2gaussPos(self, u, p1, p2):
-        raise NotImplementedError("GaussPos has not been implimented with MultiNest!")
-
-    def cube2mod_jeff(self, u, p1, p2):
-        raise NotImplementedError("Modified Jefferies prior not implemented with MultiNest!")
-
-
 class Param(object):
     '''A Param needs a starting value, a current value, and a prior
     and a flag to state whether is should vary'''
@@ -336,10 +294,6 @@ class Node:
         # Add the parameters to the self.XXX.
         for par in parameter_objects:
             setattr(self, par.name, par)
-
-        # Sometimes, I'll need to convert values from the range 0:1, into
-        # a corresponding prior distribution. This object does that
-        self.cube_converter = CubeConverter()
 
         self.log('base.__init__', "Successfully did the base Node init")
 
@@ -578,22 +532,6 @@ class Node:
             self.log('base.ln_prob', "{} ln_prior returned infinite!".format(self.name))
             return lnp
 
-    def set_cube(self, cube):
-        '''Takes a vector within a unit hypercube (0:1 on each side, one side per parameter), and transforms it to the corresponding values for the parameters in accordance with their priors.'''
-
-        par_dict = self.dynasty_par_dict
-        par_vector = []
-        for par_name, u_i in zip(self.dynasty_par_names, cube):
-            par = par_dict[par_name]
-
-            if not par.isVar:
-                continue
-
-            val = self.cube_converter.convert(u_i, par.prior)
-            par_vector.append(val)
-
-        self.dynasty_par_vals = par_vector
-
     # Dunder methods that are generally hidden from the user.
     def __get_inherited_parameter_names__(self):
         '''Construct a list of the variable parameters that I have, and append
@@ -769,14 +707,16 @@ class Node:
             child.__parent = self
 
     @property
-    def n_params(self):
-        '''How many parameters does the model at and below this node consist of?'''
-        return len(self.__get_descendant_params__()[0])
+    def dynasty_par_list(self):
+        '''An ordered list of the parameters of the tree, at and below this node
 
-    @property
-    def n_dim(self):
-        '''How many of the model parameters, at or below this node, are variable?'''
-        return len(self.__get_descendant_parameter_names__())
+        returns:
+          params, list:
+            list of Param objects
+          labels, list:
+            list of the labels associated with the params, in the same order.
+        '''
+        return self.__get_descendant_params__()
 
     @property
     def dynasty_par_names(self):
