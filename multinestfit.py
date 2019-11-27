@@ -11,6 +11,7 @@ import numpy as np
 from scipy.special import erf, erfinv
 from pymultinest.solve import Solver
 from pymultinest.analyse import Analyzer
+import mpi4py
 
 import mcmc_utils as utils
 import plot_lc_model as plotCV
@@ -83,33 +84,31 @@ class HierarchicalModelSolver(Solver):
         return self.model.chisq()
 
     def Prior(self, cube):
-        '''Take a cube vector, and return the correct thetas'''
+        '''Take a cube vector, and return the correct parameters'''
         vect = []
 
         if self.DEBUG:
             print("Entered prior with this cube:")
             print(cube)
+
         for u, prior in zip(cube, self.priors):
             if self.DEBUG:
                 print("--------")
                 print("  u = {:.2f}".format(u))
-            theta = self.convert(u, prior)
 
+            theta = self.convert(u, prior)
             vect.append(theta)
 
             if self.DEBUG:
                 print("  theta = {:.2f}".format(theta))
                 print("  lnp = {:.2f}".format(prior.ln_prob(theta)))
 
-        # if self.DEBUG:
-        #     input("> ")
-
         return vect
 
     def LogLikelihood(self, vect):
         '''Take a parameter vector, convert to desired parameters, and calculate the ln(like) of that vector
 
-        This will be maximized
+        This will be maximized!
         '''
         if self.DEBUG:
             print("~~~~~~~~~~~")
@@ -121,6 +120,9 @@ class HierarchicalModelSolver(Solver):
 
         if self.DEBUG:
             print("Got a ln(like) of {:.3f}".format(ln_like))
+
+        if not np.isfinite(ln_like):
+            ln_like = -9e99
 
         return ln_like
 
@@ -258,16 +260,17 @@ if __name__ in '__main__':
 
     print("ndim: {}\nnparams: {}".format(ndim, nparams))
 
+    print("An example 'theta' vector:")
     print(model.dynasty_par_vals)
 
     input("Hit enter to start the solver: ")
     solution = HierarchicalModelSolver(
         model,
-        outputfiles_basename='./out/',
-        n_dims=ndim, n_params=nparams,
+        outputfiles_basename='./out/nest_fit',
+        n_dims=ndim,
         n_live_points=nlive,
-        init_MPI=True,
-        verbose=True
+        verbose=True,
+        resume=False,
     )
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("Done!")
@@ -293,3 +296,14 @@ if __name__ in '__main__':
     print(solution)
     print("Multinest best fit parameters:")
     print(pos)
+
+
+    # "posterior chain" kinda but not really?
+    chain = a.get_equal_weighted_posterior()[:, :-1]
+    labels = ["{}_{}".format(a, b) for a, b in model.dynasty_par_list]
+    thumb_fig = thumbPlot(chain, labels)
+
+
+    plt.tight_layout()
+    plt.show()
+
