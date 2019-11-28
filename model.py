@@ -683,19 +683,21 @@ class Node:
 
     @dynasty_par_vals.setter
     def dynasty_par_vals(self, dynasty_par_vals):
-        if isinstance(dynasty_par_vals, dict):
-            print("Setting a dict of values")
-            for key, value in dynasty_par_vals.items():
-                self[key].currVal = value
-
-        else:
-            if not len(dynasty_par_vals) == len(self.dynasty_par_vals):
-                raise ValueError('Wrong vector length on {} - Expected {}, got {}'.format(self.name, len(self.dynasty_par_vals), len(dynasty_par_vals)))
-            self.__set_parameter_vector__(dynasty_par_vals)
+        if not len(dynasty_par_vals) == len(self.dynasty_par_vals):
+            raise ValueError('Wrong vector length on {} - Expected {}, got {}'.format(self.name, len(self.dynasty_par_vals), len(dynasty_par_vals)))
+        self.__set_parameter_vector__(dynasty_par_vals)
 
     @property
     def dynasty_par_dict(self):
         return {k:v for k,v in zip(self.dynasty_par_names, self.dynasty_par_vals)}
+
+    @dynasty_par_dict.setter
+    def dynasty_par_dict(self, par_dict):
+        for key, value in par_dict.items():
+            try:
+                self[key].currVal = value
+            except AttributeError as e:
+                print(repr(e))
 
     @property
     def ancestor_param_dict(self):

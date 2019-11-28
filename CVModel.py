@@ -367,10 +367,10 @@ class ComplexEclipse(SimpleEclipse):
         The children of this node. Single Node is also accepted
     '''
     node_par_names = (
-                'dFlux', 'sFlux', 'rdisc',
-                'scale', 'az', 'fis', 'dexp', 'phi0',
-                'exp1', 'exp2', 'yaw', 'tilt'
-            )
+        'dFlux', 'sFlux', 'rdisc',
+        'scale', 'az', 'fis', 'dexp', 'phi0',
+        'exp1', 'exp2', 'yaw', 'tilt'
+    )
 
     @property
     def cv_parnames(self):
