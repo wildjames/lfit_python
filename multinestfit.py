@@ -11,7 +11,7 @@ import numpy as np
 from scipy.special import erf, erfinv
 from pymultinest.solve import Solver
 from pymultinest.analyse import Analyzer
-import mpi4py
+import matplotlib.pyplot as plt
 
 import mcmc_utils as utils
 import plot_lc_model as plotCV
@@ -72,6 +72,9 @@ class HierarchicalModelSolver(Solver):
 
 
         self.model = model
+        par_order = self.model.dynasty_par_names
+        with open("{}_parameter_order.txt".format(kwargs['outputfiles_basename']), 'w') as f:
+            f.write(','.join(par_order))
         self.priors = [par.prior for par in model.dynasty_par_list[0]]
 
         self.convert = CubeConverter().convert
@@ -277,7 +280,7 @@ if __name__ in '__main__':
 
     ## Analysis
     # create analyzer object
-    a = Analyzer(ndim, outputfiles_basename="./out/")
+    a = Analyzer(ndim, outputfiles_basename="./out/nest_fit")
 
     # get a dictionary containing information about
     #   the logZ and its errors
@@ -301,7 +304,7 @@ if __name__ in '__main__':
     # "posterior chain" kinda but not really?
     chain = a.get_equal_weighted_posterior()[:, :-1]
     labels = ["{}_{}".format(a, b) for a, b in model.dynasty_par_list]
-    thumb_fig = thumbPlot(chain, labels)
+    thumb_fig = utils.thumbPlot(chain, labels)
 
 
     plt.tight_layout()
