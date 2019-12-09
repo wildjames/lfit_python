@@ -354,7 +354,7 @@ def notify(send_to, fnames, body):
     return
 
 
-def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
+def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 automated=False, corners=True):
     '''Takes the chain file made by mcmcfit.py and summarises the initial
     and final conditions. Uses the input filename normally supplied to
@@ -399,7 +399,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
 
     nwalkers = df['walker_no'].max() + 1
     df['step'] = df.index // nwalkers
-    nsteps = df['step'].max()
+    nsteps = df['step'].max()+1
 
     print("The chain file actually contains {} walkers, over {} steps.".format(nwalkers, nsteps))
 
@@ -410,7 +410,6 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
         os.mkdir("Initial_figs")
 
     # Plot an image of the walker likelihoods over time.
-    # data is shape (nwalkers, nsteps, ndim+1)
 
     print("Reading in the chain file for likelihoods...")
     walker_likes = df['ln_prob']
@@ -422,16 +421,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
     std = np.std(walker_likes, axis=0)
     likes = np.mean(walker_likes, axis=0)
 
-    steps = np.arange(likes.shape[0])
+    steps = np.asarray(df['step'].loc[df["walker_no"] == 1])
 
-    if thin:
-        likes = likes[nskip::thin]
-        std = std[nskip::thin]
-        steps = steps[nskip::thin]
-    else:
-        likes = likes[nskip:]
-        std = std[nskip:]
-        steps = steps[nskip:]
+    likes = likes[nskip::thin]
+    std = std[nskip::thin]
+    steps = steps[nskip::thin]
 
     # Make the likelihood plot
     fig, ax = plt.subplots(figsize=(11, 8))
@@ -460,28 +454,30 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
                 nskip = int(nskip)
             except:
                 nskip = 0
-        if not thin:
-            print("Thinning excludes every Nth step of the chain.")
+    data = df.loc[df['step'] >= nskip]
+    print("First step is {}".format(steps.min()))
+    ax.set_xlim(left=nskip+steps.min(), right=steps.max())
+    fig.canvas.draw_idle()
+
+    if not automated:
+        if thin == 1:
+            print("Thinning omits every Nth step of the chain.")
             thin = input("You opted not to thin the data, are you sure? (defaults to no thinning)\n-> thin: ")
             try:
                 thin = int(thin)
             except:
                 thin = False
-
-    # Close any open figures
-    plt.close()
-
-    if thin:
+    if thin > 1:
         df = df.loc[df.step % thin != 0]
 
-    data = df.loc[df['step'] >= nskip]
-
-    nwalkers = len(np.unique(df['walker_no']))
-    nsteps = len(np.unique(df['step']))
+    nwalkers = len(np.unique(data['walker_no']))
+    nsteps = len(np.unique(data['step']))
     npars = len(colKeys)
-
-
     print("After thinning and skipping: {} walkers, {} steps, {} params".format(nwalkers, nsteps, npars))
+
+    print(data.head())
+    plt.close()
+
 
     # Analyse the chain. Take the mean as the result, and 2 sigma as the error
     result = pd.DataFrame()
@@ -494,8 +490,6 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
     print("Result of the chain:")
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):
         print(result)
-    for k in colKeys:
-        print("'{}'".format(k))
     modparams = result.loc[colKeys,:]
     modparams.to_csv('modparams.csv', header=True)
 
@@ -504,7 +498,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
     # # # # # # # # # # # # # # # # # # # # # # # #
 
     model = construct_model(input_fname)
-    parDict = {k:v for k, v in df.mean().to_dict().items() if k in colKeys}
+    parDict = {k:v for k, v in data.mean().to_dict().items() if k in colKeys}
 
     # We want to know where we started, so we can evaluate improvements.
     # Wok out how many degrees of freedom we have in the model
@@ -546,6 +540,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
 
     if not automated:
         print("Final conditions being plotted now...")
+        input("> ")
 
     plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
@@ -557,16 +552,15 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
 
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
+        # Include a copy of the final result
+
+
         # include a copy of the input file
         with open(input_fname) as f:
             input_file = f.readlines()
-            input_file = '\n'.join(input_file)
+            input_file = ''.join(input_file)
 
         notify(destination, fnames, model_preport+model_report+input_file)
-
-    print("The chain file has the folloing variables:")
-    for p in colKeys:
-        print("-> {}".format(p))
 
     if corners:
         # Corner plots. Collect the eclipses.
@@ -603,7 +597,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=False, destination='',
             print(labels)
 
             # Get the indexes in the chain file, and gather those columns
-            chain_slice = np.asarray(df[par_labels])
+            chain_slice = np.asarray(data[par_labels])
             print("chain_slice has the shape:", chain_slice.shape)
 
             # If I've nothing to plot, continue to the next thing.
