@@ -221,12 +221,17 @@ class SimpleEclipse(Node):
         try:
             xl1 = roche.xl1(q)
         except AssertionError as err:
+            if verbose:
+                print("Failed to get the L1 point!")
             return -np.inf
 
 
         # Get the rdisc, scaled to the Roche Radius
         rdisc = ancestor_param_dict['rdisc'].currVal
         rdisc_a = rdisc * xl1
+
+        if verbose:
+            print("rDisc: {:.4f} || Max: {:.4f}".format(rdisc_a, rdisc_max_a))
 
         if rdisc_a > rdisc_max_a:
             if verbose:
@@ -255,6 +260,8 @@ class SimpleEclipse(Node):
         rmin = rwd / 3.
 
         scale = ancestor_param_dict['scale'].currVal
+        if verbose:
+            print("Scale: {:.4f} || Limits: {:.4f} -> {:.4f}".format(scale, rmin, rmax))
 
         if scale > rmax or scale < rmin:
             if verbose:
@@ -469,8 +476,8 @@ class LCModel(Node):
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
-                msg = "Failed to calculate a value of dphi at node {}"
-                print(msg.format(self.name))
+                msg = "Failed to calculate a value of dphi at node {} || Exception: {}"
+                print(msg.format(self.name, repr(error)))
             self.log('LCModel.ln_prior', "Failed to calculate a value of dphi. Returning ln_prior = -np.inf")
             return -np.inf
 

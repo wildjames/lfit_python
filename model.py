@@ -628,7 +628,7 @@ class Node:
     # Properties to make everything cleaner
     @property
     def name(self):
-        '''The name of this object, of the form <class name>_<label>'''
+        '''The name of this object, of the form "<class name>_<label>"'''
         return "{}_{}".format(self.__class__.__name__, self.label)
 
     @property
@@ -689,10 +689,14 @@ class Node:
 
     @property
     def dynasty_par_dict(self):
+        '''Returns a dict of the Param objects held at or below this node'''
         return {k:v for k,v in zip(self.dynasty_par_names, self.dynasty_par_vals)}
 
     @dynasty_par_dict.setter
     def dynasty_par_dict(self, par_dict):
+        '''Set the parameter vector by a dict of values, in the form:
+        {"<parname>_<nodename>": <value, int>}
+        '''
         for key, value in par_dict.items():
             try:
                 self[key].currVal = value

@@ -433,11 +433,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     ax.plot(steps, likes, color="green")
 
     ax.set_xlabel("Step")
-    ax.set_ylabel("ln_like")
+    ax.set_ylabel("ln_prob")
 
     plt.tight_layout()
 
-    oname = 'Final_figs/likelihood.pdf'
+    oname = 'Final_figs/ln_prob.pdf'
 
     plt.savefig(oname)
     print("Saved to {}".format(oname))
@@ -553,14 +553,17 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
         # Include a copy of the final result
-
+        modparams_text = '\n\n\nFinal result parameters:\n'
+        with open('modparams.csv', 'r') as f:
+            for line in f:
+                modparams_text += line
 
         # include a copy of the input file
         with open(input_fname) as f:
             input_file = f.readlines()
             input_file = ''.join(input_file)
 
-        notify(destination, fnames, model_preport+model_report+input_file)
+        notify(destination, fnames, model_preport+model_report+input_file+modparams_text)
 
     if corners:
         # Corner plots. Collect the eclipses.
@@ -617,7 +620,9 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
             fig = utils.thumbPlot(chain_slice, par_labels)
 
-            oname = "Final_figs/" + eclipse.name + '_corners.png'
+            fname = os.path.split(eclipse.lc.fname)[1]
+            fname = os.path.splitext(fname)[0]
+            oname = "Final_figs/" + fname + '_corners.png'
             print("Saving to {}...".format(oname))
             plt.savefig(oname)
             plt.close()
