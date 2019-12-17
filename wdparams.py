@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.interpolate as interp
+from astropy.stats import sigma_clipped_stats
 import seaborn
 from past.utils import old_div
 
@@ -431,10 +432,56 @@ if __name__ == "__main__":
     fluxes = [0, 0, 0, 0, 0, 0]
     fluxes_err = [0, 0, 0, 0, 0, 0]
     mags = [0, 0, 0, 0, 0, 0]
+    mask = [0, 0, 0, 0, 0, 0]
+    flux_order = ['u', 'g', 'r', 'i', 'z', 'kg5']
 
     # # # # # # # # # # # # # # # # # # # # # #
     # Collect the fluxes from the fit result. #
     # # # # # # # # # # # # # # # # # # # # # #
+    bands = [key for key in colKeys if 'wdflux' in key.lower()]
+    print("I have the flux columns: {}".format(bands))
+    telescopes = ['ntt', 'gtc', 'wht', 'vlt', 'none']
+    instruments = {
+        'ntt': ['ucam'],
+        'gtc': ['hcam'],
+        'wht': ['hcam', 'ucam'],
+        'vlt': ['ucam'],
+        'none': ['']
+    }
+
+    band_corrs = {}
+    for band in bands:
+        print("\nWhat telescope was band {} observed with? {}".format(band, telescopes))
+        tel = input("> ")
+        while tel not in telescopes:
+            print("\nThat telescope is not supported! ")
+            tel = input("> ")
+
+        print("What instrument was band {} observed with? {}".format(band, instruments[tel]))
+        inst = input("> ")
+
+
+        print("\nWhat filter was used for this observation? (u,g,r,i,z, u_s, g_s, r_s, i_s, z_s)")
+        filt = input("> ")
+        # Get the name of the band that we need to compare it against
+        if "_s" in filt:
+            print("This is a 'super' filter, so I need to do some colour corrections.")
+            # Save the correction table for this band here
+            correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
+            script_loc = os.path.split(__file__)[0]
+            correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
+            print("Table is stored at {}".format(correction_table_fname))
+            print("Storing in band_corrs[{}]".format(band))
+            correction_table = pd.read_csv(correction_table_fname)
+            band_corrs[band] = correction_table
+
+        index = colKeys.index(band)
+        flx, _, fle = sigma_clipped_stats(fchain[index])
+
+        index = flux_order.index(filt.replace("_s", ""))
+        fluxes[index] = flx
+        fluxes_err[index] = fle
+        mask[index] = 1
 
     ## TODO: Construct this array, and when adding to it, apply the color corrections.
     # Arrays containing all fluxes and errors
@@ -444,17 +491,14 @@ if __name__ == "__main__":
     y = fluxes
     e = fluxes_err
 
-    # Create mask to discard any filters that are not used
-    mask = np.array([uband_used, gband_used, rband_used, iband_used, zband_used, kg5band_used])
-
     print("I'm using the filters:")
-    temp = ['u', 'g', 'r', 'i', 'z', 'kg5']
-    for t, m, flux in zip(temp, mask, fluxes):
+    for t, m, flux in zip(flux_order, mask, fluxes):
         report = ''
         if m:
             report = '  -> Mean Flux: {:3f}'.format(flux)
         print("{}: {}{}".format(t, m, report))
 
+    exit()
     # # # # # # # # #
     # Model Fitting #
     # # # # # # # # #
