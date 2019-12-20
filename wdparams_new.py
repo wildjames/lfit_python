@@ -197,8 +197,7 @@ class wdModel():
             func = interp.RectBivariateSpline(self.loggs,self.teffs,z,kx=3,ky=3)
             mag = func(g,t)[0,0]
 
-            # corr = (reg - sup)
-            # sup = reg - (reg - sup)
+            # Corr = (target - HCAM/GTC/SUPER)
             mag += correction
             abs_mags.append(mag)
 
@@ -284,11 +283,11 @@ class Flux(object):
         'z_s':  915.6,
     }
 
-    def __init__(self, val, err, band, debug=False):
+    def __init__(self, val, err, band, syserr=0.03, debug=False):
         self.DEBUG = debug
 
         self.flux = val
-        self.err = err
+        self.err = np.sqrt(err**2 + (val*syserr)**2)
         self.band = band.replace("_s", "")
         self.orig_band = band
         self.cent_lambda = self.LAMBDAS[band]
@@ -631,7 +630,7 @@ if __name__ == "__main__":
         index = colKeys.index(band)
         mean, _, std = sigma_clipped_stats(fchain[:, index])
 
-        flx = Flux(mean, std, band.lower().replace("wdflux_", ""), debug=debug)
+        flx = Flux(mean, std, band.lower().replace("wdflux_", ""), syserr=syserr, debug=debug)
         fluxes.append(flx)
 
 
@@ -653,8 +652,8 @@ if __name__ == "__main__":
     for obs in myModel.obs_fluxes:
         print("{:>4s}: Flux {:.3f}+/-{:.3f}".format(obs.orig_band, obs.flux, obs.err))
 
-    plotFluxes(myModel)
-    plotColors(myModel)
+    # plotFluxes(myModel)
+    # plotColors(myModel)
 
 
     # Just summarise a previous chain, then stop
@@ -733,17 +732,23 @@ if __name__ == "__main__":
         col_names = "walker_no " + ' '.join(nameList) + ' ln_prob'
         sampler = run_ptmcmc_save(
             sampler,
-            pos, nprod, state,
-            "chain_wd.txt", col_names=col_names
+            pos, nprod,
+            "chain_wd.txt",
+            # rstate0=state,
+            col_names=col_names
         )
-        chain = flatchain(sampler.chain, npars, thin=thin)
+        print(sampler.flatchain.shape)
+        chain = sampler.flatchain
 
         # Plot the likelihoods
-        likes = sampler.chain[:, :, -1]
+
+        likes = chain[:, :, -1]
 
         # Plot the mean likelihood evolution
+        print(likes.shape)
         likes = np.mean(likes, axis=0)
-        steps = np.arange(len(likes))
+        print(likes.shape)
+        steps = np.arange(likes.shape[0])
         std = np.std(likes)
 
         # Make the likelihood plot
@@ -768,7 +773,7 @@ if __name__ == "__main__":
             print("%s = %f +%f -%f" % (nameList[i], best, uplim-best, best-lolim))
             bestPars.append(best)
         print("Creating corner plots...")
-        fig = thumbPlot(chain, nameList)
+        fig = thumbPlot(chain[0], nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
         plt.close()
