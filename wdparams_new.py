@@ -1,5 +1,6 @@
+import multiprocessing as mp
 import os
-import warnings
+# import warnings
 
 import emcee
 import matplotlib.pyplot as plt
@@ -7,16 +8,64 @@ import numpy as np
 import pandas as pd
 import scipy.interpolate as interp
 from astropy.stats import sigma_clipped_stats
-import seaborn
-from past.utils import old_div
 
-from mcmc_utils import (flatchain, readchain_dask, readflatchain,
-                        run_burnin, run_mcmc_save, thumbPlot)
+from mcmc_utils import (flatchain, initialise_walkers_pt, readchain,
+                        readflatchain, run_burnin, run_ptmcmc_save, thumbPlot)
 from model import Param
 
 # Location of data tables
 ROOT, _ = os.path.split(__file__)
-DA = pd.read_csv(os.path.join(ROOT, 'Bergeron/Table_DA'), delim_whitespace=True, skiprows=0, header=1)
+
+# Define helper functions for the MCMC fit
+def ln_prior(vect, model):
+    # first we update the model to use the pars suggested by the MCMC chain
+    for i in range(model.npars):
+        model[i] = vect[i]
+
+    lnp = 0.0
+
+    # teff, (usually uniform between allowed range - 6 to 90,000)
+    param = model.teff
+    lnp += param.prior.ln_prob(param.currVal)
+
+    # logg, uniform between allowed range (7.01 to 8.99), or Gaussian from constraints
+    param = model.logg
+    lnp += param.prior.ln_prob(param.currVal)
+
+    # Parallax, gaussian prior of the gaia value.
+    param = model.plax
+    lnp += param.prior.ln_prob(param.currVal)
+
+    # reddening, cannot exceed galactic value (should estimate from line of sight)
+    # https://irsa.ipac.caltech.edu/applications/DUST/
+    param = model.ebv
+    lnp += param.prior.ln_prob(param.currVal)
+    return lnp
+
+def ln_likelihood(vect, model):
+    # first we update the model to use the pars suggested by the MCMC chain
+    for i in range(model.npars):
+        model[i] = vect[i]
+
+    errs = []
+    for obs in model.obs_fluxes:
+        errs.append(obs.err)
+    errs = np.array(errs)
+
+    chisq = model.chisq()
+
+    return -0.5*(np.sum(np.log(2.0*np.pi*errs**2)) + chisq)
+
+def ln_prob(vect, model):
+    # first we update the model to use the pars suggested by the MCMC chain
+    for i in range(model.npars):
+        model[i] = vect[i]
+
+    lnp = ln_prior(vect, model)
+    if np.isfinite(lnp):
+        return lnp + ln_likelihood(vect, model)
+    else:
+        return lnp
 
 def parseInput(file):
     ''' reads in a file of key = value entries and returns a dictionary'''
@@ -129,8 +178,8 @@ class wdModel():
                 if self.DEBUG:
                     print("This is a kg5 band, so I will infer the model magnitude from g and r")
                 # KG5 mags must be inferred
-                gmags = np.array(DA['g'])
-                rmags = np.array(DA['r'])
+                gmags = np.array(self.DA['g'])
+                rmags = np.array(self.DA['r'])
 
                 z = sdss2kg5_vect(gmags, rmags)
                 z = z.reshape((self.nlogg,self.nteff))
@@ -150,7 +199,7 @@ class wdModel():
 
             # corr = (reg - sup)
             # sup = reg - (reg - sup)
-            mag -= correction
+            mag += correction
             abs_mags.append(mag)
 
             if self.DEBUG:
@@ -253,21 +302,22 @@ class Flux(object):
 
             ## Get the correction I need from the user
             # Valid telescopes, and their instruments
-            telescopes = ['ntt', 'gtc', 'wht', 'vlt', 'none']
             instruments = {
                 'ntt': ['ucam'],
                 'gtc': ['hcam'],
                 'wht': ['hcam', 'ucam'],
-                'vlt': ['ucam'],
+                'tnt': ['uspec'],
                 'none': ['']
             }
             filters = {
-                'u_s':'u', 'g_s':'g', 'r_s':'r', 'i_s':'i', 'z_s':'z'
+                'ucam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
+                'hcam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
+                'uspec': ['u', 'g', 'r', 'i', 'z']
             }
 
-            print("\nWhat telescope was band {} observed with? {}".format(band, telescopes))
+            print("\nWhat telescope was band {} observed with? {}".format(band, instruments.keys()))
             tel = input("> ")
-            while tel not in telescopes:
+            while tel not in instruments.keys():
                 print("\nThat telescope is not supported! ")
                 tel = input("> ")
             if tel == 'none':
@@ -280,15 +330,14 @@ class Flux(object):
             while inst not in instruments[tel]:
                 inst = input("That is not a valid instrument for this telescope!\n> ")
 
-            if band not in filters:
-                print("\nWhat filter was used for this observation? Labelled as {}".format(band))
-                print("Options: {}".format(filters.keys()))
-                filt = input("> ")
-            else:
-                filt = band
-            conv_filt = filters[band]
+            print("\nWhat filter was used for this observation? Labelled as {}".format(band))
+            print("Options: {}".format(filters[inst]))
+            filt = input("> ")
+            while filt not in filters[inst]:
+                print("That is not available on that instrument!")
+                filt = input("Enter a filter: ")
 
-            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {}-{}".format(conv_filt, filt))
+            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
             # Save the correction table for this band here
             correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
             script_loc = os.path.split(__file__)[0]
@@ -303,7 +352,7 @@ class Flux(object):
             loggs = np.unique(correction_table['logg'])
 
             # Color Correction table contains regular - super color, sorted by Teff, then logg
-            corrections = np.array(correction_table["{}-{}".format(conv_filt, filt)]).reshape(len(teffs),len(loggs))
+            corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
 
             self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
             print("Finished setting up this flux!\n\n")
@@ -332,6 +381,7 @@ class Flux(object):
         return correction
 
 def plotColors(model):
+    ### TODO: This is wrong! Correct the observations to the HCAM/GTC fluxes, then plot!
     print("\n\n-----------------------------------------------")
     print("Creating color plots...")
     fig, ax = plt.subplots(figsize=(6,6))
@@ -347,9 +397,10 @@ def plotColors(model):
     print("Magnitudes:\nu: {}\ng: {}\nr: {}".format(flux_u, flux_g, flux_r))
     print("If required, these will be color corrected to regular SDSS")
 
-    u_mag = flux_u.mag # - flux_u.color_correct_reg_minus_super(t, g)
-    g_mag = flux_g.mag # - flux_g.color_correct_reg_minus_super(t, g)
-    r_mag = flux_r.mag # - flux_r.color_correct_reg_minus_super(t, g)
+    t, g = model.teff.currVal, model.logg.currVal
+    u_mag = flux_u.mag + flux_u.color_correct_reg_minus_super(t, g)
+    g_mag = flux_g.mag + flux_g.color_correct_reg_minus_super(t, g)
+    r_mag = flux_r.mag + flux_r.color_correct_reg_minus_super(t, g)
 
     print("After corrections:")
     print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(flux_u, flux_g, flux_r))
@@ -366,12 +417,6 @@ def plotColors(model):
     umags = np.array(model.DA['u'])
     gmags = np.array(model.DA['g'])
     rmags = np.array(model.DA['r'])
-
-    # Convert Bergeron SDSS magnitudes to super SDSS, if necessary
-    t, g = model.teff.currVal, model.logg.currVal
-    umags -= flux_u.color_correct_reg_minus_super(t, g)
-    gmags -= flux_g.color_correct_reg_minus_super(t, g)
-    rmags -= flux_r.color_correct_reg_minus_super(t, g)
 
     # calculate colours
     ug = umags-gmags
@@ -515,10 +560,8 @@ def plotFluxes(model):
     print("-----------------------------------------------\n")
 
 
-
-
 if __name__ == "__main__":
-    warnings.simplefilter("ignore")
+    # warnings.simplefilter("ignore")
 
     # Allows input file to be passed to code from argument line
     import argparse
@@ -575,7 +618,7 @@ if __name__ == "__main__":
         else:
             with open(chain_file, 'r') as f:
                 colKeys = f.readline().strip().split()[1:]
-            chain = readchain_dask(chain_file)
+            chain = readchain(chain_file)
             print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
             fchain = flatchain(chain, thin=thin)
         print("Done!")
@@ -616,7 +659,7 @@ if __name__ == "__main__":
 
     # Just summarise a previous chain, then stop
     if summarise:
-        chain = readchain_dask('chain_wd.txt')
+        chain = readchain('chain_wd.txt')
         nameList = ['Teff', 'log g', 'Parallax', 'E(B-V)']
 
         likes = chain[:, :, -1]
@@ -657,59 +700,29 @@ if __name__ == "__main__":
 
         toFit = False
 
-    # Define helper functions for the MCMC fit
-    def ln_prior(model):
-        lnp = 0.0
-
-        # teff, (usually uniform between allowed range - 6 to 90,000)
-        param = model.teff
-        lnp += param.prior.ln_prob(param.currVal)
-
-        # logg, uniform between allowed range (7.01 to 8.99), or Gaussian from constraints
-        param = model.logg
-        lnp += param.prior.ln_prob(param.currVal)
-
-        # Parallax, gaussian prior of the gaia value.
-        param = model.plax
-        lnp += param.prior.ln_prob(param.currVal)
-
-        # reddening, cannot exceed galactic value (should estimate from line of sight)
-        # https://irsa.ipac.caltech.edu/applications/DUST/
-        param = model.ebv
-        lnp += param.prior.ln_prob(param.currVal)
-        return lnp
-
-    def ln_likelihood(model):
-        errs = []
-        for obs in model.obs_fluxes:
-            errs.append(obs.err)
-        errs = np.array(errs)
-
-        chisq = model.chisq()
-
-        return -0.5*(np.sum(np.log(2.0*np.pi*errs**2)) + chisq)
-
-    def ln_prob(vect, model):
-        # first we update the model to use the pars suggested by the MCMC chain
-        for i in range(model.npars):
-            model[i] = vect[i]
-
-        lnp = ln_prior(model)
-        if np.isfinite(lnp):
-            return lnp + ln_likelihood(model)
-        else:
-            return lnp
-
     if toFit:
         guessP = np.array(myModel)
         nameList = ['Teff', 'log_g', 'Parallax', 'E(B-V)']
-        p0 = emcee.utils.sample_ball(guessP, scatter*guessP, size=nwalkers)
-        sampler = emcee.EnsembleSampler(
-            nwalkers,
-            npars,
-            ln_prob,
-            args=(myModel,),
-            threads=nthread
+        # p0 = emcee.utils.sample_ball(guessP, scatter*guessP, size=nwalkers)
+        # sampler = emcee.EnsembleSampler(
+        #     nwalkers,
+        #     npars,
+        #     ln_prob,
+        #     args=(myModel,),
+        #     threads=nthread
+        # )
+
+        mp.set_start_method("forkserver")
+        pool = mp.Pool()
+        ntemps = 10
+        p0 = initialise_walkers_pt(guessP, scatter,
+                                          nwalkers, ntemps, ln_prior, myModel)
+        sampler = emcee.PTSampler(
+            ntemps, nwalkers, npars,
+            ln_likelihood, ln_prior,
+            loglargs=(myModel,),
+            logpargs=(myModel,),
+            pool=pool
         )
 
         # burnIn
@@ -718,7 +731,7 @@ if __name__ == "__main__":
         # production
         sampler.reset()
         col_names = "walker_no " + ' '.join(nameList) + ' ln_prob'
-        sampler = run_mcmc_save(
+        sampler = run_ptmcmc_save(
             sampler,
             pos, nprod, state,
             "chain_wd.txt", col_names=col_names

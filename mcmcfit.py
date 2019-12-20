@@ -20,8 +20,9 @@ import emcee
 import numpy as np
 
 import mcmc_utils as utils
-from CVModel import construct_model, extract_par_and_key
 import plot_lc_model as plotCV
+from CVModel import construct_model, extract_par_and_key
+
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
