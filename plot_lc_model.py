@@ -297,7 +297,6 @@ def plot_model(model, show, *args, **kwargs):
         del fig
         del ax
 
-
 def notify(send_to, fnames, body):
     '''Handle the actual sending an email. A pre-defined bot (login details
     in email_details.json) will send an email.
@@ -352,7 +351,6 @@ def notify(send_to, fnames, body):
     print("Email sent!")
 
     return
-
 
 def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 automated=False, corners=True):

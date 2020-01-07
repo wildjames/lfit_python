@@ -161,10 +161,7 @@ class wdModel():
     def gen_mags(self):
         '''
         Take my parameters, and interpolate a model absolute magnitude corresponding to each of my observations.
-        If a filter is Super SDSS, subtract the appropriate color correction,
-        which is stored on the flux object
-
-        Return this list
+        Returns a magnitude observed in Super SDSS, with HCAM, on the GTC.
         '''
         t, g = self.teff.currVal, self.logg.currVal
 
@@ -188,17 +185,10 @@ class wdModel():
                 z = np.array(self.DA[band])
                 z = z.reshape((self.nlogg,self.nteff))
 
-            # Apply a color correction, if necessary. Convert regular SDSS TO super
-            correction = obs.color_correct_reg_minus_super(t, g)
-            if self.DEBUG:
-                print("This color correction is {:.4f}".format(correction))
-
             # cubic bivariate spline interpolation
             func = interp.RectBivariateSpline(self.loggs,self.teffs,z,kx=3,ky=3)
             mag = func(g,t)[0,0]
 
-            # Corr = (target - HCAM/GTC/SUPER)
-            mag += correction
             abs_mags.append(mag)
 
             if self.DEBUG:
@@ -210,7 +200,7 @@ class wdModel():
 
     def gen_apparent_mags(self):
         '''Generate the apparent magnitudes of each filter, from models.
-        This can be superSDSS, if applicable.'''
+        This is the HCAM/GTC/Super version of the filter, if applicable.'''
         # Get absolute magnitudes
         abs_mags = self.gen_mags()
 
@@ -257,8 +247,11 @@ class wdModel():
         for i, obs in enumerate(self.obs_fluxes):
             flux_errs[i] = obs.err
 
-        # These can be super SDSS, so <fluxes> should already have been converted TO super.
-        obs_fluxes = np.array([obs.flux for obs in self.obs_fluxes])
+        # Collect observed GTC/HCAM magnitudes.
+        teff, logg = self.teff.currVal, self.logg.currVal
+        obs_mags = np.array([obs.bergeron_mag(teff, logg) for obs in self.obs_fluxes])
+        # Convert to fluxes
+        obs_fluxes = sdssmag2flux(obs_mags)
 
         chisq = ((fluxes - obs_fluxes)/flux_errs)**2.0
         chisq = np.sum(chisq)
@@ -360,7 +353,7 @@ class Flux(object):
             self.correct_me = False
 
     def __str__(self):
-        return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected from super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " don't")
+        return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected from super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
 
     def color_correct_reg_minus_super(self, teff, logg):
         correction = 0.0
@@ -379,11 +372,16 @@ class Flux(object):
 
         return correction
 
+    def bergeron_mag(self, teff, logg):
+        '''Returns the calculated magnitude of this WD, as if it was observed
+        with HiPERCAM on the GTC'''
+        return self.mag + self.color_correct_reg_minus_super(teff, logg)
+
 def plotColors(model):
     ### TODO: This is wrong! Correct the observations to the HCAM/GTC fluxes, then plot!
     print("\n\n-----------------------------------------------")
     print("Creating color plots...")
-    fig, ax = plt.subplots(figsize=(6,6))
+    _, ax = plt.subplots(figsize=(6,6))
 
     # OBSERVED DATA
     flux_u = [obs for obs in model.obs_fluxes if 'u' in obs.band][0]
@@ -395,11 +393,10 @@ def plotColors(model):
 
     print("Magnitudes:\nu: {}\ng: {}\nr: {}".format(flux_u, flux_g, flux_r))
     print("If required, these will be color corrected to regular SDSS")
-
     t, g = model.teff.currVal, model.logg.currVal
-    u_mag = flux_u.mag + flux_u.color_correct_reg_minus_super(t, g)
-    g_mag = flux_g.mag + flux_g.color_correct_reg_minus_super(t, g)
-    r_mag = flux_r.mag + flux_r.color_correct_reg_minus_super(t, g)
+    u_mag = flux_u.bergeron_mag(t, g)
+    g_mag = flux_g.bergeron_mag(t, g)
+    r_mag = flux_r.bergeron_mag(t, g)
 
     print("After corrections:")
     print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(flux_u, flux_g, flux_r))
@@ -533,7 +530,7 @@ def plotFluxes(model):
     obs_flx_err = [obs.err for obs in model.obs_fluxes]
 
     # Do the actual plotting
-    fig, ax = plt.subplots(figsize=(5,5))
+    _, ax = plt.subplots(figsize=(5,5))
     ax.errorbar(
         lambdas, model_flx,
         xerr=None, yerr=None,
@@ -633,14 +630,30 @@ if __name__ == "__main__":
         flx = Flux(mean, std, band.lower().replace("wdflux_", ""), syserr=syserr, debug=debug)
         fluxes.append(flx)
 
+    while True:
+        print("Would you like to add another flux? I currently have {}".format([obs.orig_band for obs in fluxes]))
+        cont = input("y/n: ")
+        if cont.lower() == 'y':
+            print("Enter a band:")
+            band = input("> ")
+            print("Enter a Flux, in mJy")
+            flx = input("> ")
+            print("Enter an error on flux, mJy")
+            fle = input("> ")
+
+            flx = float(flx)
+            fle = float(fle)
+
+            flux = Flux(flx, fle, band, syserr=syserr, debug=debug)
+            fluxes.append(flux)
+        else:
+            print("Done!")
+            break
 
     # Create the model object
     myModel = wdModel(teff, logg, plax, ebv, fluxes, debug=debug)
     npars = myModel.npars
 
-    #################
-    #### Testing ####
-    #################
 
     mags = myModel.gen_apparent_mags()
     chisq = myModel.chisq()
@@ -737,17 +750,13 @@ if __name__ == "__main__":
             # rstate0=state,
             col_names=col_names
         )
-        print(sampler.flatchain.shape)
         chain = sampler.flatchain
 
         # Plot the likelihoods
-
         likes = chain[:, :, -1]
 
         # Plot the mean likelihood evolution
-        print(likes.shape)
         likes = np.mean(likes, axis=0)
-        print(likes.shape)
         steps = np.arange(likes.shape[0])
         std = np.std(likes)
 
@@ -766,7 +775,7 @@ if __name__ == "__main__":
 
         bestPars = []
         for i in range(npars):
-            par = chain[:, i]
+            par = chain[:, :, i]
             lolim, best, uplim = np.percentile(par, [16, 50, 84])
             myModel[i] = best
 
