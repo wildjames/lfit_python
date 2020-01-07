@@ -150,8 +150,10 @@ class wdModel():
 
     @property
     def dist(self):
-        if self.plax.currVal < 0.0:
-            return 0.0
+        if self.plax.currVal <= 0.0:
+            if self.DEBUG:
+                print("Warning! Parallax, {} <= 0.0".format(self.plax.currVal))
+            return np.inf
         else:
             return 1000./self.plax.currVal
 
@@ -185,7 +187,7 @@ class wdModel():
                 z = np.array(self.DA[band])
                 z = z.reshape((self.nlogg,self.nteff))
 
-            # cubic bivariate spline interpolation
+            # cubic bivariate spline interpolation on <z>
             func = interp.RectBivariateSpline(self.loggs,self.teffs,z,kx=3,ky=3)
             mag = func(g,t)[0,0]
 
@@ -199,8 +201,7 @@ class wdModel():
         return np.array(abs_mags)
 
     def gen_apparent_mags(self):
-        '''Generate the apparent magnitudes of each filter, from models.
-        This is the HCAM/GTC/Super version of the filter, if applicable.'''
+        '''Apply distance modulus and extinction to my generated magnitudes'''
         # Get absolute magnitudes
         abs_mags = self.gen_mags()
 
@@ -253,7 +254,8 @@ class wdModel():
         # Convert to fluxes
         obs_fluxes = sdssmag2flux(obs_mags)
 
-        chisq = ((fluxes - obs_fluxes)/flux_errs)**2.0
+        # Chisquared
+        chisq = np.power(((fluxes - obs_fluxes)/flux_errs), 2)
         chisq = np.sum(chisq)
 
         return chisq
@@ -378,7 +380,6 @@ class Flux(object):
         return self.mag + self.color_correct_reg_minus_super(teff, logg)
 
 def plotColors(model):
-    ### TODO: This is wrong! Correct the observations to the HCAM/GTC fluxes, then plot!
     print("\n\n-----------------------------------------------")
     print("Creating color plots...")
     _, ax = plt.subplots(figsize=(6,6))
@@ -387,38 +388,36 @@ def plotColors(model):
     flux_u = [obs for obs in model.obs_fluxes if 'u' in obs.band][0]
     flux_g = [obs for obs in model.obs_fluxes if 'g' in obs.band][0]
     flux_r = [obs for obs in model.obs_fluxes if 'r' in obs.band or 'i' in obs.band][0]
+    print("Observations:\n    {}\n    {}\n    {}".format(flux_u, flux_g, flux_r))
 
-    model_ug_err = np.sqrt((flux_u.magerr**2) + (flux_g.magerr**2))
-    model_gr_err = np.sqrt((flux_g.magerr**2) + (flux_r.magerr**2))
+    obs_ug_err = np.sqrt((flux_u.magerr**2) + (flux_g.magerr**2))
+    obs_gr_err = np.sqrt((flux_g.magerr**2) + (flux_r.magerr**2))
 
-    print("Magnitudes:\nu: {}\ng: {}\nr: {}".format(flux_u, flux_g, flux_r))
-    print("If required, these will be color corrected to regular SDSS")
     t, g = model.teff.currVal, model.logg.currVal
     u_mag = flux_u.bergeron_mag(t, g)
     g_mag = flux_g.bergeron_mag(t, g)
     r_mag = flux_r.bergeron_mag(t, g)
 
-    print("After corrections:")
-    print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(flux_u, flux_g, flux_r))
+    print("After corrections (where necessary):")
+    print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(u_mag, g_mag, r_mag))
 
     ug_mag = u_mag - g_mag
     gr_mag = g_mag - r_mag
 
     print("Observed Colors from the ground:")
-    print("u-g = {:> 5.3f}+/-{:< 5.3f}".format(ug_mag, model_ug_err))
-    print("g-r = {:> 5.3f}+/-{:< 5.3f}".format(gr_mag, model_gr_err))
-
+    print("u-g = {:> 5.3f}+/-{:< 5.3f}".format(ug_mag, obs_ug_err))
+    print("g-r = {:> 5.3f}+/-{:< 5.3f}".format(gr_mag, obs_gr_err))
 
     # bergeron model magnitudes, will be plotted as tracks
-    umags = np.array(model.DA['u'])
-    gmags = np.array(model.DA['g'])
-    rmags = np.array(model.DA['r'])
+    bergeron_umags = np.array(model.DA['u'])
+    bergeron_gmags = np.array(model.DA['g'])
+    bergeron_rmags = np.array(model.DA['r'])
 
     # calculate colours
-    ug = umags-gmags
-    gr = gmags-rmags
+    ug = bergeron_umags-bergeron_gmags
+    gr = bergeron_gmags-bergeron_rmags
 
-    # make grid of teff, logg and colours
+    # make grid of teff, logg from the bergeron table
     teff = np.unique(model.DA['Teff'])
     logg = np.unique(model.DA['log_g'])
     nteff = len(teff)
@@ -437,21 +436,21 @@ def plotColors(model):
     model_gr = modelled_mags[g_index] - modelled_mags[r_index]
 
     # Plotting
-    # Bergeron cooling tracks
+    # Bergeron cooling tracks and isogravity contours
     for a in range(len(logg)):
         ax.plot(ug[a, :], gr[a, :], 'k-')
     for a in range(0, len(teff), 4):
         ax.plot(ug[:, a], gr[:, a], 'r--')
 
-    # Observed flux color
+    # Observed color
     ax.errorbar(
         x=ug_mag, y=gr_mag,
-        xerr=model_ug_err,
-        yerr=model_gr_err,
-        fmt='o', ls='none', color='darkred', capsize=3, label='Observed'
+        xerr=obs_ug_err,
+        yerr=obs_gr_err,
+        fmt='o', ls='none', color='darkred', capsize=3, label='Observed (GTC/HCAM calculated)'
     )
 
-    # Modelled flux color
+    # Modelled color
     ax.errorbar(
         x=model_ug, y=model_gr,
         fmt='o', ls='none', color='blue', capsize=3, label='Modelled - T: {:.0f} | logg: {:.2f}'.format(t, g)
@@ -517,8 +516,10 @@ def plotFluxes(model):
     print("model is:")
     print(model)
 
+    # Get modelled fluxes for this T, G
     model_mags = model.gen_apparent_mags()
     model_flx = sdssmag2flux(model_mags)
+    # Central wavelengths for the bands
     lambdas = np.array([obs.cent_lambda for obs in model.obs_fluxes])
 
     print("Modelled magnitudes:")
@@ -526,7 +527,11 @@ def plotFluxes(model):
         band = obs.orig_band
         print("Band {:>4s}: Mag: {:> 7.3f}  || Flux: {:<.3f}".format(band, m, f))
 
-    obs_flx = [obs.flux for obs in model.obs_fluxes]
+    # Grab the observed magnitudes, and convert them to HCAM/GTC fluxes -- NOT their native flux!
+    teff, logg = model.teff.currVal, model.logg.currVal
+    obs_mags = [obs.bergeron_mag(teff, logg) for obs in model.obs_fluxes]
+
+    obs_flx = sdssmag2flux(obs_mags)
     obs_flx_err = [obs.err for obs in model.obs_fluxes]
 
     # Do the actual plotting
@@ -534,13 +539,13 @@ def plotFluxes(model):
     ax.errorbar(
         lambdas, model_flx,
         xerr=None, yerr=None,
-        fmt='o', ls='none', color='darkred', label='Model apparent flux',
+        fmt='o', ls='none', color='darkred', label='Modelled apparent flux',
         markersize=6, linewidth=1, capsize=None
     )
     ax.errorbar(
         lambdas, obs_flx,
         xerr=None, yerr=obs_flx_err,
-        fmt='o', ls='none', color='blue', label='Observed flux',
+        fmt='o', ls='none', color='blue', label='Observed app. flux (GTC/HCAM)',
         markersize=6, linewidth=1, capsize=None
     )
     # ax.set_title("Observed and modelled fluxes")
