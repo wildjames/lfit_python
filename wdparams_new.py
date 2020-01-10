@@ -290,7 +290,6 @@ class Flux(object):
         self.mag = 2.5*np.log10(3631000. / self.flux)
         self.magerr = 2.5*0.434*(self.err / self.flux)
 
-        self.correct_me = True
 
         ## Get the correction I need from the user
         # Valid telescopes, and their instruments
@@ -307,50 +306,54 @@ class Flux(object):
             'uspec': ['u', 'g', 'r', 'i', 'z']
         }
 
-        print("\nWhat telescope was band {} observed with? {}".format(band, instruments.keys()))
-        tel = input("> ")
-        while tel not in instruments.keys():
-            print("\nThat telescope is not supported! ")
+        if 'y' in input("Apply correction? y/n: ").lower():
+            self.correct_me = True
+            print("\nWhat telescope was band {} observed with? {}".format(band, instruments.keys()))
             tel = input("> ")
-        if tel == 'none':
-            print("Not performing a color correction on this filter")
+            while tel not in instruments.keys():
+                print("\nThat telescope is not supported! ")
+                tel = input("> ")
+            if tel == 'none':
+                print("Not performing a color correction on this filter")
+                self.correct_me = False
+                return
+
+            print("What instrument was band {} observed with? {}".format(band, instruments[tel]))
+            inst = input("> ")
+            while inst not in instruments[tel]:
+                inst = input("That is not a valid instrument for this telescope!\n> ")
+
+            print("\nWhat filter was used for this observation? Labelled as {}".format(band))
+            print("Options: {}".format(filters[inst]))
+            filt = input("> ")
+            while filt not in filters[inst]:
+                print("That is not available on that instrument!")
+                filt = input("Enter a filter: ")
+
+            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
+            # Save the correction table for this band here
+            correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
+            script_loc = os.path.split(__file__)[0]
+            correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
+            print("Table is stored at {}".format(correction_table_fname))
+
+            # Create an interpolater for the color corrections
+            correction_table = pd.read_csv(correction_table_fname)
+
+            # Model table teffs
+            teffs = np.unique(correction_table['Teff'])
+            loggs = np.unique(correction_table['logg'])
+
+            # Color Correction table contains regular - super color, sorted by Teff, then logg
+            corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
+
+            self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
+        else:
             self.correct_me = False
-            return
-
-        print("What instrument was band {} observed with? {}".format(band, instruments[tel]))
-        inst = input("> ")
-        while inst not in instruments[tel]:
-            inst = input("That is not a valid instrument for this telescope!\n> ")
-
-        print("\nWhat filter was used for this observation? Labelled as {}".format(band))
-        print("Options: {}".format(filters[inst]))
-        filt = input("> ")
-        while filt not in filters[inst]:
-            print("That is not available on that instrument!")
-            filt = input("Enter a filter: ")
-
-        print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
-        # Save the correction table for this band here
-        correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
-        script_loc = os.path.split(__file__)[0]
-        correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
-        print("Table is stored at {}".format(correction_table_fname))
-
-        # Create an interpolater for the color corrections
-        correction_table = pd.read_csv(correction_table_fname)
-
-        # Model table teffs
-        teffs = np.unique(correction_table['Teff'])
-        loggs = np.unique(correction_table['logg'])
-
-        # Color Correction table contains regular - super color, sorted by Teff, then logg
-        corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
-
-        self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
         print("Finished setting up this flux!\n\n")
 
     def __str__(self):
-        return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected from super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
+        return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected to HCAM/GTC, super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
 
     def color_correct_reg_minus_super(self, teff, logg):
         correction = 0.0
@@ -620,7 +623,11 @@ if __name__ == "__main__":
         print("Done!")
 
     # Extract the fluxes from the chain file, and create a list of Fux objects from that
-    chain_bands = [key for key in colKeys if 'wdflux' in key.lower()]
+    chain_bands = [key for key in colKeys if 'wdflux' in key.lower()]# and 'kg5' not in key.lower()]
+    print("I found the following bands in the chain file:")
+    for band in chain_bands:
+        print("--> {}".format(band))
+    print('\n\n\n')
     fluxes = []
     for band in chain_bands:
         print("Doing band {}".format(band))
