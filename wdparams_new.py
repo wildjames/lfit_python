@@ -375,7 +375,7 @@ class Flux(object):
     def bergeron_mag(self, teff, logg):
         '''Returns the calculated magnitude of this WD, as if it was observed
         with HiPERCAM on the GTC'''
-        return self.mag + self.color_correct_reg_minus_super(teff, logg)
+        return self.mag - self.color_correct_reg_minus_super(teff, logg)
 
 def plotColors(model):
     print("\n\n-----------------------------------------------")
