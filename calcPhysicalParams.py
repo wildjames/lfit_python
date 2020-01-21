@@ -213,7 +213,7 @@ if __name__ == "__main__":
     parser.add_argument('--flat', '-f', type=int, help='Factor of thinning if flattened chain used', default=0)
     parser.add_argument('--dir', '-d', help='directory with WD models', default='/Users/mmc/lfit/params')
     args = parser.parse_args()
-    file = args.file
+    fname = args.file
     thin = args.thin
     nthreads = args.nthreads
     flat = args.flat
@@ -227,17 +227,17 @@ if __name__ == "__main__":
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = utils.readflatchain(file)
+        fchain = utils.readflatchain(fname)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
-        chain = readchain_dask(file)
+        chain = readchain_dask(fname)
         nwalkers, nsteps, npars = chain.shape
         fchain = flatchain(chain, npars, thin=thin)
     print("Done!")
 
     # grab param names from the file
-    with open(file, 'r') as chain_file:
+    with open(fname, 'r') as chain_file:
         nameList = chain_file.readline().strip().split(' ')[1:]
     # we need q, dphi, rw from the chain
     qVals = fchain[:, nameList.index('q_core')]
@@ -279,4 +279,11 @@ if __name__ == "__main__":
             results.add_row(thisResult)
 
     print('Found solutions for %d percent of samples in MCMC chain' % (100*float(len(results))/float(chainLength)))
-    results.write('physicalparams.log', format='ascii.commented_header', overwrite=True)
+    results.write('physicalparams.log', format='ascii', overwrite=True)
+
+    import pandas as pd
+    data = pd.read_csv("physicalparams.log", delim_whitespace=True)
+    with open('physicalparams_summary.log', 'w') as f:
+        for p, m, s in zip(data.columns, data.mean(), data.std()):
+            f.write("{:>5s}: {:.5f} +/- {:.5f}".format(p, m, s))
+            print("{:>5s}: {:.5f} +/- {:.5f}".format(p, m, s))
