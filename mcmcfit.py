@@ -314,15 +314,5 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-    with open('modparams.txt', 'w') as f:
-        f.write("parName,mean,84th percentile,16th percentile\n")
-        lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
-        labels = model.dynasty_par_names
-
-        for n, m, u, l in zip(labels, result, uplim, lolim):
-            s = "{} {} {} {}\n".format(n, m, u, l)
-            f.write(s)
-        f.write('\n')
-
     plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
                        automated=True)
