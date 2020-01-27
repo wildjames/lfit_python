@@ -314,5 +314,4 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
-                       automated=True)
+    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)

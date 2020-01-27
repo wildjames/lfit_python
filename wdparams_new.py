@@ -330,7 +330,7 @@ class Flux(object):
                 print("That is not available on that instrument!")
                 filt = input("Enter a filter: ")
 
-            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
+            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in (HCAM/GTC/super filter - {0})".format(filt))
             # Save the correction table for this band here
             correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
             script_loc = os.path.split(__file__)[0]
@@ -375,7 +375,7 @@ class Flux(object):
     def bergeron_mag(self, teff, logg):
         '''Returns the calculated magnitude of this WD, as if it was observed
         with HiPERCAM on the GTC'''
-        return self.mag - self.color_correct_reg_minus_super(teff, logg)
+        return self.mag + self.color_correct_reg_minus_super(teff, logg)
 
 def plotColors(model):
     print("\n\n-----------------------------------------------")
@@ -628,14 +628,21 @@ if __name__ == "__main__":
     for band in chain_bands:
         print("--> {}".format(band))
     print('\n\n\n')
+
     fluxes = []
     for band in chain_bands:
         print("Doing band {}".format(band))
-        index = colKeys.index(band)
-        mean, _, std = sigma_clipped_stats(fchain[:, index])
 
-        flx = Flux(mean, std, band.lower().replace("wdflux_", ""), syserr=syserr, debug=debug)
-        fluxes.append(flx)
+        #TODO: Fix this.
+        if 'kg5' in band.lower():
+            print("KG5 BANDS ARE CURRENTLY UNUSED!!! SKIPPING")
+            input("> ")
+        else:
+            index = colKeys.index(band)
+            mean, _, std = sigma_clipped_stats(fchain[:, index])
+
+            flx = Flux(mean, std, band.lower().replace("wdflux_", ""), syserr=syserr, debug=debug)
+            fluxes.append(flx)
 
     while True:
         print("Would you like to add another flux? I currently have {}".format([obs.orig_band for obs in fluxes]))
