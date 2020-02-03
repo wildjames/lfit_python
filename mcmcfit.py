@@ -17,6 +17,7 @@ from sys import exit
 
 import configobj
 import emcee
+import ptemcee
 import numpy as np
 
 import mcmc_utils as utils
@@ -244,23 +245,28 @@ if __name__ in '__main__':
         mp.set_start_method("forkserver")
         pool = mp.Pool(nthreads)
         print("MCMC using parallel tempering at {} levels, for {} total walkers.".format(ntemps, nwalkers*ntemps))
+
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
                                           nwalkers, ntemps, ln_prior, model)
+
         # Create the sampler
-        # TODO: The emcee PTSampler is deprecated. Use this package instead:
-        # https://github.com/willvousden/ptemcee
-        sampler = emcee.PTSampler(ntemps, nwalkers, npars,
-                                  ln_like, ln_prior,
-                                  loglargs=(model,),
-                                  logpargs=(model,),
-                                  pool=pool)
+        sampler = ptemcee.sampler.Sampler(
+            nwalkers, npars,
+            ln_like, ln_prob,
+            loglargs=(model,),
+            logpargs=(model,),
+            ntemps=ntemps, pool=pool,
+        )
+
     else:
         mp.set_start_method("forkserver")
         pool = mp.Pool(nthreads)
+
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
                                        ln_prior, model)
+
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
                                         ln_prob,
