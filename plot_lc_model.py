@@ -297,7 +297,6 @@ def plot_model(model, show, *args, **kwargs):
         del fig
         del ax
 
-
 def notify(send_to, fnames, body):
     '''Handle the actual sending an email. A pre-defined bot (login details
     in email_details.json) will send an email.
@@ -352,7 +351,6 @@ def notify(send_to, fnames, body):
     print("Email sent!")
 
     return
-
 
 def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 automated=False, corners=True):
@@ -577,8 +575,8 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             # This parameter it typically only important if something goes badly
             # wrong anyway, so if it gets stuck here, just filter it out.
 
-            par_labels = eclipse.node_par_names
-            par_labels = ["{}_{}".format(par, eclipse.label) for par in par_labels]
+            # Eclipse-level variables
+            par_labels = ["{}_{}".format(par, eclipse.label) for par in eclipse.node_par_names]
 
             # Get the par names from the band
             band = eclipse.parent
@@ -590,10 +588,13 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
             # Only plot parameters that are in the chain file.
             labels = []
+            print("PAR_LABELS: {}".format(par_labels))
+            print("COL_KEYS: {}".format(colKeys))
             for par in par_labels:
                 for col in colKeys:
-                    if par in col:
+                    if par == col:
                         labels.append(par)
+                        continue
             par_labels = labels
 
             print("\nMy corner plot labels are:")

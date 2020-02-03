@@ -657,6 +657,13 @@ if __name__ == "__main__":
     myModel = wdModel(teff, logg, plax, ebv)
     npars = myModel.npars
 
+    # Plot color-color plot
+    if mask[0]:
+        plotColors(mags)
+
+    # Plot measured and model fluxes
+    plotFluxes(fluxes, fluxes_err, mask, myModel)
+
     if summarise:
         chain = readchain_dask('chain_wd.txt')
         nameList = ['Teff', 'log g', 'Parallax', 'E(B-V)']

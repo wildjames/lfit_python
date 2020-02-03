@@ -17,11 +17,13 @@ from sys import exit
 
 import configobj
 import emcee
+import ptemcee
 import numpy as np
 
 import mcmc_utils as utils
-from CVModel import construct_model, extract_par_and_key
 import plot_lc_model as plotCV
+from CVModel import construct_model, extract_par_and_key
+
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -243,23 +245,28 @@ if __name__ in '__main__':
         mp.set_start_method("forkserver")
         pool = mp.Pool(nthreads)
         print("MCMC using parallel tempering at {} levels, for {} total walkers.".format(ntemps, nwalkers*ntemps))
+
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
                                           nwalkers, ntemps, ln_prior, model)
+
         # Create the sampler
-        # TODO: The emcee PTSampler is deprecated. Use this package instead:
-        # https://github.com/willvousden/ptemcee
-        sampler = emcee.PTSampler(ntemps, nwalkers, npars,
-                                  ln_like, ln_prior,
-                                  loglargs=(model,),
-                                  logpargs=(model,),
-                                  pool=pool)
+        sampler = ptemcee.sampler.Sampler(
+            nwalkers, npars,
+            ln_like, ln_prob,
+            loglargs=(model,),
+            logpargs=(model,),
+            ntemps=ntemps, pool=pool,
+        )
+
     else:
         mp.set_start_method("forkserver")
         pool = mp.Pool(nthreads)
+
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
                                        ln_prior, model)
+
         # Create the sampler
         sampler = emcee.EnsembleSampler(nwalkers, npars,
                                         ln_prob,
@@ -313,15 +320,4 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-    with open('modparams.txt', 'w') as f:
-        f.write("parName,mean,84th percentile,16th percentile\n")
-        lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
-        labels = model.dynasty_par_names
-
-        for n, m, u, l in zip(labels, result, uplim, lolim):
-            s = "{} {} {} {}\n".format(n, m, u, l)
-            f.write(s)
-        f.write('\n')
-
-    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
-                       automated=True)
+    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)
