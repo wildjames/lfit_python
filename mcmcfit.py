@@ -238,10 +238,10 @@ if __name__ in '__main__':
 
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
-    mp.set_start_method("forkserver")
-    pool = mp.Pool(nthreads)
 
     if use_pt:
+        mp.set_start_method("forkserver")
+        pool = mp.Pool(nthreads)
         print("MCMC using parallel tempering at {} levels, for {} total walkers.".format(ntemps, nwalkers*ntemps))
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
@@ -255,6 +255,8 @@ if __name__ in '__main__':
                                   logpargs=(model,),
                                   pool=pool)
     else:
+        mp.set_start_method("forkserver")
+        pool = mp.Pool(nthreads)
         # Create the initial ball of walker positions
         p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
                                        ln_prior, model)

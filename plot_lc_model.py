@@ -10,13 +10,19 @@ import os
 import configobj
 import matplotlib.pyplot as plt
 import networkx as nx
+import pandas as pd
 import numpy as np
-import yagmail as yag
 from random import choice
 
 import mcmc_utils as utils
 from CVModel import construct_model, extract_par_and_key
 
+try:
+    import yagmail as yag
+    no_yag = False
+except ImportError:
+    print("Couldn't import yagmail, emailing is disabled!")
+    no_yag = True
 
 def nxdraw(model):
     '''Draw a hierarchical node map of a model.'''
@@ -292,7 +298,7 @@ def plot_model(model, show, *args, **kwargs):
         del ax
 
 
-def notipy(send_to, fnames, body):
+def notify(send_to, fnames, body):
     '''Handle the actual sending an email. A pre-defined bot (login details
     in email_details.json) will send an email.
 
@@ -305,6 +311,8 @@ def notipy(send_to, fnames, body):
       body: str
         The main text of the email
     '''
+    if no_yag:
+        return
     print("fnames: ")
     for name in fnames:
         print("-> '{}'".format(name))
@@ -381,14 +389,19 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     # Do I need to send an email?
     emailme = destination != ''
 
-    # Grab the column names from the top.
-    with open(chain_fname, 'r') as chain_file:
-        colKeys = chain_file.readline().strip().split(' ')[1:]
-    print("Reading in the file...")
-    data = utils.readchain_dask(chain_fname)
+    # Read in the data
+    print("Reading in the data...")
+    df = pd.read_csv(chain_fname, delim_whitespace=True)
+    colKeys = list(df.columns.values)[1:-1]
 
-    print("Done!\nData shape: {}".format(data.shape))
-    print("Expected a shape (nwalkers, nprod, npars): ({}, {}, {})".format(nwalkers, nsteps, len(colKeys)))
+    print("Done!\nData shape: {}".format(df.shape))
+    print("Expected a shape (nwalkers, nprod, npars+2): ({}, {}, {})".format(nwalkers, nsteps, len(colKeys)+2))
+
+    nwalkers = df['walker_no'].max() + 1
+    df['step'] = df.index // nwalkers
+    nsteps = df['step'].max()+1
+
+    print("The chain file actually contains {} walkers, over {} steps.".format(nwalkers, nsteps))
 
     # Create the Final_figs and Initial_figs directories.
     if not os.path.isdir("Final_figs"):
@@ -397,20 +410,18 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
         os.mkdir("Initial_figs")
 
     # Plot an image of the walker likelihoods over time.
-    # data is shape (nwalkers, nsteps, ndim+1)
 
     print("Reading in the chain file for likelihoods...")
-    likes = data[:, :, -1]
+    walker_likes = df['ln_prob']
 
-    # # Image representation
-    # ax = plt.imshow(likes)
-    # plt.show()
+    # Get a numpy array of likelihoods, shaped (nwalkers, nprod).
+    walker_likes = np.asarray([walker_likes.loc[df['walker_no'] == i] for i in range(nwalkers)])
 
     # Plot the mean likelihood evolution
-    std = np.std(likes, axis=0)
-    likes = np.mean(likes, axis=0)
+    std = np.std(walker_likes, axis=0)
+    likes = np.mean(walker_likes, axis=0)
 
-    steps = np.arange(likes.shape[0])
+    steps = np.asarray(df['step'].loc[df["walker_no"] == 1])
 
     likes = likes[nskip::thin]
     std = std[nskip::thin]
@@ -422,11 +433,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     ax.plot(steps, likes, color="green")
 
     ax.set_xlabel("Step")
-    ax.set_ylabel("ln_like")
+    ax.set_ylabel("ln_prob")
 
     plt.tight_layout()
 
-    oname = 'Final_figs/likelihood.pdf'
+    oname = 'Final_figs/ln_prob.pdf'
 
     plt.savefig(oname)
     print("Saved to {}".format(oname))
@@ -443,55 +454,51 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
                 nskip = int(nskip)
             except:
                 nskip = 0
+    data = df.loc[df['step'] >= nskip]
+    print("First step is {}".format(steps.min()))
+    ax.set_xlim(left=nskip+steps.min(), right=steps.max())
+    fig.canvas.draw_idle()
+
+    if not automated:
         if thin == 1:
-            thin = input("You opted not to thin the data, are you sure? (default 1)\n-> thin: ")
+            print("Thinning omits every Nth step of the chain.")
+            thin = input("You opted not to thin the data, are you sure? (defaults to no thinning)\n-> thin: ")
             try:
                 thin = int(thin)
             except:
-                thin = 1
+                thin = False
+    if thin > 1:
+        df = df.loc[df.step % thin != 0]
 
-    # Close any open figures
+    nwalkers = len(np.unique(data['walker_no']))
+    nsteps = len(np.unique(data['step']))
+    npars = len(colKeys)
+    print("After thinning and skipping: {} walkers, {} steps, {} params".format(nwalkers, nsteps, npars))
+
+    print(data.head())
     plt.close()
 
-    data = data[:, nskip::thin, :]
-    nwalkers, nsteps, npars = data.shape
-
-    print("After thinning and skipping: {}".format(data.shape))
-
-
-    # Create the flattened version of the chain
-    chain = data.reshape((-1, npars))
-    print("The flattened chain has the shape: {}".format(chain.shape))
 
     # Analyse the chain. Take the mean as the result, and 2 sigma as the error
-    result = np.mean(chain, axis=0)
-    lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
-
-    print("Result has the shape: {}".format(result.shape))
+    result = pd.DataFrame()
+    result['mean'] = data.mean()
+    result['84th percentile'] = data.quantile(0.84)
+    result['16th percentile'] = data.quantile(0.16)
 
     # report. While we're doing that, make a dict of the values we want to assign
     # to the new version of the model.
-    resultDict = {}
     print("Result of the chain:")
-    for n, r, lo, up in zip(colKeys, result, lolim, uplim):
-        print("{:>20s} = {:.3f}   +{:.3f}   -{:.3f}".format(n, r, r-lo, up-r))
-        resultDict[n] = r
-
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        print(result)
+    modparams = result.loc[colKeys,:]
+    modparams.to_csv('modparams.csv', header=True)
 
     # # # # # # # # # # # # # # # # # # # # # # # #
     # Use the input file to reconstruct the model #
     # # # # # # # # # # # # # # # # # # # # # # # #
+
     model = construct_model(input_fname)
-
-    with open('modparams.txt', 'w') as f:
-        f.write("parName,mean,84th percentile,16th percentile\n")
-        lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
-        labels = model.dynasty_par_names
-
-        for n, m, u, l in zip(labels, result, uplim, lolim):
-            s = "{} {} {} {}\n".format(n, m, u, l)
-            f.write(s)
-        f.write('\n')
+    parDict = {k:v for k, v in data.mean().to_dict().items() if k in colKeys}
 
     # We want to know where we started, so we can evaluate improvements.
     # Wok out how many degrees of freedom we have in the model
@@ -515,22 +522,13 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     if not automated:
         print("Initial conditions being plotted now...")
 
-    plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Initial_figs')
-
-    # Set the parameters of the model to the results of the chain
-    for key, value in resultDict.items():
-        if key in model.dynasty_par_names:
-            # msg = "Setting parameter {} to the result value of {:.3f}".format(key, value)
-            # print(msg)
-
-            name, label = extract_par_and_key(key)
-
-            model.search_par(label, name).currVal = value
-
+    plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Initial_figs/')
 
     # # # # # # # # # # # # # # # # #
     # The model is now fully built. #
     # # # # # # # # # # # # # # # # #
+
+    model.dynasty_par_dict = parDict
 
     model_report = ''
     model_report += "\n\nMCMC result has a chisq of {:.3f} ({:d} D.o.F.).\n".format(model.chisq(), dof)
@@ -538,10 +536,11 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
     model_report += "a ln_prior of {:.3f}\n".format(model.ln_prior())
     model_report += "a ln_like of {:.3f}\n".format(model.ln_like())
     model_report += "a ln_prob of {:.3f}\n".format(model.ln_prob())
-    model_report += "\n\nThe final fits of this chain are attached below."
+    model_report += "\n\nThe final fits of this chain are attached below.\n\n"
 
     if not automated:
         print("Final conditions being plotted now...")
+        input("> ")
 
     plot_model(model, not automated, save=True, figsize=(11, 8), save_dir='Final_figs/')
 
@@ -553,12 +552,18 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
         fnames = [name for name in fnames if not "corner" in name.lower()]
 
-        notipy(destination, fnames, model_preport+model_report)
+        # Include a copy of the final result
+        modparams_text = '\n\n\nFinal result parameters:\n'
+        with open('modparams.csv', 'r') as f:
+            for line in f:
+                modparams_text += line
 
+        # include a copy of the input file
+        with open(input_fname) as f:
+            input_file = f.readlines()
+            input_file = ''.join(input_file)
 
-    print("The chain file has the folloing variables:")
-    for p in colKeys:
-        print("-> {}".format(p))
+        notify(destination, fnames, model_preport+model_report+input_file+modparams_text)
 
     if corners:
         # Corner plots. Collect the eclipses.
@@ -595,8 +600,7 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
             print(labels)
 
             # Get the indexes in the chain file, and gather those columns
-            keys = [colKeys.index(par) for par in par_labels]
-            chain_slice = chain[:, keys]
+            chain_slice = np.asarray(data[par_labels])
             print("chain_slice has the shape:", chain_slice.shape)
 
             # If I've nothing to plot, continue to the next thing.
@@ -616,7 +620,9 @@ def fit_summary(chain_fname, input_fname, nskip=0, thin=1, destination='',
 
             fig = utils.thumbPlot(chain_slice, par_labels)
 
-            oname = "Final_figs/" + eclipse.name + '_corners.png'
+            fname = os.path.split(eclipse.lc.fname)[1]
+            fname = os.path.splitext(fname)[0]
+            oname = "Final_figs/" + fname + '_corners.png'
             print("Saving to {}...".format(oname))
             plt.savefig(oname)
             plt.close()

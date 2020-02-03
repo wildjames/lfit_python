@@ -16,7 +16,25 @@ from matplotlib import pyplot as plt
 
 import inspect
 
+
 TINY = -np.inf
+
+def extract_par_and_key(key):
+    '''As stated. For example,
+    extract_par_and_key("wdFlux_long_complex_key_label)
+    >>> ("wdFlux", "long_complex_key_label")
+    '''
+
+    if key.startswith("ln_"):
+        key = key.split("_")
+
+        par = "_".join(key[:3])
+        label = "_".join(key[3:])
+
+    else:
+        par, label = key.split('_')[0], '_'.join(key.split('_')[1:])
+
+    return par, label
 
 
 class Prior(object):
@@ -181,8 +199,7 @@ class Node:
     # Change this when you subclass Node!
     node_par_names = ()
 
-    def __init__(self, label, parameter_objects, parent=None, children=None,
-                 DEBUG=None):
+    def __init__(self, label, parameter_objects, parent=None, children=None, DEBUG=None):
         '''Initialse the node. Does the following:
 
         - Store parameter values to attributes named after the parameter names
@@ -599,10 +616,19 @@ class Node:
                 )
                 raise NameError(fail_msg)
 
+    def __getitem__(self, index):
+        name, label = extract_par_and_key(index)
+        par = self.search_par(label, name)
+        return par
+
+    def __setitem__(self, index, value):
+        name, label = extract_par_and_key(index)
+        self.search_par(label, name).currVal = value
+
     # Properties to make everything cleaner
     @property
     def name(self):
-        '''The name of this object, of the form <class name>_<label>'''
+        '''The name of this object, of the form "<class name>_<label>"'''
         return "{}_{}".format(self.__class__.__name__, self.label)
 
     @property
@@ -657,9 +683,25 @@ class Node:
 
     @dynasty_par_vals.setter
     def dynasty_par_vals(self, dynasty_par_vals):
-        if not len(dynasty_par_vals) >= len(self.dynasty_par_vals):
+        if not len(dynasty_par_vals) == len(self.dynasty_par_vals):
             raise ValueError('Wrong vector length on {} - Expected {}, got {}'.format(self.name, len(self.dynasty_par_vals), len(dynasty_par_vals)))
         self.__set_parameter_vector__(dynasty_par_vals)
+
+    @property
+    def dynasty_par_dict(self):
+        '''Returns a dict of the Param objects held at or below this node'''
+        return {k:v for k,v in zip(self.dynasty_par_names, self.dynasty_par_vals)}
+
+    @dynasty_par_dict.setter
+    def dynasty_par_dict(self, par_dict):
+        '''Set the parameter vector by a dict of values, in the form:
+        {"<parname>_<nodename>": <value, int>}
+        '''
+        for key, value in par_dict.items():
+            try:
+                self[key].currVal = value
+            except AttributeError as e:
+                print(repr(e))
 
     @property
     def ancestor_param_dict(self):
@@ -722,7 +764,7 @@ class Node:
         so the dev can trace what functions are calling what. Writes a message
         if the user asks it to.
         '''
-        if not self.DEBUG:
+        if (self.DEBUG is None) or (not self.DEBUG):
             return
 
         # the call to inspect.stack() takes a looooong time (~ms)
@@ -798,102 +840,3 @@ class Node:
 
         self.nx_graph = G
         return G
-
-    # def draw(self, figsize=None):
-    #     '''Draw a hierarchical node map of the model.'''
-
-    #     G = self.create_tree()
-    #     pos = self.hierarchy_pos(G)
-
-    #     if figsize is None:
-    #         # Figure has two inches of width per node
-    #         figsize = (2*float(G.number_of_nodes()), 8.0)
-    #         print("Figure will be {}".format(figsize))
-
-    #     _, ax = plt.subplots(figsize=figsize)
-
-    #     nx.draw(
-    #         G,
-    #         ax=ax,
-    #         pos=pos, with_labels=True,
-    #         node_color='grey', font_weight='heavy')
-
-    #     return ax
-
-    # def hierarchy_pos(self, G,
-    #                   root=None, width=1.,
-    #                   vert_gap=0.2, vert_loc=0, xcenter=0.5):
-    #     '''
-    #     From Joel's answer at https://stackoverflow.com/a/29597209/2966723.
-    #     Licensed under Creative Commons Attribution-Share Alike
-
-    #     If the graph is a tree this will return the positions to plot this in a
-    #     hierarchical layout.
-
-    #     G: the graph (must be a tree)
-
-    #     root: the root node of current branch
-    #     - if the tree is directed and this is not given,
-    #     the root will be found and used
-    #     - if the tree is directed and this is given, then
-    #     the positions will be just for the descendants of this node.
-    #     - if the tree is undirected and not given,
-    #     then a random choice will be used.
-
-    #     width: horizontal space allocated for this branch - avoids overlap with
-    #     other branches
-
-    #     vert_gap: gap between levels of hierarchy
-
-    #     vert_loc: vertical location of root
-
-    #     xcenter: horizontal location of root
-    #     '''
-    #     if not nx.is_tree(G):
-    #         fail_msg = 'cannot use hierarchy_pos on a graph that is not a tree'
-    #         raise TypeError(fail_msg)
-
-    #     if root is None:
-    #         if isinstance(G, nx.DiGraph):
-    #             # Allows back compatibility with nx version 1.11
-    #             root = next(iter(nx.topological_sort(G)))
-    #         else:
-    #             import random
-    #             root = random.choice(list(G.nodes))
-
-    #     return self._hierarchy_pos(G, root, width, vert_gap, vert_loc, xcenter)
-
-    # def _hierarchy_pos(self, G, root,
-    #                    width=1., vert_gap=0.2, vert_loc=0, xcenter=0.5,
-    #                    pos=None, parent=None):
-    #     '''
-    #     see hierarchy_pos docstring for most arguments
-
-    #     pos: a dict saying where all nodes go if they have been assigned
-    #     parent: parent of this branch. - only affects it if non-directed
-
-    #     '''
-
-    #     if pos is None:
-    #         pos = {root: (xcenter, vert_loc)}
-    #     else:
-    #         pos[root] = (xcenter, vert_loc)
-
-    #     children = list(G.neighbors(root))
-
-    #     if not isinstance(G, nx.DiGraph) and parent is not None:
-    #         children.remove(parent)
-
-    #     if len(children) != 0:
-    #         dx = width/len(children)
-    #         nextx = xcenter - width/2 - dx/2
-    #         for child in children:
-    #             nextx += dx
-    #             pos = self._hierarchy_pos(
-    #                 G, child,
-    #                 width=dx, vert_gap=vert_gap,
-    #                 vert_loc=vert_loc-vert_gap, xcenter=nextx,
-    #                 pos=pos, parent=root
-    #             )
-
-    #     return pos
