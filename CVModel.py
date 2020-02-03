@@ -473,6 +473,7 @@ class LCModel(Node):
                 return -np.inf
 
         except Exception as error:
+            print(error)
             # If we get here, then roche couldn't find a dphi for this q.
             # That's bad!
             if verbose:
