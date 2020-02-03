@@ -290,69 +290,64 @@ class Flux(object):
         self.mag = 2.5*np.log10(3631000. / self.flux)
         self.magerr = 2.5*0.434*(self.err / self.flux)
 
-        if band not in self.BANDS:
-            print("\nObserved flux {} is super SDSS! I will perform color corrections to transform it to regular SDSS.".format(band))
-            self.correct_me = True
+        self.correct_me = True
 
-            ## Get the correction I need from the user
-            # Valid telescopes, and their instruments
-            instruments = {
-                'ntt': ['ucam'],
-                'gtc': ['hcam'],
-                'wht': ['hcam', 'ucam'],
-                'tnt': ['uspec'],
-                'none': ['']
-            }
-            filters = {
-                'ucam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
-                'hcam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
-                'uspec': ['u', 'g', 'r', 'i', 'z']
-            }
+        ## Get the correction I need from the user
+        # Valid telescopes, and their instruments
+        instruments = {
+            'ntt': ['ucam'],
+            'gtc': ['hcam'],
+            'wht': ['hcam', 'ucam'],
+            'tnt': ['uspec'],
+            'none': ['']
+        }
+        filters = {
+            'ucam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
+            'hcam': ['u', 'g', 'r', 'i', 'z', 'u_s', 'g_s', 'r_s', 'i_s', 'z_s'],
+            'uspec': ['u', 'g', 'r', 'i', 'z']
+        }
 
-            print("\nWhat telescope was band {} observed with? {}".format(band, instruments.keys()))
+        print("\nWhat telescope was band {} observed with? {}".format(band, instruments.keys()))
+        tel = input("> ")
+        while tel not in instruments.keys():
+            print("\nThat telescope is not supported! ")
             tel = input("> ")
-            while tel not in instruments.keys():
-                print("\nThat telescope is not supported! ")
-                tel = input("> ")
-            if tel == 'none':
-                print("Not performing a color correction on this filter")
-                self.correct_me = False
-                return
-
-            print("What instrument was band {} observed with? {}".format(band, instruments[tel]))
-            inst = input("> ")
-            while inst not in instruments[tel]:
-                inst = input("That is not a valid instrument for this telescope!\n> ")
-
-            print("\nWhat filter was used for this observation? Labelled as {}".format(band))
-            print("Options: {}".format(filters[inst]))
-            filt = input("> ")
-            while filt not in filters[inst]:
-                print("That is not available on that instrument!")
-                filt = input("Enter a filter: ")
-
-            print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
-            # Save the correction table for this band here
-            correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
-            script_loc = os.path.split(__file__)[0]
-            correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
-            print("Table is stored at {}".format(correction_table_fname))
-
-            # Create an interpolater for the color corrections
-            correction_table = pd.read_csv(correction_table_fname)
-
-            # Model table teffs
-            teffs = np.unique(correction_table['Teff'])
-            loggs = np.unique(correction_table['logg'])
-
-            # Color Correction table contains regular - super color, sorted by Teff, then logg
-            corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
-
-            self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
-            print("Finished setting up this flux!\n\n")
-
-        else:
+        if tel == 'none':
+            print("Not performing a color correction on this filter")
             self.correct_me = False
+            return
+
+        print("What instrument was band {} observed with? {}".format(band, instruments[tel]))
+        inst = input("> ")
+        while inst not in instruments[tel]:
+            inst = input("That is not a valid instrument for this telescope!\n> ")
+
+        print("\nWhat filter was used for this observation? Labelled as {}".format(band))
+        print("Options: {}".format(filters[inst]))
+        filt = input("> ")
+        while filt not in filters[inst]:
+            print("That is not available on that instrument!")
+            filt = input("Enter a filter: ")
+
+        print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in ({0} - HCAM/GTC/super filter)".format(filt))
+        # Save the correction table for this band here
+        correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
+        script_loc = os.path.split(__file__)[0]
+        correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
+        print("Table is stored at {}".format(correction_table_fname))
+
+        # Create an interpolater for the color corrections
+        correction_table = pd.read_csv(correction_table_fname)
+
+        # Model table teffs
+        teffs = np.unique(correction_table['Teff'])
+        loggs = np.unique(correction_table['logg'])
+
+        # Color Correction table contains regular - super color, sorted by Teff, then logg
+        corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
+
+        self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
+        print("Finished setting up this flux!\n\n")
 
     def __str__(self):
         return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected from super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
@@ -387,7 +382,7 @@ def plotColors(model):
     # OBSERVED DATA
     flux_u = [obs for obs in model.obs_fluxes if 'u' in obs.band][0]
     flux_g = [obs for obs in model.obs_fluxes if 'g' in obs.band][0]
-    flux_r = [obs for obs in model.obs_fluxes if 'r' in obs.band or 'i' in obs.band][0]
+    flux_r = [obs for obs in model.obs_fluxes if 'r' in obs.band][0]
     print("Observations:\n    {}\n    {}\n    {}".format(flux_u, flux_g, flux_r))
 
     obs_ug_err = np.sqrt((flux_u.magerr**2) + (flux_g.magerr**2))
@@ -529,7 +524,7 @@ def plotFluxes(model):
 
     # Grab the observed magnitudes, and convert them to HCAM/GTC fluxes -- NOT their native flux!
     teff, logg = model.teff.currVal, model.logg.currVal
-    obs_mags = [obs.bergeron_mag(teff, logg) for obs in model.obs_fluxes]
+    obs_mags = np.array([obs.bergeron_mag(teff, logg) for obs in model.obs_fluxes])
 
     obs_flx = sdssmag2flux(obs_mags)
     obs_flx_err = [obs.err for obs in model.obs_fluxes]
@@ -670,10 +665,6 @@ if __name__ == "__main__":
     for obs in myModel.obs_fluxes:
         print("{:>4s}: Flux {:.3f}+/-{:.3f}".format(obs.orig_band, obs.flux, obs.err))
 
-    # plotFluxes(myModel)
-    # plotColors(myModel)
-
-
     # Just summarise a previous chain, then stop
     if summarise:
         chain = readchain('chain_wd.txt')
@@ -713,7 +704,6 @@ if __name__ == "__main__":
         fig = thumbPlot(flat, nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
-        plt.close()
 
         toFit = False
 
@@ -755,7 +745,11 @@ if __name__ == "__main__":
             # rstate0=state,
             col_names=col_names
         )
-        chain = sampler.flatchain
+        chain = []
+        for i in range(ntemps):
+            chain.append(sampler.flatchain[0, i::ntemps, ...])
+        chain = np.array(chain)
+        print(chain.shape)
 
         # Plot the likelihoods
         likes = chain[:, :, -1]
@@ -774,11 +768,11 @@ if __name__ == "__main__":
         ax.set_ylabel("ln_like")
 
         plt.tight_layout()
-        plt.show()
         plt.savefig('likelihoods.png')
-        plt.close()
+        plt.show()
 
         bestPars = []
+        print(chain.shape)
         for i in range(npars):
             par = chain[:, :, i]
             lolim, best, uplim = np.percentile(par, [16, 50, 84])
@@ -790,7 +784,6 @@ if __name__ == "__main__":
         fig = thumbPlot(chain[0], nameList)
         fig.savefig('cornerPlot.pdf')
         fig.show()
-        plt.close()
     else:
         bestPars = [par for par in myModel]
 
