@@ -355,7 +355,7 @@ class Flux(object):
     def __str__(self):
         return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected to HCAM/GTC, super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
 
-    def color_correct_reg_minus_super(self, teff, logg):
+    def color_correct_GTC_minus_obs(self, teff, logg):
         correction = 0.0
 
         # Interpolate the correction for this teff, logg
@@ -375,7 +375,7 @@ class Flux(object):
     def bergeron_mag(self, teff, logg):
         '''Returns the calculated magnitude of this WD, as if it was observed
         with HiPERCAM on the GTC'''
-        return self.mag + self.color_correct_reg_minus_super(teff, logg)
+        return self.mag + self.color_correct_GTC_minus_obs(teff, logg)
 
 def plotColors(model):
     print("\n\n-----------------------------------------------")
