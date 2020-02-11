@@ -17,11 +17,13 @@ from sys import exit
 
 import configobj
 import emcee
+import ptemcee
 import numpy as np
 
 import mcmc_utils as utils
-from CVModel import construct_model, extract_par_and_key
 import plot_lc_model as plotCV
+from CVModel import construct_model, extract_par_and_key
+
 
 # I need to wrap the model's ln_like, ln_prior, and ln_prob functions
 # in order to pickle them :(
@@ -171,7 +173,11 @@ if __name__ in '__main__':
     # If we're not running the fit, plot our stuff.
     if not quiet:
         plotCV.nxdraw(model)
-        plotCV.plot_model(model, True, save=True, figsize=(11, 8), save_dir='Initial_figs/')
+        plotCV.plot_model(
+            model, True,
+            save=True, figsize=(11, 8),
+            save_dir='Initial_figs/'
+        )
     if not to_fit:
       exit()
 
@@ -238,31 +244,45 @@ if __name__ in '__main__':
 
     # Initialise the sampler. If we're using parallel tempering, do that.
     # Otherwise, don't.
-    mp.set_start_method("forkserver")
-    pool = mp.Pool(nthreads)
 
     if use_pt:
+        mp.set_start_method("forkserver")
+        pool = mp.Pool(nthreads)
         print("MCMC using parallel tempering at {} levels, for {} total walkers.".format(ntemps, nwalkers*ntemps))
+
         # Create the initial ball of walker positions
-        p_0 = utils.initialise_walkers_pt(p_0, p0_scatter_1,
-                                          nwalkers, ntemps, ln_prior, model)
+        p_0 = utils.initialise_walkers_pt(
+            p_0, p0_scatter_1, nwalkers,
+            ntemps,
+            ln_prior, model
+        )
+
         # Create the sampler
-        # TODO: The emcee PTSampler is deprecated. Use this package instead:
-        # https://github.com/willvousden/ptemcee
-        sampler = emcee.PTSampler(ntemps, nwalkers, npars,
-                                  ln_like, ln_prior,
-                                  loglargs=(model,),
-                                  logpargs=(model,),
-                                  pool=pool)
+        sampler = ptemcee.sampler.Sampler(
+            nwalkers, npars,
+            ln_like, ln_prob,
+            loglargs=(model,),
+            logpargs=(model,),
+            ntemps=ntemps, pool=pool,
+        )
+
     else:
+        mp.set_start_method("forkserver")
+        pool = mp.Pool(nthreads)
+
         # Create the initial ball of walker positions
-        p_0 = utils.initialise_walkers(p_0, p0_scatter_1, nwalkers,
-                                       ln_prior, model)
+        p_0 = utils.initialise_walkers(
+            p_0, p0_scatter_1, nwalkers,
+            ln_prior, model
+        )
+
         # Create the sampler
-        sampler = emcee.EnsembleSampler(nwalkers, npars,
-                                        ln_prob,
-                                        args=(model,),
-                                        pool=pool)
+        sampler = emcee.EnsembleSampler(
+            nwalkers, npars,
+            ln_prob,
+            args=(model,),
+            pool=pool
+        )
 
     # Run the burnin phase
     print("\n\nExecuting the burn-in phase...")
@@ -277,8 +297,10 @@ if __name__ in '__main__':
         # Get the Get the most likely step of the first burn-in
         p_0 = pos[np.argmax(prob)]
         # And scatter the walker ball about that position
-        p_0 = utils.initialise_walkers(p_0, p0_scatter_2, nwalkers,
-                                       ln_prior, model)
+        p_0 = utils.initialise_walkers(
+            p_0, p0_scatter_2, nwalkers,
+            ln_prior, model
+        )
 
         # Run that burn-in
         pos, prob, state = utils.run_burnin(sampler, p_0, nburn)
@@ -293,8 +315,10 @@ if __name__ in '__main__':
 
     if use_pt:
         # Run production stage of parallel tempered mcmc
-        sampler = utils.run_ptmcmc_save(sampler, pos, nprod,
-                                        "chain_prod.txt", col_names=col_names)
+        sampler = utils.run_ptmcmc_save(
+            sampler, pos, nprod,
+            "chain_prod.txt", col_names=col_names
+        )
 
         # get chain for zero temp walker. Higher temp walkers DONT sample the
         # right landscape!
@@ -302,8 +326,10 @@ if __name__ in '__main__':
         chain = sampler.flatchain[0, ...]
     else:
         # Run production stage of non-parallel tempered mcmc
-        sampler = utils.run_mcmc_save(sampler, pos, nprod, state,
-                                      "chain_prod.txt", col_names=col_names)
+        sampler = utils.run_mcmc_save(
+            sampler, pos, nprod, state,
+            "chain_prod.txt", col_names=col_names
+        )
 
         # lnprob is in sampler.ln(probability) and is shape (nwalkers, nsteps)
         # sampler.chain has shape (nwalkers, nsteps, npars)
@@ -311,15 +337,4 @@ if __name__ in '__main__':
         # Collect results from all walkers
         chain = utils.flatchain(sampler.chain, npars, thin=10)
 
-    with open('modparams.txt', 'w') as f:
-        f.write("parName,mean,84th percentile,16th percentile\n")
-        lolim, result, uplim = np.percentile(chain, [16, 50, 84], axis=0)
-        labels = model.dynasty_par_names
-
-        for n, m, u, l in zip(labels, result, uplim, lolim):
-            s = "{} {} {} {}\n".format(n, m, u, l)
-            f.write(s)
-        f.write('\n')
-
-    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest,
-                       automated=True)
+    plotCV.fit_summary('chain_prod.txt', input_fname, destination=dest, automated=True)

@@ -3,7 +3,6 @@ Helper functions to aid the MCMC nuts and bolts.
 '''
 import warnings
 
-import dask.dataframe as dd
 import emcee
 import numpy as np
 import pandas as pd
@@ -22,6 +21,11 @@ except (AttributeError, ImportError):
     # print("Could not import package, `triangle`, falling back on `corner.triangle`")
     import corner as triangle
 
+try:
+    import dask.dataframe as dd
+    use_dask = True
+except ImportError:
+    use_dask = False
 
 TINY = -np.inf
 
@@ -70,15 +74,20 @@ def initialise_walkers(p, scatter, nwalkers, ln_prior, model):
 
 def initialise_walkers_pt(p, scatter, nwalkers, ntemps, ln_prior, model):
     # Create starting ball of walkers with a certain amount of scatter
-    p0 = np.array([emcee.utils.sample_ball(p, scatter*p, size=nwalkers) for
-                   i in range(ntemps)])
+    p0 = np.array(
+        [emcee.utils.sample_ball(p, scatter*p, size=nwalkers) for i in range(ntemps)]
+    )
+
     orig_shape = p0.shape
+
     # Re-shape p0 array
     p0 = p0.reshape(nwalkers*ntemps, len(p))
+
     # Make initial number of invalid walkers equal to total number of walkers
     numInvalid = nwalkers*ntemps
     print('Initialising walkers...')
     print('Number of walkers currently invalid:')
+
     # All invalid params need to be resampled
     while numInvalid > 0:
         # Create a mask of invalid params
@@ -106,12 +115,18 @@ def run_burnin(sampler, startPos, nSteps, storechain=False, progress=True):
     iStep = 0
     if progress:
         bar = tqdm(total=nSteps)
-    for pos, prob, state in sampler.sample(startPos,
-                                           iterations=nSteps,
-                                           storechain=storechain):
-        iStep += 1
-        if progress:
-            bar.update()
+
+    # emcee irritatingly changed the keyword. This is very ugly.
+    try:
+        for pos, prob, state in sampler.sample(startPos, iterations=nSteps, storechain=storechain):
+            iStep += 1
+            if progress:
+                bar.update()
+    except:
+        for pos, prob, state in sampler.sample(startPos, iterations=nSteps, store=storechain):
+            iStep += 1
+            if progress:
+                bar.update()
     if progress:
         bar.close()
     return pos, prob, state
@@ -131,30 +146,44 @@ def run_mcmc_save(sampler, startPos, nSteps, rState, file, col_names='',
     if progress:
         bar = tqdm(total=nSteps)
 
-    for pos, prob, state in sampler.sample(startPos,
-                                           iterations=nSteps, rstate0=rState,
-                                           storechain=True, **kwargs):
+    ## TODO: Impliment this with kwrgs manipulation, currently it is dumb.
+    try:
+        for pos, prob, state in sampler.sample(startPos, iterations=nSteps, rstate0=rState, store=True, skip_initial_state_check=True, **kwargs):
 
-        iStep += 1
-        if progress:
-            bar.update()
+            iStep += 1
+            if progress:
+                bar.update()
 
-        for k in range(pos.shape[0]):
-            # loop over all walkers and append to file
-            thisPos = pos[k]
-            thisProb = prob[k]
+            for k in range(pos.shape[0]):
+                # loop over all walkers and append to file
+                thisPos = pos[k]
+                thisProb = prob[k]
 
-            with open(file, 'a') as f:
-                f.write("{0:4d} {1:s} {2:f}\n".format(
-                    k, " ".join(map(str, thisPos)), thisProb))
+                with open(file, 'a') as f:
+                    f.write("{0:4d} {1:s} {2:f}\n".format(
+                        k, " ".join(map(str, thisPos)), thisProb))
+    except TypeError:
+        for pos, prob, state in sampler.sample(startPos, iterations=nSteps, rstate0=rState, storechain=True, **kwargs):
+
+            iStep += 1
+            if progress:
+                bar.update()
+
+            for k in range(pos.shape[0]):
+                # loop over all walkers and append to file
+                thisPos = pos[k]
+                thisProb = prob[k]
+
+                with open(file, 'a') as f:
+                    f.write("{0:4d} {1:s} {2:f}\n".format(
+                        k, " ".join(map(str, thisPos)), thisProb))
 
     if progress:
         bar.close()
     return sampler
 
 
-def run_ptmcmc_save(sampler, startPos, nSteps, file,
-                    progress=True, col_names='', **kwargs):
+def run_ptmcmc_save(sampler, startPos, nSteps, file, progress=True, col_names='', **kwargs):
     '''runs PT MCMC and saves zero temperature chain to a file'''
     if file:
         with open(file, "w") as f:
@@ -166,26 +195,44 @@ def run_ptmcmc_save(sampler, startPos, nSteps, file,
     if progress:
         bar = tqdm(total=nSteps)
 
-    for pos, prob, like in sampler.sample(startPos,
-                                          iterations=nSteps,
-                                          storechain=True, **kwargs):
+    ## TODO: Impliment this with kwrgs manipulation, currently it is dumb.
+    try:
+        for pos, prob, like in sampler.sample(startPos, iterations=nSteps, store=True, **kwargs):
+            iStep += 1
+            if progress:
+                bar.update()
+            # pos is shape (ntemps, nwalkers, npars)
+            # prob is shape (ntemps, nwalkers)
+            # loop over all walkers for first temp and append to file
+            zpos = pos[0, ...]
+            zprob = prob[0, ...]
 
-        iStep += 1
-        if progress:
-            bar.update()
-        # pos is shape (ntemps, nwalkers, npars)
-        # prob is shape (ntemps, nwalkers)
-        # loop over all walkers for first temp and append to file
-        zpos = pos[0, ...]
-        zprob = prob[0, ...]
+            for k in range(zpos.shape[0]):
+                thisPos = zpos[k]
+                thisProb = zprob[k]
 
-        for k in range(zpos.shape[0]):
-            thisPos = zpos[k]
-            thisProb = zprob[k]
+                with open(file, 'a') as f:
+                    f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
+                    map(str, thisPos)), thisProb))
 
-            with open(file, 'a') as f:
-                f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
-                map(str, thisPos)), thisProb))
+    except:
+        for pos, prob, like in sampler.sample(startPos, iterations=nSteps, storechain=True, **kwargs):
+            iStep += 1
+            if progress:
+                bar.update()
+            # pos is shape (ntemps, nwalkers, npars)
+            # prob is shape (ntemps, nwalkers)
+            # loop over all walkers for first temp and append to file
+            zpos = pos[0, ...]
+            zprob = prob[0, ...]
+
+            for k in range(zpos.shape[0]):
+                thisPos = zpos[k]
+                thisProb = zprob[k]
+
+                with open(file, 'a') as f:
+                    f.write("{0:4d} {1:s} {2:f}\n".format(k, " ".join(
+                    map(str, thisPos)), thisProb))
 
     if progress:
         bar.close()
@@ -206,8 +253,7 @@ def readchain(file, **kwargs):
     '''Reads in the chain file in a single thread.
     Returns the chain in the shape (nwalkers, nprod, npars)
     '''
-    data = pd.read_csv(file, header=0, compression=None,
-                       delim_whitespace=True, **kwargs)
+    data = pd.read_csv(file, header=0, compression=None, delim_whitespace=True, **kwargs)
     data = np.array(data)
 
     # Figure out what shape the result should have.
@@ -229,6 +275,10 @@ def readchain(file, **kwargs):
 def readchain_dask(file, **kwargs):
     '''Reads in the chain file using threading.
     Returns the chain in the shape (nwalkers, nprod, npars).'''
+
+    if not use_dask:
+        return readchain(file, **kwargs)
+
     data = dd.io.read_csv(file, engine='c', header=0, compression=None,
                           na_filter=False, delim_whitespace=True, **kwargs)
     data = data.compute()
@@ -251,8 +301,7 @@ def readchain_dask(file, **kwargs):
 
 
 def readflatchain(file):
-    data = pd.read_csv(file, header=None, compression=None,
-                       delim_whitespace=True)
+    data = pd.read_csv(file, header=None, compression=None, delim_whitespace=True)
     data = np.array(data)
     return data
 
@@ -284,8 +333,13 @@ def GR_diagnostic(sampler_chain):
         between = sum((psi_j_dot - psi_dot_dot)**2) / (m - 1)
 
         # Calculate within-chain variance
-        inner_sum = np.sum(np.array([(psi_j_t[j, :] - psi_j_dot[j])**2
-                                     for j in range(m)]), axis=1)
+        inner_sum = np.sum(
+            np.array(
+                [(psi_j_t[j, :] - psi_j_dot[j])**2 for j in range(m)]
+            ),
+            axis=1
+        )
+
         outer_sum = np.sum(inner_sum)
         W = outer_sum / (m*(n-1))
 

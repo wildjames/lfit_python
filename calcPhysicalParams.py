@@ -134,6 +134,18 @@ def find_wdmass(wdtemp, scaled_mass, rw_a, baseDir, model='hamada'):
     # OK, there should be a solution: return it
     return brentq(funcToSolve, mlo, mhi)*units.M_sun
 
+def logg(m,r):
+    MSUN = 1.9891e+30
+    RSUN = 6.95508e+8
+    G    = 6.67384e-11*1000 #cgs units
+
+    try:
+        m = m.value * MSUN*1000 #cgs units
+        r = r.value * RSUN*100 #cgs units
+    except:
+        m = m * MSUN*1000 #cgs units
+        r = r * RSUN*100 #cgs units
+    return np.log10(G*m/(r*r))
 
 def solve(input_data, baseDir):
     q, dphi, rw, twd, p = input_data
@@ -192,18 +204,24 @@ def solve(input_data, baseDir):
         r2 = 0.49*a*q**(2.0/3.0)
         r2 /= 0.6 * q**(2.0/3.0) + np.log(1.0+q**(1.0/3.0))
 
+        # logg from mass and radius of WD
+        logg_wd = logg(mw, rw_a*a)
+
         # need to be a little careful here for different versions of astropy
-        data = (q, mw, rw_a*a, mr, r2, a, kw, kr, inc)
+        data = (q, mw, rw_a*a, logg_wd, mr, r2, a, kw, kr, inc)
         return data
     else:
         return None
 
 
 if __name__ == "__main__":
+    import pandas as pd
+    from mcmc_utils import thumbPlot
+    import matplotlib.pyplot as plt
 
     sns.set()
     parser = argparse.ArgumentParser(description='Calculate physical parameters from MCMC chain of LFIT parameters')
-    parser.add_argument('file', action='store', help='input file from MCMC run')
+    parser.add_argument('file', action='store', help='chain_prod file from mcmcfit run')
     parser.add_argument('twd', action='store', type=float, help='white dwarf temperature (K)')
     parser.add_argument('e_twd', action='store', type=float, help='error on wd temp')
     parser.add_argument('p', action='store', type=float, help='orbital period (days)')
@@ -211,9 +229,9 @@ if __name__ == "__main__":
     parser.add_argument('--thin', '-t', type=int, help='amount to thin MCMC chain by', default=1)
     parser.add_argument('--nthreads', '-n', type=int, help='number of threads to run', default=6)
     parser.add_argument('--flat', '-f', type=int, help='Factor of thinning if flattened chain used', default=0)
-    parser.add_argument('--dir', '-d', help='directory with WD models', default='/Users/mmc/lfit/params')
+    parser.add_argument('--dir', '-d', help='directory with WD models', default='/home/php18jfw/Github/lfit/params/')
     args = parser.parse_args()
-    file = args.file
+    fname = args.file
     thin = args.thin
     nthreads = args.nthreads
     flat = args.flat
@@ -227,17 +245,17 @@ if __name__ == "__main__":
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = utils.readflatchain(file)
+        fchain = readflatchain(fname)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
-        chain = readchain_dask(file)
+        chain = readchain_dask(fname)
         nwalkers, nsteps, npars = chain.shape
         fchain = flatchain(chain, npars, thin=thin)
     print("Done!")
 
     # grab param names from the file
-    with open(file, 'r') as chain_file:
+    with open(fname, 'r') as chain_file:
         nameList = chain_file.readline().strip().split(' ')[1:]
     # we need q, dphi, rw from the chain
     qVals = fchain[:, nameList.index('q_core')]
@@ -260,13 +278,13 @@ if __name__ == "__main__":
     # loop over the MCMC chain, calculating system parameters as we go
 
     # table for results
-    results = Table(names=('q', 'Mw', 'Rw', 'Mr', 'Rr', 'a', 'Kw', 'Kr', 'incl'))
+    results = Table(names=('q', 'Mw', 'Rw', 'logg', 'Mr', 'Rr', 'a', 'Kw', 'Kr', 'incl'))
     # need to be a little careful about astropy versions here, since only
     # versions >=1.0 allow quantities in tables
     # function below extracts value from quantity and floats alike
     getval = lambda el: getattr(el, 'value', el)
 
-    print("Running MCMC...")
+    print("Getting solutions for each step of the MCMC chain...")
     psolve = partial(solve, baseDir=baseDir)
     data = zip(qVals, dphiVals, rwVals, twdVals, pVals)
     solvedParams = PB.map(psolve, data, multiprocess=True)
@@ -279,4 +297,14 @@ if __name__ == "__main__":
             results.add_row(thisResult)
 
     print('Found solutions for %d percent of samples in MCMC chain' % (100*float(len(results))/float(chainLength)))
-    results.write('physicalparams.log', format='ascii.commented_header', overwrite=True)
+    results.write('physicalparams.log', format='ascii', overwrite=True)
+
+    data = results.to_pandas()
+
+    with open('physicalparams_summary.log', 'w') as f:
+        for p, m, s in zip(data.columns, data.mean(), data.std()):
+            f.write("{:>5s}: {:.5f} +/- {:.5f}\n".format(p, m, s))
+            print("{:>5s}: {:.5f} +/- {:.5f}".format(p, m, s))
+
+    fig = thumbPlot(data, data.columns)
+    plt.savefig("physicalParams_corners.png")
