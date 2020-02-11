@@ -2,7 +2,7 @@ import multiprocessing as mp
 import os
 # import warnings
 
-import emcee
+import ptemcee
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -424,8 +424,8 @@ def plotColors(model):
     ug = ug.reshape((nlogg, nteff))
     gr = gr.reshape((nlogg, nteff))
 
-    # Generate the model's absolute magnitudes, and plot that color too
-    modelled_mags = model.gen_mags()
+    # Generate the model's apparent magnitudes (no atmosphere), and plot that color too
+    modelled_mags = model.gen_apparent_mags()
     bands = [obs.orig_band for obs in model.obs_fluxes]
     u_index = bands.index(flux_u.orig_band)
     g_index = bands.index(flux_g.orig_band)
@@ -514,7 +514,7 @@ def plotFluxes(model):
     print("model is:")
     print(model)
 
-    # Get modelled fluxes for this T, G
+    # Get modelled fluxes for this T, G. Includes distance modulus and interstellar reddening
     model_mags = model.gen_apparent_mags()
     model_flx = sdssmag2flux(model_mags)
     # Central wavelengths for the bands
@@ -738,9 +738,10 @@ if __name__ == "__main__":
         ntemps = 10
         p0 = initialise_walkers_pt(guessP, scatter,
                                           nwalkers, ntemps, ln_prior, myModel)
-        sampler = emcee.PTSampler(
-            ntemps, nwalkers, npars,
+        sampler = ptemcee.sampler.Sampler(
+            nwalkers, npars,
             ln_likelihood, ln_prior,
+            ntemps=ntemps,
             loglargs=(myModel,),
             logpargs=(myModel,),
             pool=pool
@@ -756,7 +757,6 @@ if __name__ == "__main__":
             sampler,
             pos, nprod,
             "chain_wd.txt",
-            # rstate0=state,
             col_names=col_names
         )
         chain = []
