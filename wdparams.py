@@ -85,7 +85,11 @@ def parseInput(file):
     input_dict = {}
     for line in blob:
         # Each line is then split at the equals sign
-        k, v = line.split('=')
+        try:
+            k, v = line.split('=')
+        except Exception as e:
+            print(line)
+            raise e
         input_dict[k.strip()] = v.strip()
     return input_dict
 
