@@ -245,7 +245,7 @@ if __name__ == "__main__":
     print("Reading chain file...")
     if flat > 0:
         # Input chain already thinned but may require additional thinning
-        fchain = utils.readflatchain(fname)
+        fchain = readflatchain(fname)
         nobjects = (flat*len(fchain))/thin
         fchain = fchain[:nobjects]
     else:
