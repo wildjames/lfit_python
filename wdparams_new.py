@@ -162,7 +162,7 @@ class wdModel():
 
     def gen_mags(self):
         '''
-        Take my parameters, and interpolate a model absolute magnitude corresponding to each of my observations.
+        Take my Teff and logg, and interpolate a model absolute magnitude corresponding to each of my observations.
         Returns a magnitude observed in Super SDSS, with HCAM, on the GTC.
         '''
         t, g = self.teff.currVal, self.logg.currVal
@@ -201,7 +201,9 @@ class wdModel():
         return np.array(abs_mags)
 
     def gen_apparent_mags(self):
-        '''Apply distance modulus and extinction to my generated magnitudes'''
+        '''Apply distance modulus and extinction to my generated magnitudes.
+        Observed above the atmosphere, from earth, in super SDSS, with HCAM, on the GTC.
+        '''
         # Get absolute magnitudes
         abs_mags = self.gen_mags()
 
@@ -331,6 +333,9 @@ class Flux(object):
                 filt = input("Enter a filter: ")
 
             print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in (HCAM/GTC/super filter - {0})".format(filt))
+
+
+
             # Save the correction table for this band here
             correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
             script_loc = os.path.split(__file__)[0]
@@ -345,15 +350,20 @@ class Flux(object):
             loggs = np.unique(correction_table['logg'])
 
             # Color Correction table contains regular - super color, sorted by Teff, then logg
-            corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
+            corrections = np.array(correction_table[filt])
+            corrections = corrections.reshape(len(teffs),len(loggs))
 
             self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
         else:
             self.correct_me = False
+
+
         print("Finished setting up this flux!\n\n")
+
 
     def __str__(self):
         return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected to HCAM/GTC, super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
+
 
     def color_correct_GTC_minus_obs(self, teff, logg):
         correction = 0.0
@@ -372,10 +382,13 @@ class Flux(object):
 
         return correction
 
+
     def bergeron_mag(self, teff, logg):
         '''Returns the calculated magnitude of this WD, as if it was observed
         with HiPERCAM on the GTC'''
         return self.mag + self.color_correct_GTC_minus_obs(teff, logg)
+
+
 
 def plotColors(model):
     print("\n\n-----------------------------------------------")
@@ -405,6 +418,7 @@ def plotColors(model):
     print("Observed Colors from the ground:")
     print("u-g = {:> 5.3f}+/-{:< 5.3f}".format(ug_mag, obs_ug_err))
     print("g-r = {:> 5.3f}+/-{:< 5.3f}".format(gr_mag, obs_gr_err))
+
 
     # bergeron model magnitudes, will be plotted as tracks
     bergeron_umags = np.array(model.DA['u'])
@@ -514,7 +528,7 @@ def plotFluxes(model):
     print("model is:")
     print(model)
 
-    # Get modelled fluxes for this T, G. Includes distance modulus and interstellar reddening
+    # Get modelled WD fluxes for this T, G. Includes distance modulus and interstellar reddening
     model_mags = model.gen_apparent_mags()
     model_flx = sdssmag2flux(model_mags)
     # Central wavelengths for the bands
@@ -526,6 +540,7 @@ def plotFluxes(model):
         print("Band {:>4s}: Mag: {:> 7.3f}  || Flux: {:<.3f}".format(band, m, f))
 
     # Grab the observed magnitudes, and convert them to HCAM/GTC fluxes -- NOT their native flux!
+    # Obviously, includes distance and interstellar reddenning
     teff, logg = model.teff.currVal, model.logg.currVal
     obs_mags = np.array([obs.bergeron_mag(teff, logg) for obs in model.obs_fluxes])
 

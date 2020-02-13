@@ -442,9 +442,9 @@ if __name__ == "__main__":
     # # # # # # # # # # # # # # # # # # # # # #
 
     # For each filter, fill lists with wd fluxes from mcmc chain, then append to main array
-    if 'wdFlux_u' in colKeys:
+    if 'wdflux_u' in colKeys:
 
-        index = colKeys.index('wdFlux_u')
+        index = colKeys.index('wdflux_u')
         uband = fchain[:, index]
         uband = np.array([uband])
 
