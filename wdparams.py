@@ -131,9 +131,8 @@ def model(thisModel, mask):
 
     abs_mags = np.array(abs_mags)
 
-    #TODO: Fix this horrid bit!!!
     # A_x/E(B-V) extinction from Cardelli (1989)
-    # Where are these values from?? (KG5 estimated)
+    # TODO: Where are these values from?? (KG5 estimated)
     ext = ebv*np.array([5.155, 3.793, 2.751, 2.086, 1.479, 3.5])
     dmod = 5.0*np.log10(d/10.0)
     app_red_mags = abs_mags + ext + dmod

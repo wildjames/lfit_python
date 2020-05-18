@@ -129,11 +129,10 @@ This branch also has a notifier, which will email the resulting lightcurve figur
 2.  pip install the requirements of `lfit_python`; `pip3 install -r requirements.txt`
 3.  Thats it
 
-## TODO
-
 ## TODO 
 - AIES samplers are [likely not suitable for parameter spaces with N > ~5](https://statmodeling.stat.columbia.edu/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/). Should we move to a different algorithm?
-- The `emcee` implimentation of parallel tempering is deprecated in the latest version. [This](https://github.com/willvousden/ptemcee) branch is now the preferred one to use, and needs to be integrated into `lfit_python`.
+  - Lipschitz optimisation may work well for this case (it is highly likely to find the global minimum, unless the likelihood is extremely concentrated) - though there are two problems. High dimensionality means many samples are necessary to characterise the gradient, and if the likelihood is very sharply peaked and otherwise smooth the global maximum can be easily missed. 
+    - What about a burn-in with the MCMC, followed by optimisation by Lipschitz? This would localise it on the sharp peak and avoid that issue, potentially. Then, with a decent estimate of maximum gradient to work with, we can be confident that it will find the global maximum (or minimum, whatever.)
 
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e32287a32e864c278f1a06beeeb8e7fb)](https://www.codacy.com/manual/wildjames/lfit_python?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=wildjames/lfit_python&amp;utm_campaign=Badge_Grade)
