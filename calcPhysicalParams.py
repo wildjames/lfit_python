@@ -49,7 +49,7 @@ def panei_mr(targetTemp, baseDir):
     '''given a target temp, returns a function giving
     radius as a function of mass.
     function is derived from cubic interpolation of Panei models'''
-    assert np.all((targetTemp >= 5000*units.K) & (targetTemp < 45000*units.K)), \
+    assert np.all((targetTemp >= 5000.*units.K) & (targetTemp < 45000.*units.K)), \
         "Model invalid at temps less than 4000 or greater than 45,000 K"
 
     # read panei model grid in

@@ -98,7 +98,7 @@ class wdModel():
 
     # arguments are Param objects (see mcmc_utils)
     def __init__(self, teff, logg, plax, ebv, fluxes, debug=False):
-        self.DEBUG = False
+        self.DEBUG = debug
 
         self.teff = teff
         self.logg = logg
@@ -120,11 +120,11 @@ class wdModel():
 
         # Extinction coefficient dictionary
         self.extinction_coefficients = {
-            'u': 5.155,
-            'g': 3.793,
-            'r': 2.751,
-            'i': 2.086,
-            'z': 1.479,
+            'u_s': 5.155,
+            'g_s': 3.793,
+            'r_s': 2.751,
+            'i_s': 2.086,
+            'z_s': 1.479,
             'kg5': 3.5,
         }
 
@@ -158,11 +158,11 @@ class wdModel():
             return 1000./self.plax.currVal
 
     def __str__(self):
-        return "<wdModel with teff {:.3f} || logg {:.3f} || plax {:.3f} || ebv {:.3f}>".format(self.teff.currVal, self.logg.currVal, self.plax.currVal, self.ebv.currVal)
+        return "<wdModel with teff {:.3f} || logg {:.3f} || plax {:.3f} || ebv {:.3f} || Debugging {}>".format(self.teff.currVal, self.logg.currVal, self.plax.currVal, self.ebv.currVal, self.DEBUG)
 
-    def gen_mags(self):
+    def gen_absolute_mags(self):
         '''
-        Take my parameters, and interpolate a model absolute magnitude corresponding to each of my observations.
+        Take my Teff and logg, and interpolate a model absolute magnitude corresponding to each of my observations.
         Returns a magnitude observed in Super SDSS, with HCAM, on the GTC.
         '''
         t, g = self.teff.currVal, self.logg.currVal
@@ -170,15 +170,16 @@ class wdModel():
         abs_mags = []
         for obs in self.obs_fluxes:
             if self.DEBUG:
-                print("\nObserving band {}".format(obs.band))
+                print("\n Interpolating Bergeron model magnitude, with observing band (HCAM, Super) {}".format(obs.band))
             band = obs.band
 
+            # Get the Bergeron magnitude for this Teff, logg in this band on the GTC/HCAM
             if band == 'kg5':
                 if self.DEBUG:
                     print("This is a kg5 band, so I will infer the model magnitude from g and r")
                 # KG5 mags must be inferred
-                gmags = np.array(self.DA['g'])
-                rmags = np.array(self.DA['r'])
+                gmags = np.array(self.DA['g_s'])
+                rmags = np.array(self.DA['r_s'])
 
                 z = sdss2kg5_vect(gmags, rmags)
                 z = z.reshape((self.nlogg,self.nteff))
@@ -201,9 +202,11 @@ class wdModel():
         return np.array(abs_mags)
 
     def gen_apparent_mags(self):
-        '''Apply distance modulus and extinction to my generated magnitudes'''
+        '''Apply distance modulus and extinction to my generated magnitudes.
+        Observed above the atmosphere, from earth, in super SDSS, with HCAM, on the GTC.
+        '''
         # Get absolute magnitudes
-        abs_mags = self.gen_mags()
+        abs_mags = self.gen_absolute_mags()
 
         # Apply distance modulus
         d = self.dist
@@ -230,7 +233,7 @@ class wdModel():
             print("Got apparent magnitudes.")
             for obs, mag in zip(self.obs_fluxes, mags):
                 band = obs.band
-                print(" {:> 5s}: {:.3f}".format(band, mag))
+                print(" {}: {:.3f}".format(band, mag))
 
         if self.DEBUG:
             print("\n------------------------------------\n")
@@ -276,6 +279,11 @@ class Flux(object):
         'r_s':  619.9,
         'i_s':  771.1,
         'z_s':  915.6,
+        'us':  352.6,
+        'gs':  473.2,
+        'rs':  619.9,
+        'is':  771.1,
+        'zs':  915.6,
     }
 
     def __init__(self, val, err, band, syserr=0.03, debug=False):
@@ -283,11 +291,13 @@ class Flux(object):
 
         self.flux = val
         self.err = np.sqrt(err**2 + (val*syserr)**2)
-        self.band = band.replace("_s", "")
+
+        # This is the actual band observed with.
         self.orig_band = band
+
         self.cent_lambda = self.LAMBDAS[band]
 
-        self.mag = 2.5*np.log10(3631000. / self.flux)
+        self.mag = 2.5*np.log10(3631e3 / self.flux)
         self.magerr = 2.5*0.434*(self.err / self.flux)
 
 
@@ -331,8 +341,11 @@ class Flux(object):
                 filt = input("Enter a filter: ")
 
             print("This is a 'super' filter, so I need to do some colour corrections. Using the column {0}, which is the magnitude in (HCAM/GTC/super filter - {0})".format(filt))
+
+
+
             # Save the correction table for this band here
-            correction_table_fname = 'calculated_mags_{}_{}.csv'.format(tel, inst)
+            correction_table_fname = 'color_corrections_HCAM-GTC-super_minus_{}_{}.csv'.format(tel, inst)
             script_loc = os.path.split(__file__)[0]
             correction_table_fname = os.path.join(script_loc, 'color_correction_tables', correction_table_fname)
             print("Table is stored at {}".format(correction_table_fname))
@@ -345,12 +358,20 @@ class Flux(object):
             loggs = np.unique(correction_table['logg'])
 
             # Color Correction table contains regular - super color, sorted by Teff, then logg
-            corrections = np.array(correction_table[filt]).reshape(len(teffs),len(loggs))
+            corrections = np.array(correction_table[filt])
+            corrections = corrections.reshape(len(teffs),len(loggs))
 
+            self.orig_band = filt
             self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
         else:
             self.correct_me = False
 
+        # This is the HCAM-equivalent band
+        if '_s' in self.orig_band:
+            self.band = self.orig_band
+        else:
+            self.band = self.orig_band + '_s'
+            
         try:
             LOGFILE.write("Created a flux observation with these characteristics:\n")
             LOGFILE.write("Apply correction to HiPERCAM/GTC/Super filters: {}\n".format(self.correct_me))
@@ -363,15 +384,19 @@ class Flux(object):
             pass
         print("Finished setting up this flux!\n\n")
 
+
     def __str__(self):
-        return "Flux object with band {}, flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected to HCAM/GTC, super SDSS!".format(self.band, self.flux, self.mag, "" if self.correct_me else " DON'T")
+        return "Flux object with band {} (HCAM equivalent: {}), flux {:.5f}, magnitude {:.3f}. I{} need to be color corrected to HCAM/GTC, super SDSS!".format(
+            self.orig_band, self.band, self.flux, self.mag, "" if self.correct_me else " DON'T"
+        )
+
 
     def color_correct_GTC_minus_obs(self, teff, logg):
         correction = 0.0
 
         # Interpolate the correction for this teff, logg
         if self.DEBUG:
-            print("\nInterpolating color correction for band {} T: {:.0f} || logg: {:.3f}".format(self.orig_band, teff, logg))
+            print("\nInterpolating color correction for band {} T: {:.0f} || logg: {:.3f}".format(self.band, teff, logg))
 
         if self.correct_me:
             correction = self.correction_func(teff, logg)[0,0]
@@ -379,14 +404,24 @@ class Flux(object):
             correction = 0.0
 
         if self.DEBUG:
-            print("Got a correction of {:.3f} mags\n".format(correction))
+            print("Got a correction of {:.3f} mags for {}".format(correction, self.band))
+            print(" (I have a natively observed magnitude of {:.6f})".format(self.mag))
 
         return correction
+
 
     def bergeron_mag(self, teff, logg):
         '''Returns the calculated magnitude of this WD, as if it was observed
         with HiPERCAM on the GTC'''
-        return self.mag + self.color_correct_GTC_minus_obs(teff, logg)
+        corr = self.color_correct_GTC_minus_obs(teff, logg)
+        corrmag = self.mag + corr
+
+        if self.DEBUG:
+            print("Band {} || Magnitude: {:.6f} || Correction: {:.5f} || GTC/HCAM magnitude: {:.6f}".format(self.band, self.mag, corr, corrmag))
+
+        return corrmag
+
+
 
 def plotColors(model):
     print("\n\n-----------------------------------------------")
@@ -402,53 +437,78 @@ def plotColors(model):
     obs_ug_err = np.sqrt((flux_u.magerr**2) + (flux_g.magerr**2))
     obs_gr_err = np.sqrt((flux_g.magerr**2) + (flux_r.magerr**2))
 
+    # Correct magnitudes to the Bergeron frame
     t, g = model.teff.currVal, model.logg.currVal
     u_mag = flux_u.bergeron_mag(t, g)
     g_mag = flux_g.bergeron_mag(t, g)
     r_mag = flux_r.bergeron_mag(t, g)
 
-    print("After corrections (where necessary):")
+    if model.DEBUG:
+        print("Observation bergeron magnitudes (GTC/HCAM), uncorrected for extinction:")
+        print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(u_mag, g_mag, r_mag))
+
+    # subtract interstellar extinction
+    ex = model.ebv
+    u_mag -= model.extinction_coefficients['u_s'] * ex.currVal
+    g_mag -= model.extinction_coefficients['g_s'] * ex.currVal
+    r_mag -= model.extinction_coefficients['r_s'] * ex.currVal
+
+    print("After correcting to GTC/HCAM/Super, and removing IS extinction:")
     print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(u_mag, g_mag, r_mag))
 
     ug_mag = u_mag - g_mag
     gr_mag = g_mag - r_mag
 
-    print("Observed Colors from the ground:")
+    print("Observed Colors in the HCAM/GTC/super lightpath (corrected for IS extinction):")
     print("u-g = {:> 5.3f}+/-{:< 5.3f}".format(ug_mag, obs_ug_err))
     print("g-r = {:> 5.3f}+/-{:< 5.3f}".format(gr_mag, obs_gr_err))
 
+
+    # Generate the model's apparent magnitudes (no atmosphere, no IS extinction), and plot that color too
+    # Get absolute magnitudes
+    abs_mags = model.gen_absolute_mags()
+    # Apply distance modulus
+    dmod = 5.0*np.log10(model.dist/10.0)
+    modelled_mags = abs_mags + dmod
+
+    # Calculate the colours
+    bands = [obs.orig_band for obs in model.obs_fluxes]
+    u_index = bands.index(flux_u.orig_band)
+    g_index = bands.index(flux_g.orig_band)
+    r_index = bands.index(flux_r.orig_band)
+    if model.DEBUG:
+        print("Bergeron model interpolations for T: {:.0f}, log(g): {:.3f}...".format(model.teff.currVal, model.logg.currVal))
+        print("Observed bands: {}".format(bands))
+        print("Modelled mags: {}".format(modelled_mags))
+        print("Indexes|| u: {} || g: {} || r: {}\n".format(u_index, g_index, r_index))
+
+    model_ug = modelled_mags[u_index] - modelled_mags[g_index]
+    model_gr = modelled_mags[g_index] - modelled_mags[r_index]
+
     # bergeron model magnitudes, will be plotted as tracks
-    bergeron_umags = np.array(model.DA['u'])
-    bergeron_gmags = np.array(model.DA['g'])
-    bergeron_rmags = np.array(model.DA['r'])
+    bergeron_umags = np.array(model.DA['u_s'])
+    bergeron_gmags = np.array(model.DA['g_s'])
+    bergeron_rmags = np.array(model.DA['r_s'])
 
     # calculate colours
     ug = bergeron_umags-bergeron_gmags
     gr = bergeron_gmags-bergeron_rmags
 
     # make grid of teff, logg from the bergeron table
-    teff = np.unique(model.DA['Teff'])
-    logg = np.unique(model.DA['log_g'])
-    nteff = len(teff)
-    nlogg = len(logg)
+    teffs = np.unique(model.DA['Teff'])
+    loggs = np.unique(model.DA['log_g'])
+    nteff = len(teffs)
+    nlogg = len(loggs)
     # reshape colours onto 2D grid of (logg, teff)
     ug = ug.reshape((nlogg, nteff))
     gr = gr.reshape((nlogg, nteff))
 
-    # Generate the model's apparent magnitudes (no atmosphere), and plot that color too
-    modelled_mags = model.gen_apparent_mags()
-    bands = [obs.orig_band for obs in model.obs_fluxes]
-    u_index = bands.index(flux_u.orig_band)
-    g_index = bands.index(flux_g.orig_band)
-    r_index = bands.index(flux_r.orig_band)
-    model_ug = modelled_mags[u_index] - modelled_mags[g_index]
-    model_gr = modelled_mags[g_index] - modelled_mags[r_index]
 
     # Plotting
     # Bergeron cooling tracks and isogravity contours
-    for a in range(len(logg)):
+    for a in range(nlogg):
         ax.plot(ug[a, :], gr[a, :], 'k-')
-    for a in range(0, len(teff), 4):
+    for a in range(0, nteff, 4):
         ax.plot(ug[:, a], gr[:, a], 'r--')
 
     # Observed color
@@ -456,19 +516,21 @@ def plotColors(model):
         x=ug_mag, y=gr_mag,
         xerr=obs_ug_err,
         yerr=obs_gr_err,
-        fmt='o', ls='none', color='darkred', capsize=3, label='Observed (GTC/HCAM calculated)'
+        fmt='o', ls='none', color='darkred', capsize=3,
+        label='Observed (GTC/HCAM calculated)'
     )
 
     # Modelled color
     ax.errorbar(
         x=model_ug, y=model_gr,
-        fmt='o', ls='none', color='blue', capsize=3, label='Modelled - T: {:.0f} | logg: {:.2f}'.format(t, g)
+        fmt='o', ls='none', color='blue', capsize=3,
+        label='Modelled - T: {:.0f} | logg: {:.2f}'.format(t, g)
     )
 
     # annotate for teff
     xa = ug[0, 4] + 0.03
     ya = gr[0, 4]
-    val = teff[4]
+    val = teffs[4]
     t = ax.annotate(
         'T = %d K' % val, xy=(xa, ya), color='r',
         horizontalalignment='left',
@@ -478,7 +540,7 @@ def plotColors(model):
 
     xa = ug[0, 8] + 0.03
     ya = gr[0, 8]
-    val = teff[8]
+    val = teffs[8]
     t = ax.annotate(
         'T = %d K' % val, xy=(xa, ya), color='r',
         horizontalalignment='left',
@@ -488,7 +550,7 @@ def plotColors(model):
 
     xa = ug[0, 20] + 0.01
     ya = gr[0, 20] - 0.01
-    val = teff[20]
+    val = teffs[20]
     t = ax.annotate(
         'T = %d K' % val, xy=(xa, ya), color='r',
         horizontalalignment='left',
@@ -498,7 +560,7 @@ def plotColors(model):
 
     xa = ug[0, 24] + 0.01
     ya = gr[0, 24] - 0.01
-    val = teff[24]
+    val = teffs[24]
     t = ax.annotate(
         'T = %d K' % val, xy=(xa, ya), color='r',
         horizontalalignment='left',
@@ -525,7 +587,9 @@ def plotFluxes(model):
     print("model is:")
     print(model)
 
-    # Get modelled fluxes for this T, G. Includes distance modulus and interstellar reddening
+    # Get modelled WD fluxes for this T, G.
+    # Includes distance modulus and interstellar reddening.
+    # Flux as seen through HCAM/GTC/Super
     model_mags = model.gen_apparent_mags()
     model_flx = sdssmag2flux(model_mags)
     # Central wavelengths for the bands
@@ -537,6 +601,7 @@ def plotFluxes(model):
         print("Band {:>4s}: Mag: {:> 7.3f}  || Flux: {:<.3f}".format(band, m, f))
 
     # Grab the observed magnitudes, and convert them to HCAM/GTC fluxes -- NOT their native flux!
+    # Includes distance and interstellar reddenning
     teff, logg = model.teff.currVal, model.logg.currVal
     obs_mags = np.array([obs.bergeron_mag(teff, logg) for obs in model.obs_fluxes])
 
@@ -591,6 +656,7 @@ if __name__ == "__main__":
         print("I will NOT run a fit, but just re-create the output figures!")
     nochain = args.nochain
     debug = args.debug
+    print(debug)
 
     # Read information about mcmc, priors, neclipses, sys err
     nburn = int(input_dict['nburn'])
@@ -757,8 +823,11 @@ if __name__ == "__main__":
         mp.set_start_method("forkserver")
         pool = mp.Pool()
         ntemps = 10
-        p0 = initialise_walkers_pt(guessP, scatter,
-                                          nwalkers, ntemps, ln_prior, myModel)
+        p0 = initialise_walkers_pt(
+            guessP, scatter,
+            nwalkers, ntemps, ln_prior,
+            myModel
+        )
         sampler = ptemcee.sampler.Sampler(
             nwalkers, npars,
             ln_likelihood, ln_prior,
