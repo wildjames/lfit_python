@@ -646,7 +646,7 @@ if __name__ == "__main__":
     LOGFILE.write("~=~=~= Horrid code written by J. Wild, 2019 =~=~=~\n\n\n")
     LOGFILE.write("Running fit from the following input file:")
     LOGFILE.write("#################################\n\n")
-    LOGFILE.write(args.file.read())
+    LOGFILE.write(open(args.file, 'r').read())
     LOGFILE.write("#################################\n\n")
     LOGFILE.write("Setting up fluxes...\n\n")
 
@@ -829,3 +829,5 @@ if __name__ == "__main__":
     print("Model: {}".format(myModel))
     plotColors(myModel)
     plotFluxes(myModel)
+
+    LOGFILE.close()
