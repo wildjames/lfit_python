@@ -710,7 +710,7 @@ if __name__ == "__main__":
     # Logging
     LOGFILE.write("Fitting White Dwarf fluxes to model cooling tracks...\n")
     LOGFILE.write("~=~=~= Horrid code written by J. Wild, 2019 =~=~=~\n\n\n")
-    LOGFILE.write("Running fit from the following input file:")
+    LOGFILE.write("Running fit from the following input file:\n")
     LOGFILE.write("#################################\n\n")
     LOGFILE.write(open(args.file, 'r').read())
     LOGFILE.write("#################################\n\n")
