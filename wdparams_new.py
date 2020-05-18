@@ -350,6 +350,17 @@ class Flux(object):
             self.correction_func = interp.RectBivariateSpline(teffs, loggs, corrections, kx=3, ky=3)
         else:
             self.correct_me = False
+
+        try:
+            LOGFILE.write("Created a flux observation with these characteristics:\n")
+            LOGFILE.write("Apply correction to HiPERCAM/GTC/Super filters: {}\n".format(self.correct_me))
+            LOGFILE.write("Telescope: {}\n".format(tel))
+            LOGFILE.write("Instrument: {}\n".format(inst))
+            LOGFILE.write("Filter: {}\n".format(filt))
+            LOGFILE.write("to make the correction, I'll read off the filter from the table found here: {}\m".format(correction_table_fname))
+            LOGFILE.write("\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n\n")
+        except:
+            pass
         print("Finished setting up this flux!\n\n")
 
     def __str__(self):
@@ -560,7 +571,7 @@ def plotFluxes(model):
 
 
 if __name__ == "__main__":
-    # warnings.simplefilter("ignore")
+    LOGFILE = open("WDPARAMS.LOGS", 'w')
 
     # Allows input file to be passed to code from argument line
     import argparse
@@ -628,6 +639,16 @@ if __name__ == "__main__":
     for band in chain_bands:
         print("--> {}".format(band))
     print('\n\n\n')
+
+
+    # Logging
+    LOGFILE.write("Fitting White Dwarf fluxes to model cooling tracks...\n")
+    LOGFILE.write("~=~=~= Horrid code written by J. Wild, 2019 =~=~=~\n\n\n")
+    LOGFILE.write("Running fit from the following input file:")
+    LOGFILE.write("#################################\n\n")
+    LOGFILE.write(args.file.read())
+    LOGFILE.write("#################################\n\n")
+    LOGFILE.write("Setting up fluxes...\n\n")
 
     fluxes = []
     for band in chain_bands:
