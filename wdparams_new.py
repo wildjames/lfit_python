@@ -374,11 +374,14 @@ class Flux(object):
             
         try:
             LOGFILE.write("Created a flux observation with these characteristics:\n")
+            LOGFILE.write("Observed Flux: {:.3f}+/-{:.3f}\n".format(self.flux, self.err))
+            LOGFILE.write("My band has a central wavelength of {:.2f}\n".format(self.cent_lambda))
+            LOGFILE.write("\n")
             LOGFILE.write("Apply correction to HiPERCAM/GTC/Super filters: {}\n".format(self.correct_me))
             LOGFILE.write("Telescope: {}\n".format(tel))
             LOGFILE.write("Instrument: {}\n".format(inst))
             LOGFILE.write("Filter: {}\n".format(filt))
-            LOGFILE.write("to make the correction, I'll read off the filter from the table found here: {}\m".format(correction_table_fname))
+            LOGFILE.write("to make the correction, I'll read off the filter from the table found here: {}\n".format(correction_table_fname))
             LOGFILE.write("\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-\n\n")
         except:
             pass
