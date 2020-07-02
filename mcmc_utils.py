@@ -253,7 +253,7 @@ def readchain(file, **kwargs):
     '''Reads in the chain file in a single thread.
     Returns the chain in the shape (nwalkers, nprod, npars)
     '''
-    data = pd.read_csv(file, header=0, compression=None, delim_whitespace=True, **kwargs)
+    data = pd.read_csv(file, delim_whitespace=True, comment='#', **kwargs)
     data = np.array(data)
 
     # Figure out what shape the result should have.
