@@ -279,11 +279,11 @@ class Flux(object):
         'r_s':  619.9,
         'i_s':  771.1,
         'z_s':  915.6,
-        'us':  352.6,
-        'gs':  473.2,
-        'rs':  619.9,
-        'is':  771.1,
-        'zs':  915.6,
+        'us':   352.6,
+        'gs':   473.2,
+        'rs':   619.9,
+        'is':   771.1,
+        'zs':   915.6,
     }
 
     def __init__(self, val, err, band, syserr=0.03, debug=False):
@@ -371,7 +371,7 @@ class Flux(object):
             self.band = self.orig_band
         else:
             self.band = self.orig_band + '_s'
-            
+
         try:
             LOGFILE.write("Created a flux observation with these characteristics:\n")
             LOGFILE.write("Observed Flux: {:.3f}+/-{:.3f}\n".format(self.flux, self.err))
