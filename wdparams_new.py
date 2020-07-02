@@ -696,7 +696,10 @@ if __name__ == "__main__":
             fchain = readflatchain(chain_file)
         else:
             with open(chain_file, 'r') as f:
-                colKeys = f.readline().strip().split()[1:]
+                line = f.readline()
+                while line[0] == '#':
+                    line = f.readline()
+                colKeys = line.strip().split()[1:]
             chain = readchain(chain_file)
             print("The chain has the {} walkers, {} steps, and {} pars.".format(*chain.shape))
             fchain = flatchain(chain, thin=thin)
