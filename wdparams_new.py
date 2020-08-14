@@ -112,7 +112,7 @@ class wdModel():
         self.obs_fluxes = fluxes
 
         # Teff, logg to model SDSS magnitudes tables
-        self.DA = pd.read_csv(os.path.join(ROOT, 'Bergeron/Table_DA'), delim_whitespace=True, skiprows=0, header=1)
+        self.DA = pd.read_csv(os.path.join(ROOT, 'Bergeron/Table_DA_sdss'), delim_whitespace=True, skiprows=0, header=1)
         self.loggs = np.unique(self.DA['log_g'])
         self.teffs = np.unique(self.DA['Teff'])
         self.nlogg = len(self.loggs)
