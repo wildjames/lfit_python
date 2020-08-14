@@ -426,7 +426,7 @@ class Flux(object):
 
 
 
-def plotColors(model):
+def plotColors(model, fname='colorplot.pdf'):
     print("\n\n-----------------------------------------------")
     print("Creating color plots...")
     _, ax = plt.subplots(figsize=(6,6))
@@ -577,13 +577,13 @@ def plotColors(model):
     ax.set_ylim([-0.5, 0.5])
     ax.legend()
 
-    plt.savefig("colorPlot.pdf")
+    plt.savefig(fname)
     plt.show()
 
     print("Done!")
     print("-----------------------------------------------\n")
 
-def plotFluxes(model):
+def plotFluxes(model, fname='fluxplot.pdf'):
     '''Plot the colors, and the theoretical WD cooling tracks'''
     print("\n\n-----------------------------------------------")
     print("Creating flux plots...")
@@ -631,7 +631,7 @@ def plotFluxes(model):
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig("fluxPlot.pdf")
+    plt.savefig(fname)
     plt.show()
 
     print("Done!")
