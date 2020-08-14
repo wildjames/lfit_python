@@ -279,11 +279,11 @@ class Flux(object):
         'r_s':  619.9,
         'i_s':  771.1,
         'z_s':  915.6,
-        'us':  352.6,
-        'gs':  473.2,
-        'rs':  619.9,
-        'is':  771.1,
-        'zs':  915.6,
+        'us':   352.6,
+        'gs':   473.2,
+        'rs':   619.9,
+        'is':   771.1,
+        'zs':   915.6,
     }
 
     def __init__(self, val, err, band, syserr=0.03, debug=False):
@@ -371,7 +371,7 @@ class Flux(object):
             self.band = self.orig_band
         else:
             self.band = self.orig_band + '_s'
-            
+
         try:
             LOGFILE.write("Created a flux observation with these characteristics:\n")
             LOGFILE.write("Observed Flux: {:.3f}+/-{:.3f}\n".format(self.flux, self.err))
@@ -426,7 +426,7 @@ class Flux(object):
 
 
 
-def plotColors(model):
+def plotColors(model, fname='colorplot.pdf'):
     print("\n\n-----------------------------------------------")
     print("Creating color plots...")
     _, ax = plt.subplots(figsize=(6,6))
@@ -577,13 +577,13 @@ def plotColors(model):
     ax.set_ylim([-0.5, 0.5])
     ax.legend()
 
-    plt.savefig("colorPlot.pdf")
+    plt.savefig(fname)
     plt.show()
 
     print("Done!")
     print("-----------------------------------------------\n")
 
-def plotFluxes(model):
+def plotFluxes(model, fname='fluxplot.pdf'):
     '''Plot the colors, and the theoretical WD cooling tracks'''
     print("\n\n-----------------------------------------------")
     print("Creating flux plots...")
@@ -631,7 +631,7 @@ def plotFluxes(model):
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig("fluxPlot.pdf")
+    plt.savefig(fname)
     plt.show()
 
     print("Done!")
