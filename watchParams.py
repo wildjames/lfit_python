@@ -870,7 +870,7 @@ class Watcher():
         gp = self.create_GP()
 
         # Compute the matrix
-        gp.compute(phi, err)
+        gp.compute(phi)
 
         # Draw samples from the GP
         samples = gp.sample_conditional(res, phi, size=100)

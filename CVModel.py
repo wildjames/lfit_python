@@ -526,6 +526,9 @@ class SimpleGPEclipse(SimpleEclipse):
     # _dist_cp is initially set to whatever, it will be overwritten anyway.
     _dist_cp = 9e99
 
+    node_par_names = SimpleEclipse.node_par_names
+    node_par_names += ('ln_whitenoise_gp',)
+
     def calcChangepoints(self):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
         on or off the extra GP amplitude.
@@ -642,7 +645,7 @@ class SimpleGPEclipse(SimpleEclipse):
             )
 
         # Use that kernel to make a GP object
-        georgeGP = george.GP(kernel, solver=george.HODLRSolver)
+        georgeGP = george.GP(kernel, white_noise=self.ln_whitenoise_gp.currVal, solver=george.HODLRSolver)
 
         self.log('SimpleGPEclipse.create_GP', "Successfully created a new GP!")
         return georgeGP
@@ -684,7 +687,7 @@ class SimpleGPEclipse(SimpleEclipse):
         # Create the GP of this eclipse
         gp = self.create_GP()
         # Compute the GP
-        gp.compute(self.lc.x, self.lc.ye)
+        gp.compute(self.lc.x)
 
         # The 'quiet' argument tells the GP to return -inf when you get
         # an invalid kernel, rather than throwing an exception.
@@ -699,6 +702,7 @@ class SimpleGPEclipse(SimpleEclipse):
 class ComplexGPEclipse(SimpleGPEclipse):
     # Exactly as the simple GP Eclipse, but this time with the extra 4 params.
     node_par_names = ComplexEclipse.node_par_names
+    node_par_names += ('ln_whitenoise_gp',)
 
     @property
     def cv_parnames(self):
@@ -793,15 +797,26 @@ def construct_model(input_file, debug=False, nodata=False):
     if debug:
         print("\nThe bands have these parameters: {}".format(band_par_names))
 
-    # Use the Eclipse class to find the parameters we're interested in
-    if is_complex:
-        ecl_pars = ComplexEclipse.node_par_names
-        if debug:
-            print("Using the complex BS model")
+    if not use_gp:
+        # Use the Eclipse class to find the parameters we're interested in
+        if is_complex:
+            ecl_pars = ComplexEclipse.node_par_names
+            if debug:
+                print("Using the complex BS model")
+        else:
+            ecl_pars = SimpleEclipse.node_par_names
+            if debug:
+                print("Using the simple BS model")
     else:
-        ecl_pars = SimpleEclipse.node_par_names
-        if debug:
-            print("Using the simple BS model")
+        # Use the Eclipse class to find the parameters we're interested in
+        if is_complex:
+            ecl_pars = ComplexGPEclipse.node_par_names
+            if debug:
+                print("Using the complex BS model, with a gaussian process")
+        else:
+            ecl_pars = SimpleGPEclipse.node_par_names
+            if debug:
+                print("Using the simple BS model, with a gaussian process")
 
     # I care about the order in which eclipses and bands are defined.
     # Collect that order here.
