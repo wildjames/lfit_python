@@ -756,6 +756,8 @@ class Node:
 
     @DEBUG.setter
     def DEBUG(self, flag):
+        for child in self.children:
+            child.DEBUG = flag
         self.__DEBUG = flag
 
     def log(self, called_by, message='\n', log_stack=False):
