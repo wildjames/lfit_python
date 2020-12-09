@@ -112,7 +112,9 @@ class wdModel():
         self.obs_fluxes = fluxes
 
         # Teff, logg to model SDSS magnitudes tables
-        self.DA = pd.read_csv(os.path.join(ROOT, 'Bergeron/Table_DA_sdss'), delim_whitespace=True, skiprows=0, header=1)
+        table_loc = os.path.join(ROOT, 'Bergeron/Table_DA_sdss')
+        print("--->> I am using the WD model atmosphere table found here: {} <<---".format(table_loc))
+        self.DA = pd.read_csv(table_loc, delim_whitespace=True, skiprows=0, header=1)
         self.loggs = np.unique(self.DA['log_g'])
         self.teffs = np.unique(self.DA['Teff'])
         self.nlogg = len(self.loggs)
@@ -447,7 +449,7 @@ def plotColors(model, fname='colorplot.pdf'):
     r_mag = flux_r.bergeron_mag(t, g)
 
     if model.DEBUG:
-        print("Observation bergeron magnitudes (GTC/HCAM), uncorrected for extinction:")
+        print("Observation, uncorrected for IS extinction:")
         print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(u_mag, g_mag, r_mag))
 
     # subtract interstellar extinction
@@ -456,7 +458,7 @@ def plotColors(model, fname='colorplot.pdf'):
     g_mag -= model.extinction_coefficients['g_s'] * ex.currVal
     r_mag -= model.extinction_coefficients['r_s'] * ex.currVal
 
-    print("After correcting to GTC/HCAM/Super, and removing IS extinction:")
+    print("After correcting (if necessary), and removing IS extinction:")
     print("   Magnitudes:\n     u: {}\n     g: {}\n     r: {}".format(u_mag, g_mag, r_mag))
 
     ug_mag = u_mag - g_mag
@@ -520,14 +522,14 @@ def plotColors(model, fname='colorplot.pdf'):
         xerr=obs_ug_err,
         yerr=obs_gr_err,
         fmt='o', ls='none', color='darkred', capsize=3,
-        label='Observed (GTC/HCAM calculated)'
+        label='Observed'
     )
 
     # Modelled color
     ax.errorbar(
         x=model_ug, y=model_gr,
         fmt='o', ls='none', color='blue', capsize=3,
-        label='Modelled - T: {:.0f} | logg: {:.2f}'.format(t, g)
+        label='Modelled'.format(t, g)
     )
 
     # annotate for teff
@@ -622,7 +624,7 @@ def plotFluxes(model, fname='fluxplot.pdf'):
     ax.errorbar(
         lambdas, obs_flx,
         xerr=None, yerr=obs_flx_err,
-        fmt='o', ls='none', color='blue', label='Observed app. flux (GTC/HCAM)',
+        fmt='o', ls='none', color='blue', label='Observed flux',
         markersize=6, linewidth=1, capsize=None
     )
     # ax.set_title("Observed and modelled fluxes")
@@ -735,6 +737,7 @@ if __name__ == "__main__":
             mean, _, std = sigma_clipped_stats(fchain[:, index])
 
             flx = Flux(mean, std, band.lower().replace("wdflux_", ""), syserr=syserr, debug=debug)
+            print("Band {} at chain file index {}\nFlux: {:.5f}+/-{:.5f}\nLabel applied in code: {}\n------------------------\n\n".format(band, index, mean, std, flx.orig_band))
             fluxes.append(flx)
 
     while True:
