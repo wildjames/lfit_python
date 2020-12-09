@@ -208,6 +208,9 @@ if __name__ in '__main__':
     if comp_scat:
         # scatter factors. p0_scatter_1 will be multiplied by these:
         scat_fract = {
+            'ln_ampin_gp': 5.0,
+            'ln_ampout_gp': 5.0,
+            'ln_tau_gp': 5.0,
             'q':      1,
             'rwd':    1,
             'dphi':   0.2,
