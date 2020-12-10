@@ -527,7 +527,7 @@ class SimpleGPEclipse(SimpleEclipse):
     _dist_cp = 9e99
 
     node_par_names = SimpleEclipse.node_par_names
-    node_par_names += ('ln_whitenoise_gp',)
+    node_par_names += ('wnoisegp',)
 
     def calcChangepoints(self):
         '''Caclulate the WD ingress and egresses, i.e. where we want to switch
@@ -645,7 +645,11 @@ class SimpleGPEclipse(SimpleEclipse):
             )
 
         # Use that kernel to make a GP object
-        georgeGP = george.GP(kernel, white_noise=self.ln_whitenoise_gp.currVal, solver=george.HODLRSolver)
+        georgeGP = george.GP(
+            kernel,
+            white_noise=np.log(self.wnoisegp.currVal**2),
+            solver=george.HODLRSolver
+        )
 
         self.log('SimpleGPEclipse.create_GP', "Successfully created a new GP!")
         return georgeGP
@@ -702,7 +706,7 @@ class SimpleGPEclipse(SimpleEclipse):
 class ComplexGPEclipse(SimpleGPEclipse):
     # Exactly as the simple GP Eclipse, but this time with the extra 4 params.
     node_par_names = ComplexEclipse.node_par_names
-    node_par_names += ('ln_whitenoise_gp',)
+    node_par_names += ('wnoisegp',)
 
     @property
     def cv_parnames(self):
